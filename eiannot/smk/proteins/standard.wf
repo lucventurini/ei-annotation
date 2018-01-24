@@ -1,0 +1,48 @@
+import sys
+import os
+import random
+import snakemake
+import yaml
+import subprocess
+from snakemake import logger as snake_logger
+from shutil import which
+
+
+__doc__ = """This SNAKEMAKE file contains the rules for all the rules necessary to produce the final annotation."""
+
+CFG=workflow.overwrite_configfile
+REF = config["reference"]["genome"]
+PROTEINS = config.get("proteins", dict()).get("files", [])
+
+print(PROTEINS.keys())
+
+MIN_INTRON, MAX_INTRON = config["reference"]["hard_intron_range"]
+protein_coverage = config.get("proteins", dict()).get("coverage", 50)
+protein_identity = config.get("proteins", dict()).get("identity", 50)
+protein_chunks = config.get("proteins", dict()).get("chunks", 10)
+
+protein_chunk_array = []
+for _ in range(1, protein_chunks + 1):
+  protein_chunk_array.append(str(_).zfill(3))
+
+
+def protein_to_file(wildcards):
+  return PROTEINS[wildcards.protein]
+
+BASE = os.path.join(os.environ["HOME"], "workspace", "ei-annotation")
+RULES = os.path.join(BASE, "eiannot", "smk", "proteins")
+
+outdir = os.path.join(config.get("outdir", "."), "ei-annot", "Proteins")
+
+include: os.path.join(RULES, "sanitize.smk")
+include: os.path.join(RULES, "index.smk")
+include: os.path.join(RULES, "chunk.smk")
+include: os.path.join(RULES, "align.smk")
+include: os.path.join(RULES, "collapse.smk")
+include: os.path.join(RULES, "convert.smk")
+
+
+rule all:
+  input:
+    protein_gff3=expand(os.path.join(outdir, "Alignments", "{protein}.gff3"), protein=PROTEINS.keys())
+  output: touch("proteins.done")
