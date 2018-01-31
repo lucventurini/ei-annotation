@@ -7,8 +7,6 @@ import os
 MAX_LENGTH = 10000  # Ideally this should be in the config!
 
 
-
-
 rule filter:
   input: "portcullis.pass.bed"
   output:
