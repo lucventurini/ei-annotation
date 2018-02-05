@@ -1,0 +1,17 @@
+import os
+
+SAMPLE_MAP = {}
+INPUT_1_MAP = {}
+INPUT_2_MAP = {}
+EXT_MAP = {}
+for i in range(len(SAMPLES)):
+	SAMPLE_MAP[SAMPLES[i]] = STRANDEDNESS[i].lower()
+	name, ext = os.path.splitext(R1[i])
+	r1 = os.path.join(READS_DIR, SAMPLES[i] + ".R1.fq")
+	r2 = os.path.join(READS_DIR, SAMPLES[i] + ".R2.fq") if R2[i] else ""
+	if ext == ".gz" or ext == ".bz2":
+		r1 += ext
+		r2 += ext if R2[i] else ""
+	EXT_MAP[SAMPLES[i]] = ext
+	INPUT_1_MAP[SAMPLES[i]] = r1
+	INPUT_2_MAP[SAMPLES[i]] = r2
