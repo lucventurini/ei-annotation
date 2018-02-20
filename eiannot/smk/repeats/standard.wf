@@ -6,6 +6,7 @@ import yaml
 import subprocess
 from snakemake import logger as snake_logger
 from shutil import which
+import eiannot
 
 
 __doc__ = """This SNAKEMAKE file contains the rules for all the rules necessary to produce the final annotation."""
@@ -13,8 +14,8 @@ __doc__ = """This SNAKEMAKE file contains the rules for all the rules necessary 
 CFG=workflow.overwrite_configfile
 REF = config["reference"]["genome"]
 
-BASE = os.path.join(os.environ["HOME"], "workspace", "ei-annotation")
-RULES = os.path.join(BASE, "eiannot", "smk", "repeats")
+BASE = os.path.dirname(eiannot.__file__)
+RULES = os.path.join(BASE, "smk", "repeats")
 
 outdir = os.path.join(config.get("outdir", "."), "ei-annot", "Repeats")
 
@@ -28,5 +29,5 @@ include: os.path.join(RULES, "polish_rmodeler.smk")
 
 rule all:
   input:
-    repeats_gff3=os.path.join(outdir, "repeats.gff3"
+    repeats_gff3=os.path.join(outdir, "repeats.gff3")
   output: touch("repeats.done")

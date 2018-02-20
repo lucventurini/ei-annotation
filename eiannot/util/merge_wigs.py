@@ -6,7 +6,9 @@ import re
 from collections import OrderedDict
 import pandas
 import pyBigWig
+import pysam
 import time
+from itertools import product
 # from sklearn.preprocessing import scale
 
 
@@ -21,7 +23,7 @@ def parse_wig(sample, chroms, tpm=True):
             if chrom not in wig.chroms():
                 # print("Chrom {} not found in {}".format(chrom, wig_name))
                 continue
-            matr[chrom] = np.nan_to_num(np.array(wig.values(chrom, 0, chroms[chrom])))
+            matr[chrom] = wig.values(chrom, 0, chroms[chrom], numpy=True).astype(np.int16)
         return matr
 
     chrom_keys = list(chroms.keys())
@@ -30,20 +32,25 @@ def parse_wig(sample, chroms, tpm=True):
 
     pos_matr = dict()
     [pos_matr.setdefault(chrom, None) for chrom in chrom_keys]
-    neg_matr = None
+    neg_matr = pos_matr.copy()
 
-    if sample["stranded"] is True:
-        neg_matr = pos_matr.copy()
-        pos_name = "{}_Forward.bw".format(sample["prefix"])
-        with pyBigWig.open(pos_name, "rb") as _pos:
-            pos_matr = __parse(_pos, chrom_keys, pos_matr)
-        neg_name = "{}_Reverse.bw".format(sample["prefix"])
-        with pyBigWig.open(neg_name, "rb") as _neg:
-            neg_matr = __parse(_neg, chrom_keys, neg_matr)
-    else:
-        pos_name = "{}.bw".format(sample["prefix"])
-        with pyBigWig.open(pos_name, "rb") as _pos:
-            pos_matr = __parse(_pos, chrom_keys, pos_matr)
+    for prod in product((1, 2), ("+", "-")):
+
+        if sample["strandedness"].get(prod, True) is True:
+            matr = pos_matr
+        else:
+            matr = neg_matr
+
+        name = "{pref}.read{num}_{strand}.bw".format(pref=sample["prefix"],
+                                                     num=prod[0],
+                                                     strand=prod[1])
+        name = os.path.join(sample["dir"], name)
+
+        try:
+            with pyBigWig.open(name, "rb") as bw:
+                matr = __parse(bw, chrom_keys, matr)
+        except RuntimeError as exc:
+            raise RuntimeError(str(exc) + "\tFilename: {}".format(name))
 
     if tpm is True:
         # Divide the read counts by the length of each gene in kilobases. This gives you reads per kilobase (RPK).
@@ -71,10 +78,11 @@ def main():
 
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("-o", "--out", required=True)
-    parser.add_argument("-c", "--chrom_sizes", required=True)
+    parser.add_argument("-c", "--chrom-sizes", dest="chrom_sizes", required=True)
     parser.add_argument("--raw", default=False, action="store_true",
                         help="""By default, this script will calculate a pseudo-TPM count for each BAM before
                         calculating the total coverage. With this flag, raw values will be used instead.""")
+    parser.add_argument("--incude-non-ss", default=False, action="store_true")
     parser.add_argument("-m", "--multiplier", type=int, default=1)
     parser.add_argument("-s", "--samplesheet", required=True)
     args = parser.parse_args()
@@ -89,16 +97,23 @@ def main():
     pattern = re.compile(".*reads mapped:\s*([0-9]*).*")
     with open(args.samplesheet) as _:
         for line in _:
-            name, prefix, bam, stranded = line.strip().split()
+            name, bam, stranded = line.strip().split()
             assert os.path.exists(bam)
-            assert os.path.exists("{}.stats".format(bam)), "{}.stats".format(bam)
-            with open("{}.stats".format(bam)) as bstats:
-                for line in bstats:
-                    if "reads mapped:" in line:
-                        mapped = int(re.search(pattern, line).groups()[0])
-                        break
-            stranded = (stranded == "True")
-            samples[name] = {"prefix": prefix, "mapped": mapped, "stranded": stranded}
+            _bam = pysam.AlignmentFile(bam)
+            if not _bam.has_index():
+                pysam.index(bam)
+                _bam = pysam.AlignmentFile(bam)
+            mapped = _bam.mapped
+            strand_dict = {(1, "+"): True, (1, "-"): True, (2, "+"): True, (2, "-"): True}
+            if stranded == "fr-firststrand":
+                strand_dict = {(1, "+"): False, (1, "-"): True, (2, "+"): True, (2, "-"): False}
+            elif stranded == "fr-secondstrand":
+                strand_dict = {(1, "+"): True, (1, "-"): False, (2, "+"): False, (2, "-"): True}
+            else:
+                pass
+            samples[name] = {"prefix": os.path.basename(os.path.splitext(bam)[0]),
+                             "dir": os.path.dirname(bam),
+                             "mapped": mapped, "strandedness": strand_dict}
 
     with open(args.chrom_sizes) as _:
         for line in _:
@@ -108,7 +123,7 @@ def main():
             chroms[chrom] = size
 
     pos_matr = dict()
-    [pos_matr.setdefault(chrom, np.zeros(chroms[chrom])) for chrom in chroms]
+    [pos_matr.setdefault(chrom, np.zeros(chroms[chrom], dtype=np.int16)) for chrom in chroms]
 
     neg_matr = dict()
     [neg_matr.setdefault(chrom, np.zeros(chroms[chrom])) for chrom in chroms]
@@ -130,9 +145,14 @@ def main():
             if len(pos_matr[chrom].nonzero()) > 0:
                 ar = pos_matr[chrom] * args.multiplier
                 max_cov = max(max_cov, ar.max())
-                out.addEntries(chrom, 0,
-                                   values=pos_matr[chrom] * args.multiplier,
-                                   span=chroms[chrom], step=1)
+                try:
+                    out.addEntries(chrom, 0,
+                                       values=pos_matr[chrom] * args.multiplier,
+                                       span=chroms[chrom], step=1)
+                except RuntimeError as exc:
+                    raise RuntimeError(str(exc) + "\nchrom: {chrom}\nspan: {span}\nentries: {entries}".format(
+                        chrom=chrom, span=chroms[chrom], entries=len(pos_matr[chrom] * args.multiplier)
+                    ))
             continue
         pass
     print("Maximum positive coverage:", max_cov)

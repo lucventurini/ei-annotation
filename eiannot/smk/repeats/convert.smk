@@ -1,6 +1,8 @@
 import os
 from eicore.external_process.snakemake_helper import loadPreCmd
 
+### Snakemake rule to convert the output of RepeatMasker into suitable repeat hints for Augustus
+
 rule convert:
   input: rules.masker.output
   output: os.path.join(outdir, "repeats.gff3")

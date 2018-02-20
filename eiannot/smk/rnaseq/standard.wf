@@ -8,11 +8,10 @@ import os
 
 
 BASE = os.path.dirname(eiannot.__file__)
-RULES = os.path.join(BASE, "smk", "rnaseq", "coverage")
+RULES = os.path.join(BASE, "smk", "rnaseq")
 
 outdir = os.path.join(config.get("outdir", "."), "ei-annot", "Hints", "RNASeq")
 
-include: os.path.join(RULES, "bam2wig.smk")
-include: os.path.join(RULES, "merge_wigs.smk")
-include: os.path.join(RULES, "wig2hints.smk")
+include: os.path.join(RULES, "coverage", "standard.wf")
+include: os.path.join(RULES, "junctions", "portcullis_filter.smk")
 

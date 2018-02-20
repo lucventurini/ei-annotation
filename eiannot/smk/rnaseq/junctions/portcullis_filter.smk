@@ -4,27 +4,39 @@
 
 
 import os
+import subprocess
+from eicore.external_process.snakemake_helper import loadPreCmd
 MAX_LENGTH = 10000  # Ideally this should be in the config!
 
-
 rule filter:
-  input: "portcullis.pass.bed"
+  input: os.path.join(out_dir, "Daijin", "4-portcullis", "output", "portcullis.merged.tab")
   output:
-    gold="portcullis.gold.bed",
-    silver="portcullis.silved.bed"
+    gold=os.path.join(outdir, "portcullis.gold.bed"),
+    silver=os.path.join(outdir, "portcullis.silved.bed"),
+    tmp=temp(os.path.join(outdir, "temp.gff3"))
+  params:
+    load=loadPreCmd(config["load"]["portcullis"])
   run:
-    with open(input, "rt") as pbed, open(output[0], "wt") as gold, open(output[1], "wt") as silver:
-      for line in pbed:
-        fields = line.strip().split("\t")
-        if len(fields) != 12:
-          print(line, end='', file=gold)
-          print(line, end='', file=silver)
+    called=subprocess.call("{params.load} junctools convert -of igff -o {output.tmp} {input}", shell=True)
+    if called > 0:
+      raise OSError
+    with open(output.tmp, "rt") as pgff, open(output.gold, "wt") as gold, open(output.silver) as silver:
+      for line in pgff:
+        line = line.strip()
+        fields = line.split("\t")
+        if fields[0][0] == "#":  # Comment
+          print(line, file=gold)
+          print(line, file=silver)
           continue
-        score = float(fields[4])
-        length = int(fields[7]) - int(fields[6])
-        if length >= MAX_LENGTH:
+        try:
+          start, end = int(fields[3]), int(fields[4])
+        except TypeError, ValueError as exc:
           continue
+        length = end - start + 1
+        if length > MAX_LENGTH:
+          continue
+        score = float(fields[5])
         if score == 1:
-          print(line, end='', file=gold)
+          print(line, file=gold)
         else:
-          print(line, end='', file=silver)
+          print(line, file=silver)
