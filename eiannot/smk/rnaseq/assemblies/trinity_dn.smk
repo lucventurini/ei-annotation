@@ -10,16 +10,31 @@ from eiannot.smk.rnaseq import gmap_intron_lengths
 
 rule trinity_dn_all:
   input: expand(os.path.join(ASM_DIR, "output", "trinity_dn_{strand}.gff"), strand=["unstranded", "firststrand", "secondstrand"])
-  output: touch(os.path.join(ASM_DIR, "trinity_dn.done")
+  output: touch(os.path.join(ASM_DIR, "trinity_dn.done"))
 
 
 rule create_trinity_sheet:
-  input: 
-
+  input:
+  output:
+    unstranded=os.path.join("READ_DIR", "unstranded.tsv"),
+    firststrand=os.path.join("READ_DIR", "firststrand.tsv"),
+    secondstrand=os.path.join("READ_DIR", "secondstrand.tsv"),
+  run:
+    # To improve: at the moment the sample map does not contain the replicate information
+    # This is information that we should ideally capture
+    with open("{output.unstranded}", "wt") as unst, open("{output.firststrand}", "wt") as fst, open("{output.secondstrand}", "wt"):
+      for sample in SAMPLE_MAP:
+        if SAMPLE_MAP[sample] == "fr-firststrand":
+          out=fst
+        elif SAMPLE_MAP[sample] == "fr-secondstrand":
+          out=sst
+        else:
+          out=unst
+        print(SAMPLES[sample], SAMPLES[sample], INPUT_1_MAP[sample], INPUT_2_MAP[sample], sep="\t", file=out)
 
 
 rule asm_trinity_dn_unstranded:
-  input: rules.create_trinity_sheet.output
+  input: rules.create_trinity_sheet.output.unstranded
   output: os.path.join(ASM_DIR, "trinity_unstranded", "Trinity.fasta")
   params:
     load=loadPreCmd(config.get("load", dict()).get("trinity", None)),
@@ -48,7 +63,7 @@ rule asm_map_trinity_dn_unstranded:
 	shell: "{params.load} gmap --dir={params.index_dir} --db={NAME} --min-intronlength={MIN_INTRON} {params.intron_length} --format=3 --min-trimmed-coverage={TGG_COVERAGE} --min-identity={TGG_IDENTITY} -n {TGG_NPATHS} -t {THREADS} {input.transcripts} > {params.gff} 2> {log} && ln -sf {params.link_src} {output.gff} && touch -h {output.gff}"
 
 rule asm_trinity_dn_firststrand:
-  input: rules.create_trinity_sheet.output
+  input: rules.create_trinity_sheet.output.firststrand
   output: touch(os.path.join(ASM_DIR, "trinity_dn_firststrand", "Trinity.fasta"))
   params:
     load=loadPreCmd(config.get("load", dict()).get("trinity", None)),
@@ -79,7 +94,7 @@ rule asm_map_trinity_dn_firststrand:
 
 
 rule asm_trinity_dn_secondstrand:
-  input: rules.create_trinity_sheet.output
+  input: rules.create_trinity_sheet.output.secondstrand
   output: touch(os.path.join(ASM_DIR, "trinity_dn_secondstrand", "Trinity.fasta"))
   params:
     load=loadPreCmd(config.get("load", dict()).get("trinity", None)),

@@ -3,8 +3,12 @@ from eiannot.smk.rnaseq import hisatStrandOption, hisatInput
 import os
 
 
+rule hisat_all:
+	input: expand(os.path.join(ALIGN_DIR, "output", "hisat-{sample}-{run}.bam"), sample=SAMPLES, run=TOPHAT_RUNS)
+	output: touch(os.path.join(ALIGN_DIR, "hisat2.done"))
+
 rule align_hisat_index:
-	input: REF
+	input: rules.sanitize_reference.output
 	output: os.path.join(ALIGN_DIR, "hisat", "index", NAME + ".done")
 	params: load=loadPreCmd(config.get("load", dict()).get("hisat", None))
 	log: os.path.join(ALIGN_DIR, "hisat.index.log")
