@@ -111,19 +111,10 @@ def main():
 
     # Now that we have a complete table, it is easy to filter out
 
-    training_candidates = merged[(
-        (merged.Status.str.match("complete", case=False)) &
-        (merged["ORF_start"] == merged["mikado_orf_start"]) & (merged["ORF_end"] == merged["mikado_orf_end"]) &
-        ((merged.combined_cds_length == merged.selected_cds_length) & 
-         (merged.five_utr_num > 0) & (merged.three_utr_num > 0) & (merged.combined_cds_fraction >= 0.5) &
-         (merged.transcripts_per_gene == 1) & (merged.source_score == merged.source_score.max()))
-    )][[merged.columns[0], "parent"]]
-
     # Now we have to exclude genes that are within 1000bps of another gene
     # Load from the MIDX the positions
 
     indexer, positions, genes = build_pos_index(midx)
-    training_candidates = remove_genes_with_overlaps(training_candidates, indexer, positions, genes, args.flank)
 
     # This instead are the gold/silver/bronze categories for the training
 
@@ -133,6 +124,12 @@ def main():
         ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length>=300) &
          (merged.five_utr_num == 2) & (merged.three_utr_num == 1))
     )][[merged.columns[0], "parent"]]
+
+    training_candidates = gold[(
+         (gold.combined_cds_fraction >= 0.5) &
+         (gold.transcripts_per_gene == 1) & (gold.source_score == gold.source_score.max()))
+    ][[gold.columns[0], "parent"]]
+    training_candidates = remove_genes_with_overlaps(training_candidates, indexer, positions, genes, args.flank)
 
     silver = merged[(
         (~merged["parent"].isin(gold["parent"])) &
@@ -161,5 +158,3 @@ def main():
 
 
 main()
-
-
