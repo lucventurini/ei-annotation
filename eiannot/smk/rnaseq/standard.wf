@@ -1,4 +1,5 @@
 import os
+from eiannot.rnaseq import *
 
 ### The purpose of this WorkFlow is to generate RNA-Seq coverage hints for Augustus.
 ### In order to do so, we have to map the alignments in a way which will contain the following information:
