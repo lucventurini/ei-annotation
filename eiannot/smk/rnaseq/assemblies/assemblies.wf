@@ -5,11 +5,112 @@ import os
 from eicore.external_process.snakemake_helper import loadPreCmd
 from .utils import *
 import snakemake
+from collections import namedtuple
+from collections import OrderedDict as odict
 
 
-# We can use conditional rules to include or exclude the snakemakes
+class Sample:
 
-ALIGNMENT_METHODS = config.get("align_methods")
+    valid_strands = [None]
+
+    def __init__(self, sample, read1, read2, is_long, strandedness):
+
+        self.__sample = sample
+        if read1 is None or not read1:
+            raise ValueError("Read1 must be defined!")
+        self.__read1 = read1
+        self.__read2 = read2
+        if not isinstance(is_long, bool):
+            raise TypeError("Is_long must be boolean!")
+        self.__is_long = is_long
+        if strandedness not in valid_strands:
+            raise ValueError("Strandedness must be one of: {}".format(self.valid_strands)
+
+        self.__strandedness = strandedness
+
+    @property
+    def read1(self):
+        return read1
+
+    @property
+    def read2(self):
+        return read2
+
+    @property
+    def is_paired(self):
+        return (self.read2)
+
+    @property
+    def is_long(self):
+        return self.__is_long
+
+    @property
+    def strandedness(self):
+        return self.__strandedness
+
+
+
+class AssemblyStorer:
+
+    gtf_methods = ["cufflinks", "stringtie", "class", "scallop"]
+    gff_methods = ["trinitydn", "trinitygg"]
+
+    def __init__(self, samples, asm_dir):
+        self.samples = dict()
+
+        if not os.path.exists(asm_dir):
+            os.makedirs(asm_dir)
+        elif not os.path.isdir(asm_dir):
+            raise TypeError("{} is not a directory".format(asm_dir))
+
+        self.asm_dir = asm_dir
+
+        for sample in samples:
+            # Create a dictionary of samples
+            self.samples[sample.sample] = sample
+
+        self.asms = dict()
+
+    def add_assemblers(self, config, AlignStorer):
+
+        for asm in config["asm_methods"]:
+            self.asms[asm] = list()
+            for sample in self.samples:
+                for aln in config["align_methods"]:
+                    for aln_index in range(len(config["align_methods"][aln])):
+                         for asm_index, asm_setting in enumerate(config["asm_methods"]):
+                            self.asms.append((sample, aln, aln_index, asm_index, asm_setting))
+
+    @property
+    def transcript_array(self):
+        array = odict()
+        for asm in self.asms:
+            if asm in self.gff_methods:
+                suff = ".gff"
+            elif asm in self.gtf_methods:
+                suff = ".gtf"
+            else:
+                raise KeyError(asm)
+            fname = "{}-{}-{}.{}".format(asm, ?, ?, suff)
+            array.append(os.path.join(self.asm_dir,
+
+
+        abv_aln_str = aln_abrv[aln] + samp_idx
+			for gtf in GTF_ASSEMBLY_METHODS:
+				for index, setting in enumerate(ASSEMBLY_METHODS[gtf]):
+					filename = gtf + "-" + str(index) + "-" + aln_str + ".gtf"
+					TRANSCRIPT_ARRAY.append(ASM_DIR + "/output/" + filename)
+					LABEL_ARRAY.append(asm_abrv[gtf] + "-" + str(index) + "-" + abv_aln_str)
+					if not SAMPLE_MAP[samp] == "fr-unstranded":
+						SS_ARRAY.append(TRANSCRIPT_ARRAY[-1])
+			for gff in GFF_ASSEMBLY_METHODS:
+				for index, setting in enumerate(ASSEMBLY_METHODS[gff]):
+					filename = gff + "-" + str(index) + "-" + aln_str + ".gff"
+					TRANSCRIPT_ARRAY.append(ASM_DIR + "/output/" + filename)
+					LABEL_ARRAY.append(asm_abrv[gff] + "-" + str(index) + "-" + abv_aln_str)
+					if not SAMPLE_MAP[samp] == "fr-unstranded":
+						SS_ARRAY.append(TRANSCRIPT_ARRAY[-1])
+
 
 TRANSCRIPT_ARRAY=[]
 LABEL_ARRAY=[]

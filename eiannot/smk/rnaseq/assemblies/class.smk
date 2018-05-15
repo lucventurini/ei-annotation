@@ -3,7 +3,7 @@ import os
 
 rule asm_class:
 	input:
-		bam=os.path.join(ALIGN_DIR, "output", "{alrun}.sorted.bam"),
+		bam=os.path.join(config["aln_globals"]["align_dir"], "output", "{alrun}.sorted.bam"),
 		align=rules.align_all.output,
 		ref=REF
 	output:
