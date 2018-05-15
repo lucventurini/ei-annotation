@@ -1,0 +1,76 @@
+import funcALIGNMENT_METHODS
+import subprocess
+import re
+import os
+from eicore.external_process.snakemake_helper import loadPreCmd
+from .utils import *
+import snakemake
+
+
+# We can use conditional rules to include or exclude the snakemakes
+
+ALIGNMENT_METHODS = config.get("align_methods")
+
+TRANSCRIPT_ARRAY=[]
+LABEL_ARRAY=[]
+SS_ARRAY=[]
+for samp in SAMPLES:
+	for aln in ALIGNMENT_METHODS:
+		for aln_idx, setting in enumerate(ALIGNMENT_METHODS[aln]):
+			samp_idx = "-" + samp + "-" + str(aln_idx)
+			aln_str = aln + samp_idx
+			abv_aln_str = aln_abrv[aln] + samp_idx
+			for gtf in GTF_ASSEMBLY_METHODS:
+				for index, setting in enumerate(ASSEMBLY_METHODS[gtf]):
+					filename = gtf + "-" + str(index) + "-" + aln_str + ".gtf"
+					TRANSCRIPT_ARRAY.append(ASM_DIR + "/output/" + filename)
+					LABEL_ARRAY.append(asm_abrv[gtf] + "-" + str(index) + "-" + abv_aln_str)
+					if not SAMPLE_MAP[samp] == "fr-unstranded":
+						SS_ARRAY.append(TRANSCRIPT_ARRAY[-1])
+			for gff in GFF_ASSEMBLY_METHODS:
+				for index, setting in enumerate(ASSEMBLY_METHODS[gff]):
+					filename = gff + "-" + str(index) + "-" + aln_str + ".gff"
+					TRANSCRIPT_ARRAY.append(ASM_DIR + "/output/" + filename)
+					LABEL_ARRAY.append(asm_abrv[gff] + "-" + str(index) + "-" + abv_aln_str)
+					if not SAMPLE_MAP[samp] == "fr-unstranded":
+						SS_ARRAY.append(TRANSCRIPT_ARRAY[-1])
+
+TRANSCRIPTS_STR = ",".join(TRANSCRIPT_ARRAY)
+LABEL_STR = ",".join(LABEL_ARRAY)
+SS_STR = ",".join(SS_ARRAY)
+
+
+ALIGN_DIR = os.path.join(OUT_DIR, "2-alignments")
+
+ALIGN_RUNS = []
+for aln in ALIGNMENT_METHODS:
+	for samp in SAMPLES:
+		for index, setting in enumerate(ALIGNMENT_METHODS[aln]):
+			ALIGN_RUNS.append(aln+"-"+samp+"-"+str(index))
+
+
+if "gmap" in ALIGNMENT_METHODS or "gsnap" in ALIGNMENT_METHODS:
+  include: "gmap_index.smk"
+  if "gsnap" in ALIGNMENT_METHODS:
+    include: "gsnap.smk"
+
+if "hisat2" in ALIGNMENT_METHODS:
+  include: "hisat2.smk"
+
+if "star" in ALIGNMENT_METHODS or "star_long" in ALIGNMENT_METHODS:
+  include: "star_index.smk"
+  if "star" in ALIGNMENT_METHODS:
+    include: "star.smk"
+  if "star_long" in ALIGNMENT_METHODS:
+    include: "star_long.smk"
+
+if "tophat2" in ALIGNMENT_METHODS:
+  include: "tophat2.smk"
+
+include: "bam_utils.smk"
+
+rule asm_all:
+	input: expand("{asm_run}.stats", asm_run=TRANSCRIPT_ARRAY)
+	output:	ASM_DIR+"/output/all.done"
+	threads: 1
+	shell: "touch {output}"

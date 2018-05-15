@@ -99,21 +99,6 @@ def gmap_intron_lengths(config, MAX_INTRON):
 
 # STAR specific functions
 
-def starCompressionOption(sample, EXT_MAP):
-    if EXT_MAP[sample] == ".gz":
-        return "--readFilesCommand zcat"
-    elif EXT_MAP[sample] == ".bz":
-        return "--readFilesCommand bzcat"
-    else:
-        return ""
-
-def starInput(sample, INPUT_1_MAP, INPUT_2_MAP, SAMPLE_MAP):
-    if not seSample(sample, SAMPLE_MAP, INPUT_2_MAP):
-        return "--readFilesIn " + os.path.abspath(INPUT_1_MAP[sample]) + " " + os.path.abspath(INPUT_2_MAP[sample])
-    else:
-        return "--readFilesIn " + os.path.abspath(INPUT_1_MAP[sample])
-
-
 def starLongInput(sample, L_INPUT_MAP):
     return "--readFilesIn " + os.path.abspath(L_INPUT_MAP[sample])
 
