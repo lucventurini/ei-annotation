@@ -11,7 +11,7 @@ rule align_gsnap:
 		bam=os.path.join(ALIGN_DIR, "gsnap", "{sample}-{run,\d+}", "gsnap.bam"),
 		link=os.path.join(ALIGN_DIR, "output", "gsnap-{sample}-{run,\d+}.bam")
 	params:
-		load=loadPreCmd(config.get("load", dict()).get("gmap", None), config.get("load", dict())..get("samtools", None)),
+		load=loadPreCmd(config.get("load", dict()).get("gmap", None), config.get("load", dict()).get("samtools", None)),
 		extra=lambda wildcards: config.get("align_methods", dict()).get("gsnap", [""]* int(wildcards.run))[int(wildcards.run)],
 		link_src=os.path.join("..", "gsnap", "{sample}-{run}", "gsnap.bam"),
 		# Can use tophat function safely here

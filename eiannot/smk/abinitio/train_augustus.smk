@@ -14,7 +14,7 @@ if config.get("augustus", dict()).get("train", False) is True:
     params:
       load=loadPreCmd(config.get("load", dict()).get("augustus", None)),
       flank=2000,  # Move into configuration
-      keep_mask=""  # Potentially we could put "--softmasked" here
+      keep_mask=  # Potentially we could put "--softmasked" here
     shell: """{params.load} gff2gbSmallDNA.pl {input.gff} {input.softmasked} {params.flank} > {output}"""
 
   rule split_training:

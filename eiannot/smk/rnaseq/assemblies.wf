@@ -1,0 +1,44 @@
+import sys
+import os,sys
+import glob
+import itertools
+import subprocess
+import yaml
+from os import listdir
+from os.path import isfile, join
+from shutil import which
+import functools
+from eiannotation.rnaseq.utils import *
+
+CFG=workflow.overwrite_configfile
+
+# Basics
+NAME = config.get("name", "eiannot")
+OUT_DIR = config.get("out_dir", "eiannot")
+THREADS = int(config.get("threads", 1))
+
+# Short read fields
+R1 = []
+R2 = []
+SAMPLES = []
+STRANDEDNESS = []
+if "short_reads" in config:
+	R1 = config["short_reads"]["r1"]
+	R2 = config["short_reads"]["r2"]
+	SAMPLES = config["short_reads"]["samples"]
+	STRANDEDNESS = config["short_reads"]["strandedness"]
+
+subworkflow align:
+  workdir: OUT_DIR
+	snakefile: os.path.join("alignments", "align_workflow.smk")
+
+
+rule all:
+	input:
+		mikado=OUT_DIR + "/mikado.yaml",
+		align=ALIGN_DIR+"/alignment.stats",
+		#l_align=ALIGN_DIR+"/lr_alignment.stats",
+		asm=ASM_DIR+"/assembly.stats"
+
+rule clean:
+	shell: "rm -rf {OUT_DIR}"

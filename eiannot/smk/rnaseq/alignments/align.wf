@@ -1,0 +1,49 @@
+import funcALIGNMENT_METHODS
+import subprocess
+import re
+import os
+from eicore.external_process.snakemake_helper import loadPreCmd
+from .utils import *
+import snakemake
+
+
+# We can use conditional rules to include or exclude the snakemakes
+
+if "globals" not in config:
+  config["aln_globals"] = dict()
+
+
+config["aln_globals"]["align_dir"] = os.path.abspath(os.path.join(OUT_DIR, "2-alignments"))
+config["aln_globals"]["align_runs"] = []
+for aln in config.get("align_methods"):
+  for sample in config.get("samples):
+		for index, setting in enumerate(ALIGNMENT_METHODS[aln]):
+			config["aln_globals"]["align_runs"].append(aln+"-"+samp+"-"+str(index))
+
+if "gmap" in config.get("align_methods") or "gsnap" in config.get("align_methods"):
+  include: "gmap_index.smk"
+  if "gsnap" in config.get("align_methods"):
+    include: "gsnap.smk"
+
+if "hisat2" in config.get("align_methods"):
+  include: "hisat2.smk"
+
+if "star" in config.get("align_methods") or "star_long" in config.get("align_methods"):
+  include: "star_index.smk"
+  if "star" in config.get("align_methods"):
+    include: "star.smk"
+  if "star_long" in config.get("align_methods"):
+    include: "star_long.smk"
+
+if "tophat2" in config.get("align_methods"):
+  include: "tophat2.smk"
+
+include: "bam_utils.smk"
+
+localrules: align_all
+
+rule align_all:
+  input: expand(os.path.join(config["aln_globals"]["align_dir"], "output, "{align_run}.sorted.bam.stats"), align_run=ALIGN_RUNS)
+  output: os.path.join(config["aln_globals"]["align_dir"], "output", "all.done")
+  threads: 1
+  shell: "touch {output}"

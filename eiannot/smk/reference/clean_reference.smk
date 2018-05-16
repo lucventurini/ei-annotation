@@ -15,4 +15,4 @@ rule samtools_index_reference:
   output: rules.sanitize_reference.output + ".fai"
   params:
     load=loadPreCmd(config.get("load", dict()).get("samtools", None))
-  shell: """{params.load} samtools index {input}"""
+  shell: """{params.load} samtools faidx {input}"""
