@@ -4,7 +4,7 @@ import os
 
 rule hisat_all:
   # Change samples and runs
-	input: expand(os.path.join(config["aln_globals"]["align_dir"], "output", "hisat-{sample}-{run}.bam"), sample=SAMPLES, run=HISAT_RUNS)
+	input: expand("")
 	output: touch(os.path.join(os.path.join(config["aln_globals"]["align_dir"], "hisat2.done"))
 
 rule align_hisat_index:

@@ -5,24 +5,6 @@ import os
 from eiannot.smk.rnaseq import hisatStrandOption, hisatInput
 
 
-def hisatStrandOption(sample, SAMPLE_MAP):
-    if SAMPLE_MAP[sample] == "fr-firststrand":
-        return "--rna-strandness=RF"
-    elif SAMPLE_MAP[sample] == "fr-secondstrand":
-        return "--rna-strandness=FR"
-    elif SAMPLE_MAP[sample] == "f":
-        return "--rna-strandness=F"
-    elif SAMPLE_MAP[sample] == "r":
-        return "--rna-strandness=R"
-    else:
-        return ""
-
-
-def hisatInput(sample, SAMPLE_MAP, INPUT_1_MAP, INPUT_2_MAP):
-    if not seSample(sample, SAMPLE_MAP, INPUT_2_MAP):
-        return "-1 " + INPUT_1_MAP[sample] + " -2 " + INPUT_2_MAP[sample]
-    else:
-        return "-U " + INPUT_1_MAP[sample]
 
 config = snakemake.config
 load = loadPreCmd(config.get("load", dict()).get("hisat", None))
