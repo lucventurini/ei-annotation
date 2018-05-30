@@ -76,4 +76,4 @@ if __name__ == '__main__':
     with open(snakename, "wt") as snake:
         print(wf.__str__(source=None), file=snake)
 
-    snakemake.snakemake(snakefile=snakename)
+    # snakemake.snakemake(snakefile=snakename)

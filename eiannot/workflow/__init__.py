@@ -1,10 +1,12 @@
 import abc  # The single instances of the
 import networkx as nx
+from eicore.external_process.snakemake_helper import loadPreCmd
 
 
 class AtomicOperation(metaclass=abc.ABCMeta):
 
     __name__ = "atomic"
+    __loader = []
 
     @abc.abstractmethod
     def __init__(self):
@@ -15,13 +17,14 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         Optional:
         - message"""
 
-        self.__outputs = None
-        self.__inputs = None
+        self.__outputs = dict()
+        self.__inputs = dict()
         self.__message = None
         self.__touch = False
         self.__cmd = None
         self.__log = None
         self.__params = dict()
+        self.__configuration = dict()
 
     @property
     @abc.abstractmethod
@@ -81,19 +84,13 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     @input.setter
     def input(self, inputs):
 
-        if isinstance(inputs, (str, bytes)):
-            if isinstance(inputs, bytes):
-                inputs = inputs.decode()
-            inputs = [inputs]
-        elif isinstance(inputs, list):
-            if not all(isinstance(_, (str, bytes)) for _ in inputs):
-                print(*[(_, type(_)) for _ in inputs], sep="\n")
-                raise TypeError()
-        elif isinstance(inputs, dict):
-            assert all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes)) for _ in
-                       inputs.items())
-        else:
-            raise TypeError("Invalid inputs type: {}".format(type(inputs)))
+        """In the EI workflow, inputs *must* be dictionaries."""
+
+        if not isinstance(inputs, dict):
+            raise TypeError("Inputs must be dictionaries")
+        elif not all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes)) for _ in
+                       inputs.items()):
+            raise ValueError("Input dictionaries must contain only strings")
         self.__inputs = inputs
 
     @property
@@ -103,22 +100,17 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     @output.setter
     def output(self, outputs):
 
-        if isinstance(outputs, (str, bytes)):
-            if isinstance(outputs, bytes):
-                outputs = outputs.decode()
-            outputs = [outputs]
-        elif isinstance(outputs, list):
-            assert all(isinstance(_, (str, bytes)) for _ in outputs)
-        elif isinstance(outputs, dict):
-            assert all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes)) for _ in
-                       outputs.items())
-        else:
-            raise TypeError("Invalid outputs type: {}".format(type(outputs)))
+        if not isinstance(outputs, dict):
+            raise TypeError("Inputs must be dictionaries")
+        elif not all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes)) for _ in
+                       outputs.items()):
+            raise ValueError("Input dictionaries must contain only strings")
         self.__outputs = outputs
 
     def add_to_params(self, key, value):
         """This method is used to add a key/value to params.
-        We do not want to expose directly the dictionary to the outside."""
+        We do not want to expose directly the dictionary to the outside.
+        Params is useful for containing information such as memory, job name, etc."""
 
         if not isinstance(key, str):
             if isinstance(key, bytes):
@@ -131,6 +123,15 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             else:
                 raise TypeError("Invalid type: {}".format(type(key)))
         self.__params[key] = value
+
+    @property
+    def load(self):
+        """This property defines how to "load" a module for use in cluster environments."""
+
+        # TODO: this will have to be revised once we have the configuration
+        runs = [self.__configuration["programs"][_]["runs"] for _ in self.__loader]
+
+        return loadPreCmd(*runs)
 
     def delete_from_params(self, key):
         if key in self.__params:
@@ -200,6 +201,17 @@ class EIWorfkflow:
 
         pass
 
+    def add_node(self, node: AtomicOperation):
+
+        if not isinstance(node, AtomicOperation):
+
+            raise ValueError("Only AtomicOperations are valid nodes")
+        self.__graph.add_node(node)
+
+    def __add__(self, node):
+
+        self.add_node(node)
+
     def add_edge(self, in_edge, out_edge):
         """Here we are going to exploit the fact that adding an edge will automatically add the nodes
         in the graph."""
@@ -228,6 +240,35 @@ class EIWorfkflow:
 
         return snake
 
+    def connect(self, inbound: AtomicOperation, outbound: AtomicOperation, name: [str|bytes]):
+
+        self.add_edge(inbound, outbound)
+        outbound.input[name] = inbound.output[name]
+
     @property
     def graph(self):
         return self.__graph.copy(as_view=True)
+
+    def merge(self, others):
+
+        self.__graph = nx.compose_all([self.__graph] + others)
+
+    def __iter__(self):
+        return iter(self.__graph)
+
+    @property
+    def adj(self):
+        return self.__graph.adj
+
+
+class EIWrapper(EIWorfkflow):
+
+    @property
+    def output(self):
+
+        """EI wrappers must have *ONE* output"""
+
+        nodes = [_ for _ in self if not self.adj[_]]
+        if not len(nodes) == 1 and len(nodes[0].output) == 1:
+            raise ValueError("EI wrappers must have at most one output!")
+        return nodes[0].output
