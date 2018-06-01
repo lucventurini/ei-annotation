@@ -1,7 +1,7 @@
-from .. import AtomicOperation, EIWrapper
+from .. import AtomicOperation, EIWrapper, ShortSample
+from . import IndexBuilder, ShortAligner
 import os
 import itertools
-
 
 
 class HisatWrapper(EIWrapper):
@@ -10,14 +10,9 @@ class HisatWrapper(EIWrapper):
 
         # First, we have to build the index
 
-        indexer = HisatBuild(configuration, outdir)
-
-        # Optionally build the reference splice catalogue
-
+        super().__init__()
 
         # Then we have to do all the alignments
-
-        alignments = []
         # Retrieve the running parameters
         runs = configuration["programs"]["hisat"]["runs"]
         samples = configuration["short_reads"]["samples"]
@@ -26,11 +21,25 @@ class HisatWrapper(EIWrapper):
             # Start creating the parameters necessary for the run
             indexer = HisatBuild(configuration, outdir)
             self.add_node(indexer)
-            for sample, run  in itertools.product(samples, range(len(runs))):
-
-
-
-
+            # Optionally build the reference splice catalogue
+            splices = HisatExtractSplices(configuration, outdir)
+            splice_out = splices.output["splices"]
+            if splice_out:
+                self.add_node(splices)
+            hisat_runs = []
+            for sample, run in itertools.product(samples, range(len(runs))):
+                hisat_run = HisatAligner(configuration=configuration,
+                                         index=indexer.out_prefix,
+                                         sample=sample,
+                                         outdir = outdir,
+                                         run=run,
+                                         ref_transcriptome=splice_out)
+                hisat_runs.append(hisat_run)
+            self.add_edges_from([(indexer, run) for run in hisat_runs])
+            if splice_out:
+                self.add_edges_from([(splices, run) for run in hisat_runs])
+            flag = HisatFlag(outdir, [run.output["link"] for run in hisat_runs])
+            self.add_edges_from([(run, flag) for run in hisat_runs])
 
 
 class HisatFlag(AtomicOperation):
@@ -40,8 +49,13 @@ class HisatFlag(AtomicOperation):
     # 	output: ALIGN_DIR+"/hisat.done"
     # 	shell: "touch {output}"
 
-    pass
+    def __init__(self, outdir, runs=[]):
 
+        super().__init__()
+        for number, run in enumerate(runs):
+            self.input["run{}".format(number)] = run
+        self.output["flag"] = os.path.join(outdir, "hisat.done")
+        self.touch = True
 
 
 class HisatLink(AtomicOperation):
@@ -51,79 +65,91 @@ class HisatLink(AtomicOperation):
         return "ln -s {input} {output}".format(input=self.input[0],
                                                output=self.output[0])
 
-
-class HisatAligner(AtomicOperation):
-
-    __loader = ["hisat", "samtools"]
-
-    def __init__(self, configuration, outdir, sample, run):
-
-        self.__sample = sample
-        self._outdir = outdir
-        self.__run = run
-        self.__configuration = configuration
-        self.output = {"bam": os.path.join(self._outdir, "hisat", "{sample}-{run,\d+}", "hisat.bam"),
-                       "link": os.path.join(self._outdir, "output", "hisat-{sample}-{run,\d+}.bam")}
-
     @property
-    def message(self):
-        message = "Aligning input with hisat (sample {sample} - run {run})".format(
-            sample=self.__sample,
-            run=self.__run
-        )
-        return message
+    def loader(self):
+        return []
+
+
+class HisatAligner(ShortAligner):
+
+    def __init__(self, configuration, index, outdir, sample: ShortSample, run: int, ref_transcriptome=None):
+
+        super().__init__(configuration=configuration, sample=sample,
+                         run=run, index=index, ref_transcriptome=ref_transcriptome,
+                         outdir=outdir)
+        self.output = {"bam": os.path.join(self.bamdir,
+                                           "hisat.bam"),
+                       "link": self.link}
 
     @property
     def cmd(self):
 
-        load = None  # TODO: maybe put this into the AtomicOperation class?
-
-        cmd = "{load} ".format(load=load if load else "")
+        load = self.load
+        cmd = "{load}"
         cmd += "hisat2 -p {threads} "
-        cmd += "--min-intronlen={MIN_INTRON} --max-intronlen={MAX_INTRON} "
+        min_intron, max_intron = self.min_intron, self.max_intron
+        cmd += "--min-intronlen={min_intron} --max-intronlen={max_intron} "
         if self.input.get("transcriptome", None):
             cmd += "--known-splicesite-infile={}".format(self.input.get("transcriptome"))
-        extra = self.__configuration["programs"][self.__run]["runs"]
-        strand = ""  # TODO: implement
-        infiles = ""  # TODO: implement
-        cmd += "{strand} {extra} -x {index} {infiles} > {log} | samtools view -b -@ {threads} - > {output}".format(
-            strand=strand, infiles=infiles,
-            threads=threads, output=self.output[0])
+        extra = self.extra
+        strand = self.strand
+        infiles = self.input_reads
+        threads = self.threads
+        output = self.output
+        index = self.index
+        cmd += "{strand} {extra} -x {index} {infiles} > {log}"
+        cmd += "| samtools view -b -@ {threads} - > {output[bam]}"
+        link_src = self.link_src
+        cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        cmd = cmd.format(**locals())
         return cmd
 
-        # rule align_hisat:
-    # 	input:
-    # 		r1=lambda wildcards: INPUT_1_MAP[wildcards.sample],
-    # 		index=rules.align_hisat_index.output
-    # 	output:
-    # 		bam=ALIGN_DIR+"/hisat/{sample}-{run,\d+}/hisat.bam",
-    # 		link=ALIGN_DIR+"/output/hisat-{sample}-{run,\d+}.bam"
-    # 	params:
-    # 		indexdir=ALIGN_DIR+"/hisat/index/"+NAME,
-    # 		load=loadPre(config, "hisat"),
-    # 		load_samtools=loadPre(config, "samtools"),
-    # 		link_src="../hisat/{sample}-{run}/hisat.bam",
-    # 		extra=lambda wildcards: config["align_methods"]["hisat"][int(wildcards.run)],
-    # 		ss_gen="hisat2_extract_splice_sites.py " + REF_TRANS + " > " + ALIGN_DIR + "/hisat/{sample}-{run}/splice_sites.txt &&" if REF_TRANS else "",
-    # 		trans="--known-splicesite-infile=" + ALIGN_DIR + "/hisat/{sample}-{run}/splice_sites.txt" if REF_TRANS else "",
-    # 		strand=lambda wildcards: hisatStrandOption(wildcards.sample),
-    # 		infiles=lambda wildcards: hisatInput(wildcards.sample)
-    # 	log: ALIGN_DIR+"/hisat-{sample}-{run}.log"
-    # 	threads: THREADS
-    # 	message: "Aligning input with hisat (sample {wildcards.sample} - run {wildcards.run})"
-    #     	shell: "{params.load} {params.load_samtools} {params.ss_gen} hisat2 -p {threads} --min-intronlen={MIN_INTRON} --max-intronlen={MAX_INTRON} {params.trans} {params.strand} {params.extra} -x {params.indexdir} --dta {params.infiles} 2> {log} | samtools view -b -@ {threads} - > {output.bam} && ln -sf {params.link_src} {output.link} && touch -h {output.link}"
-    #
+    @property
+    def strand(self):
+        if self.sample.strandedness == "fr-firststrand":
+            return "--rna-strandness=RF"
+        elif self.sample.strandedness == "fr-secondstrand":
+            return "--rna-strandness=FR"
+        elif self.sample.strandedness == "f":
+            return "--rna-strandness=F"
+        elif self.sample.strandedness == "r":
+            return "--rna-strandness=R"
+        else:
+            return ""
+
+    @property
+    def input_reads(self):
+
+        read1, read2 = self.input["read1"], self.input.get("read2", None)
+
+        if read2:
+            return "-1 {read1} -2 {read2}".format(**locals())
+        else:
+            return "-U {read1}".format(**locals())
+
+    @property
+    def loader(self):
+        return ["hisat", "samtools"]
+
+    @property
+    def toolname(self):
+        return "hisat"
 
 
 class HisatExtractSplices(AtomicOperation):
 
+    __name__ = "hisat_extract_splices"
+
     def __init__(self, configuration, outdir):
 
+        super().__init__()
         self._outdir = outdir
         self.input = {"ref_trans": configuration.get("reference", dict()).get("transcriptome", "")}
         self.__configuration = configuration
-        self.output = {"splices":  os.path.join(outdir, "rnaseq", "2-alignments", "index", "splice_sites.txt")}
-        pass
+        if self.input["ref_trans"]:
+            self.output = {"splices":  os.path.join(outdir, "rnaseq", "2-alignments", "index", "splice_sites.txt")}
+        else:
+            self.output = dict()
 
     @property
     def cmd(self):
@@ -136,23 +162,31 @@ class HisatExtractSplices(AtomicOperation):
         cmd = "{load} hisat2_extract_splice_sites.py {input[ref_trans]} > {output[splices]}".format(**locals())
         return cmd
 
+    @property
+    def loader(self):
+        return ["hisat"]
 
-class HisatBuild(AtomicOperation):
+    @property
+    def rulename(self):
+        return self.__name__
+
+
+class HisatBuild(IndexBuilder):
 
     def __init__(self, configuration, outdir):
 
-        super().__init__()
+        super().__init__(configuration, outdir)
         # TODO: probably the input should be the cleaned up genome
-        self.input = {"genome": configuration["reference"]["genome"]}
-        self._outdir = os.path.join(outdir, "rnaseq", "2-alignments", "index", "hisat")
         self.output = {"flag": os.path.join(self._outdir, "hisat_index.done")}
-        self.log = os.path.join(outdir, "rnaseq", "2-alignments", "index", "log", "hisat.log")
         self.touch = True
-        self.__configuration = configuration
+
+    @property
+    def toolname(self):
+        return "hisat"
 
     @property
     def out_prefix(self):
-        return os.path.join(self._outdir[0], "genome")
+        return os.path.abspath(os.path.join(self._outdir[0], "genome"))
 
     @property
     def message(self):
@@ -172,3 +206,7 @@ class HisatBuild(AtomicOperation):
             **locals()
         )
         return cmd
+
+    @property
+    def loader(self):
+        return ["hisat"]

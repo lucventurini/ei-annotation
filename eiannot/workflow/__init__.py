@@ -1,12 +1,129 @@
 import abc  # The single instances of the
 import networkx as nx
 from eicore.external_process.snakemake_helper import loadPreCmd
+import os
+from frozendict import frozendict
+
+
+class Sample(metaclass=abc.ABCMeta):
+
+    def __init__(self, label, read_dir):
+        self.__label = label
+        self.__read_dir = read_dir
+        if not os.path.exists(self.read_dir):
+            os.makedirs(self.read_dir)
+
+    @property
+    def read_dir(self):
+        return self.__read_dir
+
+    def __str__(self):
+        return self.label
+
+    @property
+    def label(self):
+        return self.__label
+
+
+class LongSample(Sample):
+
+    def __init__(self, readfile, label, read_dir):
+
+        super().__init__(label=label, read_dir=read_dir)
+        suffix = readfile.split(".")[-1]
+        if suffix in ("fa", "fna", "fasta"):
+            suffix = ".fa"
+        elif suffix in ("fq", "fastq"):
+            suffix = ".fq"
+        else:
+            suffix = ".{}".format(suffix)
+        rout = os.path.join(self.read_dir,
+                            "{label}.long{suffix}".format(**locals()))
+
+        if not os.path.islink(rout):
+            os.symlink(os.path.abspath(readfile), rout)
+        self.__readfile = rout
+
+    @property
+    def readfile(self):
+        return self.__readfile
+
+    @property
+    def read1(self):
+        return self.readfile
+
+    @property
+    def read2(self):
+        """This will always return None; long-read samples only have one set of reads."""
+        return None
+
+
+class ShortSample(Sample):
+    """This simple class defines the input reads for a given sample."""
+
+    def __init__(self, read1, read2, label, read_dir, strandedness=None):
+
+        super(ShortSample, self).__init__(label=label, read_dir=read_dir)
+
+        self.__strandedness = strandedness
+        suffix = read1.split(".")[-1]
+        if suffix not in ("gz", "bz2"):
+            suffix = ""
+        else:
+            suffix = ".{}".format(suffix)
+        self.__suffix = suffix
+
+        r1out = os.path.join(read_dir, "{label}.R1.fq{suffix}".format(**locals()))
+
+        if not os.path.islink(r1out):
+            os.symlink(os.path.abspath(read1), r1out)
+        self.__read1 = r1out
+
+        if read2 is not None:
+            r2out = os.path.join(read_dir, "{label}.R2.fq{suffix}".format(**locals()))
+            if not os.path.islink(r2out):
+                os.symlink(os.path.abspath(read2), r2out)
+            self.__read2 = r2out
+
+        @property
+        def read1(self):
+            return self.__read1
+
+        @property
+        def read2(self):
+            return self.__read2
+
+        @property
+        def paired(self):
+            return self.read2 is not None
+
+        @property
+        def stranded(self):
+            return self.strandedness is not None
+
+        @property
+        def strandedness(self):
+            """Returns the exact strandedness of the sample."""
+            # We will check the exact type of the
+            return self.__strandedness
+
+        @property
+        def suffix(self):
+            return self.__suffix
+
+        @property
+        def reader(self):
+            if not self.suffix:
+                return ""
+            elif self.suffix == ".gz":
+                return "zcat"
+            elif self.suffix == ".bz2":
+                return "bzcat"
 
 
 class AtomicOperation(metaclass=abc.ABCMeta):
 
     __name__ = "atomic"
-    __loader = []
 
     @abc.abstractmethod
     def __init__(self):
@@ -24,6 +141,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         self.__cmd = None
         self.__log = None
         self.__params = dict()
+        self.__threads = None
         self.__configuration = dict()
 
     @property
@@ -125,13 +243,18 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         self.__params[key] = value
 
     @property
+    @abc.abstractmethod
+    def loader(self):
+        """Each atomic operation has to specify which are the modules to load for its functioning."""
+        return []
+
+    @property
     def load(self):
         """This property defines how to "load" a module for use in cluster environments."""
 
         # TODO: this will have to be revised once we have the configuration
-        runs = [self.__configuration["programs"][_]["runs"] for _ in self.__loader]
-
-        return loadPreCmd(*runs)
+        to_load = [self.__configuration["programs"][_]["runs"] for _ in self.loader]
+        return loadPreCmd(*to_load)
 
     def delete_from_params(self, key):
         if key in self.__params:
@@ -184,6 +307,29 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
         return "\n".join(string) + "\n"
 
+    @property
+    def configuration(self):
+        return frozendict(self.__configuration)
+
+    @configuration.setter
+    def configuration(self, d):
+        if not isinstance(d, dict):
+            raise ValueError
+        self.__configuration = d
+
+    @property
+    def threads(self):
+        # Single location. We can change this whenever we desire.
+        if self.__threads is None:
+            return self.configuration.get("threads", 1)
+        else:
+            return self.__threads
+
+    @threads.setter
+    def threads(self, threads):
+        if not isinstance(threads, int) or threads < 1:
+            raise ValueError
+        self.__threads = threads
 
 class EIWorfkflow:
 
