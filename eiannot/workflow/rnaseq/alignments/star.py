@@ -1,5 +1,5 @@
-from .. import AtomicOperation, EIWrapper, ShortSample, LongSample
-from . import IndexBuilder, ShortAligner
+from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample, LongSample
+from .abstract import IndexBuilder, ShortAligner
 import os
 import itertools
 
@@ -24,7 +24,7 @@ class StarIndex(IndexBuilder):
 
     def cmd(self):
         load = self.load
-        threads = self.__configuration["threads"]
+        threads = self.threads
         input = self.input
         log = self.log
         align_dir = os.path.abspath(os.path.dirname(self.output["index"]))
@@ -77,6 +77,7 @@ class StarAligner(ShortAligner):
         load = self.load
         index = os.path.dirname(self.input["index"])
         outdir = self.bamdir
+        threads = self.threads
         cmd = "{load}"
         cmd += "cd {outdir} &&"
         cmd += "STAR --runThreadN {threads} --runMode alignReads --genomeDir {index}"
@@ -106,3 +107,55 @@ class StarAligner(ShortAligner):
     @property
     def toolname(self):
         return "star"
+
+    @property
+    def strand(self):
+        """STAR does not accept specifying the strand of reads, so this property returns an empty string."""
+        return ""
+
+
+class StarFlag(AtomicOperation):
+
+    # rule hisat_all:
+    # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
+    # 	output: ALIGN_DIR+"/hisat.done"
+    # 	shell: "touch {output}"
+
+    def __init__(self, outdir, runs=[]):
+
+        super().__init__()
+        for number, run in enumerate(runs):
+            self.input["run{}".format(number)] = run
+        self.output["flag"] = os.path.join(outdir, "star.done")
+        self.touch = True
+
+
+class StarWorkflow(EIWrapper):
+
+    def __init__(self, configuration, outdir):
+
+        # First, we have to build the index
+
+        super().__init__()
+
+        # Then we have to do all the alignments
+        # Retrieve the running parameters
+        runs = configuration["programs"]["star"]["runs"]
+        samples = configuration["short_reads"]["samples"]
+
+        if len(runs) > 0:
+            # Start creating the parameters necessary for the run
+            indexer = StarIndex(configuration, outdir)
+            self.add_node(indexer)
+            # Optionally build the reference splice catalogue
+            star_runs = []
+            for sample, run in itertools.product(samples, range(len(runs))):
+                hisat_run = StarAligner(configuration=configuration,
+                                        index=indexer.output["index"],
+                                        sample=sample,
+                                        outdir=outdir,
+                                        run=run)
+                star_runs.append(hisat_run)
+            self.add_edges_from([(indexer, run) for run in star_runs])
+            flag = StarFlag(outdir, [run.output["link"] for run in star_runs])
+            self.add_edges_from([(run, flag) for run in star_runs])

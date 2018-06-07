@@ -99,7 +99,7 @@ class ShortSample(Sample):
 
         @property
         def stranded(self):
-            return self.strandedness is not None
+            return self.strandedness is not None and self.strandedness != "fr-unstranded"
 
         @property
         def strandedness(self):
@@ -143,6 +143,18 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         self.__params = dict()
         self.__threads = None
         self.__configuration = dict()
+
+    def __hash__(self):
+        """The hash will only consider the rule name. In a SnakeMake graph,
+        a rule should be present only once anyway."""
+        return hash(self.rulename)
+
+    def __eq__(self, other):
+
+        """In order to make sure that we add a rule only once,
+        we are going to compare the hashes, ie, the rule names."""
+
+        return hash(self) == hash(other)
 
     @property
     @abc.abstractmethod
@@ -304,6 +316,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             string.append("  log: \"{}\"".format(self.log))
         if self.cmd:
             string.append("  shell: \"{}\"".format(self.cmd))
+        string.append("  threads: {}".format(self.threads))
 
         return "\n".join(string) + "\n"
 
@@ -331,6 +344,18 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             raise ValueError
         self.__threads = threads
 
+    @property
+    def species(self):
+        """This property returns the name of the organism to be used."""
+        # TODO: check consistency of name
+        return self.configuration.get("name", "Daijin")
+
+    @property
+    def genome(self):
+        # TODO: this will probably be changed
+        return self.configuration["reference"]["genome"]
+
+
 class EIWorfkflow:
 
     """The workflow is, at its core, a nx.DiGraph.
@@ -349,8 +374,10 @@ class EIWorfkflow:
 
     def add_node(self, node: AtomicOperation):
 
-        if not isinstance(node, AtomicOperation):
+        # TODO: we have to verify whether we should add the nodes as *strings*
+        # TODO: another possibility is to have their hash function to return the string, to avoid ambiguities
 
+        if not isinstance(node, AtomicOperation):
             raise ValueError("Only AtomicOperations are valid nodes")
         self.__graph.add_node(node)
 

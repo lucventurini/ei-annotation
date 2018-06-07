@@ -1,5 +1,5 @@
 import abc
-from .. import ShortSample, LongSample, AtomicOperation, Sample
+from eiannot.workflow import ShortSample, LongSample, AtomicOperation, Sample
 import os
 
 
@@ -113,6 +113,12 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
                             "{sample}-{run}".format(sample=self.sample.label, run=self.run),
                             os.path.basename(self.output["bam"]))
 
+    @property
+    def rulename(self):
+        # We have to give a unique name to each alignment
+        return "{toolname}-{sample}-{run}".format(sample=self.sample.label,
+                                                  run=self.run, toolname=self.toolname)
+
 
 class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
 
@@ -120,7 +126,7 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
 
     def __init__(self, configuration, outdir):
         super(IndexBuilder, self).__init__()
-        self.input = {"genome": configuration["reference"]["genome"]}
+        self.input = {"genome": self.genome}
         if configuration.get("reference", dict()).get("transcriptome", ""):
             self.input["ref_transcriptome"] = os.path.abspath(configuration["reference"]["transcriptome"])
         self._outdir = os.path.join(outdir, "rnaseq", "2-alignments", "index", self.toolname)
@@ -136,3 +142,7 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def toolname(self):
         pass
+
+    @property
+    def rulename(self):
+        return "{toolname}_index".format(toolname=self.toolname)

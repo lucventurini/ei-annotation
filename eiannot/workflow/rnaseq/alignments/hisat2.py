@@ -1,5 +1,5 @@
-from .. import AtomicOperation, EIWrapper, ShortSample
-from . import IndexBuilder, ShortAligner
+from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample
+from .abstract import IndexBuilder, ShortAligner
 import os
 import itertools
 
@@ -56,18 +56,6 @@ class HisatFlag(AtomicOperation):
             self.input["run{}".format(number)] = run
         self.output["flag"] = os.path.join(outdir, "hisat.done")
         self.touch = True
-
-
-class HisatLink(AtomicOperation):
-
-    @property
-    def cmd(self):
-        return "ln -s {input} {output}".format(input=self.input[0],
-                                               output=self.output[0])
-
-    @property
-    def loader(self):
-        return []
 
 
 class HisatAligner(ShortAligner):
@@ -186,7 +174,7 @@ class HisatBuild(IndexBuilder):
 
     @property
     def out_prefix(self):
-        return os.path.abspath(os.path.join(self._outdir[0], "genome"))
+        return os.path.abspath(os.path.join(self._outdir[0], self.species))
 
     @property
     def message(self):
@@ -198,8 +186,8 @@ class HisatBuild(IndexBuilder):
     def cmd(self):
 
         load = None
-        threads = self.__configuration["threads"]  # TODO: better way to get threads
-        input = self.input["genome"]
+        threads = self.threads
+        input = self.input
         out_prefix = self.out_prefix
         log = self.log
         cmd = "{load} hisat2-build {extra} -p {threads} {input[genome]} {out_prefix} > {log} 2>&1".format(
