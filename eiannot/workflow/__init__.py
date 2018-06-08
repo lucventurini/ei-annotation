@@ -218,7 +218,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
         if not isinstance(inputs, dict):
             raise TypeError("Inputs must be dictionaries")
-        elif not all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes)) for _ in
+        elif not all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes, list)) for _ in
                        inputs.items()):
             raise ValueError("Input dictionaries must contain only strings")
         self.__inputs = inputs
@@ -287,29 +287,24 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         if self.cmd:
             d[key]["shell"] = self.cmd
         string = ["rule {}:".format(self.rulename)]
-        if isinstance(self.input, str):
-            string.append("  input: \"{}\"".format(self.input))
-        else:
-            string.append("  input:")
-            for obj in self.input[:-1]:
-                string.append("    \"{}\",".format(obj))
-            string.extend(["    \"{}\"".format(self.input[-1])])
-        if self.touch is True:
-            if len(self.output) == 1:
-                string.append("  output: touch(\"{}\")".format(self.output[0]))
+        # Inputs now are always dictionaries
+        string.append("  input:")
+        for key, value in self.input.items():
+            if isinstance(value, bytes):
+                value = value.decode()
+            if not isinstance(value, list):
+                string.append("    {key}=\"{value}\",".format(**locals()))
             else:
-                string.append("  output:")
-                for obj in self.output[-1]:
-                    string.append("    touch(\"{}\"),".format(obj))
-                string.append("  output: touch(\"{}\")".format(self.output[-1]))
-        else:
-            if isinstance(self.output, str):
-                string.append("  output: \"{}\"".format(self.output))
+                string.append("    {key}={value},".format(**locals()))
+        string[-1] = string[-1].rstrip(",")  # Remove trailing comma
+        string.append("  output:")
+        for key, value in self.output.items():
+            if self.touch is True:
+                assert len(self.output) == 1
+                string.append("    {key}=touch(\"{value}\")".format(**locals()))
             else:
-                string.append("  output:")
-                for obj in self.output[:-1]:
-                    string.append("    \"{}\",".format(obj))
-                string.append("    \"{}\"".format(self.output[-1]))
+                string.append("    {key}={value},".format(**locals()))
+        string[-1] = string[-1].rstrip(",")
         if self.message:
             string.append("  message: \"{}\" """.format(self.message))
         if self.log:
@@ -363,9 +358,11 @@ class EIWorfkflow:
     The goal is to print out a completely correct SnakeMake workflow, where all the
     computation necessary to determine input/output files and how to create them has been already pre-calculated."""
 
-    def __init__(self):
+    def __init__(self, configuration=None):
 
         self.__graph = nx.DiGraph()
+        self.__configuration = dict()
+        self.configuration = configuration
 
     def check_graph(self):
         """This method will check that the graph is valid, before printing."""
@@ -413,7 +410,7 @@ class EIWorfkflow:
 
         return snake
 
-    def connect(self, inbound: AtomicOperation, outbound: AtomicOperation, name: [str|bytes]):
+    def connect(self, inbound: AtomicOperation, outbound: AtomicOperation, name):
 
         self.add_edge(inbound, outbound)
         outbound.input[name] = inbound.output[name]
@@ -433,6 +430,18 @@ class EIWorfkflow:
     def adj(self):
         return self.__graph.adj
 
+    @property
+    def configuration(self):
+        return self.__configuration
+
+    @configuration.setter
+    def configuration(self, conf):
+        # TODO: this should be powered by JSON schemas
+        if conf is None or isinstance(conf, dict):
+            self.__configuration = conf
+        else:
+            raise TypeError
+
 
 class EIWrapper(EIWorfkflow):
 
@@ -441,7 +450,11 @@ class EIWrapper(EIWorfkflow):
 
         """EI wrappers must have *ONE* output"""
 
+        return self.exit.output
+
+    @property
+    def exit(self):
         nodes = [_ for _ in self if not self.adj[_]]
         if not len(nodes) == 1 and len(nodes[0].output) == 1:
             raise ValueError("EI wrappers must have at most one output!")
-        return nodes[0].output
+        return nodes[0]

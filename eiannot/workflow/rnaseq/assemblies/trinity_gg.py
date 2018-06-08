@@ -1,11 +1,12 @@
-from .abstract import ShortAssembler
+from .abstract import ShortAssembler, ShortAssemblerWrapper
 from ... import AtomicOperation, EIWrapper, ShortSample
 from ..alignments.gmap import GmapIndex, gmap_intron_lengths
-from ..alignments.abstract import ShortAligner
+from ..alignments.abstract import ShortAligner  # TODO: got to decide how to set the links
 import functools
 import subprocess as sp
 import re
 import os
+import itertools
 
 
 @functools.lru_cache(maxsize=4, typed=True)
@@ -21,32 +22,42 @@ def trinity_version(loader):
     return version
 
 
-class TrinityGGWrapper(EIWrapper):
+class TrinityGGWrapper(ShortAssemblerWrapper):
 
-    def __init__(self, configuration, bams, outdir):
-        super().__init__()
-        self._outdir = outdir
+    def __init__(self, configuration, bams):
+        super().__init__(configuration)
         self.configuration = configuration
 
-        runs = configuration["programs"]["hisat"]["runs"]
-
-        if len(runs) > 0:
-            indexer = GmapIndex(configuration, outdir)
+        if len(self.runs) > 0 and len(bams) > 0:
+            indexer = GmapIndex(configuration, self.outdir)
 
             trinities = []
             mappers = []
 
-            for bam in bams:
-                for run in runs:
-                    trinity = TrinityGG(bam, configuration, outdir, run)
-                    mapper = TrinityGmap()
+            for bam, run in itertools.product(bams, range(len(self.runs))):
+                trinity = TrinityGG(bam, configuration, self.outdir, run)
+                trinities.append(trinity)
+                mapper = TrinityGmap(trinity, indexer)
+                self.add_edge(trinity, mapper)
+                self.add_edge(indexer, mapper)
+                mappers.append(mapper)
+                self.add_to_gf(mapper)
+
+            flag = TrinityFlag(self.outdir, mappers)
+            self.add_edges_from([mapper, flag] for mapper in mappers)
+
+    @property
+    def toolname(self):
+        return "trinity"
 
 
-    # rule
-    # shell: "touch {output}"
-    # trinity_all:
-    # input: expand(ASM_DIR + "/output/trinity-{run2}-{alrun}.gff", run2=TRINITY_RUNS, alrun=ALIGN_RUNS)
-    # output: ASM_DIR + "/trinity.done"
+class TrinityFlag(AtomicOperation):
+
+    def __init__(self, outdir, gmaps):
+        super().__init__()
+        self.input = {"gffs": [gmap.output["gf"] for gmap in gmaps]}
+        self.touch = True
+        self.output = {"flag": os.path.join(outdir, "trinity.done")}
 
 
 class TrinityGG(ShortAssembler):
@@ -64,11 +75,6 @@ class TrinityGG(ShortAssembler):
     @property
     def loader(self):
         return ["trinity"]
-
-    @property
-    def rulename(self):
-        # TODO: implement
-        return ""
 
     @property
     def cmd(self):
@@ -148,16 +154,24 @@ class TrinityGG(ShortAssembler):
 
 class TrinityGmap(ShortAssembler):
 
-    def __init__(self, transcripts, run, configuration, outdir):
+    def __init__(self, trinitygg: TrinityGG, index: GmapIndex):
 
+        run = trinitygg.run
+        configuration = trinitygg.configuration
+        outdir = trinitygg._outdir
         super().__init__(bam=None, run=run, configuration=configuration, outdir=outdir)
-        self.input['transcripts'] = transcripts
-        self.message = "Mapping trinity transcripts to the genome: {input[transcripts]}"
+        self.input['transcripts'] = trinitygg.output["transcripts"]
+        self.message = "Mapping trinity transcripts to the genome: {input[transcripts]}".format(
+            input=self.input
+        )
+        self._trinitygg = trinitygg
+        self._gmapdb = index
+        self.log = os.path.join(self._outdir, "logs", "trinitygmap-{run}-{alrun}.log".format(
+            run=run, alrun=trinitygg.alrun))
 
     @property
     def rulename(self):
-        # TODO: implement
-        return ''
+        return 'trinity-gmap-{run}-{alrun}'.format(run=self.run, alrun=self._trinitygg.alrun)
 
     @property
     def toolname(self):
@@ -183,8 +197,8 @@ class TrinityGmap(ShortAssembler):
     def cmd(self):
         load = self.load
         cmd = "{load}"
-        index_dir = ''  # TODO: define
-        db = ''  # TODO: define
+        index_dir = os.path.dirname(self._gmapdb.out_prefix)
+        db = os.path.basename(self._gmapdb.out_prefix)
         strand = self.strand
         min_intron = self.min_intron
         max_intron = gmap_intron_lengths(self.load, self.max_intron)
@@ -201,7 +215,7 @@ class TrinityGmap(ShortAssembler):
         cmd += "-t {threads} {input[transcripts]} > {output[gf]} 2> {log}"
         link_src = ""
         gff = ""
-        cmd += "&& ln -sf {link_src} {output[gf]} && touch -h {output[gf]}"
+        cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
 

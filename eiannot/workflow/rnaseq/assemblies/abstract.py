@@ -1,5 +1,5 @@
 import abc
-from eiannot.workflow import ShortSample, LongSample, AtomicOperation, Sample
+from eiannot.workflow import ShortSample, LongSample, AtomicOperation, Sample, EIWrapper
 import os
 import re
 
@@ -16,17 +16,20 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
         self.__ref_transcriptome = None
         self.ref_transcriptome = ref_transcriptome
         self._outdir = outdir
-        self.input["bam"] = bam
+        if bam is not None:
+            self.input["bam"] = bam
         self.log = os.path.join(self._outdir, "{toolname}-{sample}-{run}-{alrun}.log".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run,
             alrun=self.alrun
         ))
-        self.output["gf"] = os.path.join(
+        self.output["link"] = os.path.join(
           self._outdir, "output", "{toolname}-{sample}-{run}-{alrun}.{suffix}".format(
                 toolname=self.toolname, sample=self.sample, run=self.run,
                 suffix=self.suffix, alrun=self.alrun
             )
         )
+        self.output["gf"] = os.path.join(self.gfdir, os.path.basename(self.output["link"]))
+
         self.message = "Using {toolname} to assemble (run: {run}): {input[bam]}".format(
             input=self.input, run=run, toolname=self.toolname)
 
@@ -54,7 +57,8 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
     @property
     def gfdir(self):
         return os.path.join(self._outdir, self.toolname,
-                            "{sample}-{run}".format(sample=self.sample.label, run=self.run))
+                            "{sample}-{run}-{alrun}".format(sample=self.sample.label, run=self.run,
+                                                            alrun=self.alrun))
 
     @property
     def link(self):
@@ -130,11 +134,92 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
     @property
     def link_src(self):
         return os.path.join("..", self.toolname,
-                            "{sample}-{run}-{alrun}".format(sample=self.sample.label, run=self.run),
+                            "{sample}-{run}-{alrun}".format(sample=self.sample.label, run=self.run, alrun=self.alrun),
                             os.path.basename(self.output["bam"]))
 
     @property
     def rulename(self):
         # We have to give a unique name to each alignment
-        return "{toolname}-{sample}-{run}".format(sample=self.sample.label,
-                                                  run=self.run, toolname=self.toolname)
+        return "{toolname}-{run}-{alrun}".format(alrun=self.alrun,
+                                                 run=self.run, toolname=self.toolname)
+
+
+class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
+
+    def __init__(self, configuration, bams, aln_flag):
+        super().__init__()
+        self.__gf_rules = set()
+        self.aln_flag = aln_flag
+        self.configuration = configuration
+        self.bams = bams
+
+    @property
+    @abc.abstractmethod
+    def toolname(self):
+        pass
+
+    def add_to_gf(self, rule):
+        if not isinstance(rule, ShortAssembler):
+            raise TypeError
+        if "link" not in rule.output:
+            raise KeyError("Link not found for rule {}".format(rule.rulename))
+        self.__gf_rules.add(rule.rulename)
+
+    @property
+    def gfs(self):
+        """This property will the output files (ie GTF/GFFs) of the wrapper."""
+        return self.__gf_rules
+
+    @property
+    def runs(self):
+        return self.configuration["programs"][self.toolname]["runs"]
+
+    def add_flag_to_inputs(self):
+        for rule in self:
+            rule.input["aln_flag"] = self.aln_flag
+
+class AsmStats(AtomicOperation):
+
+    def __init__(self, asm_run: ShortAssembler):
+
+        super().__init__()
+        self.input["gf"] = asm_run.output["link"]
+        self.output["stats"] = self.input["gf"] + ".stats"
+        self.log = "Computing assembly stats for: {input[gf]}"
+
+    @property
+    def rulename(self):
+        return "asm_gf_stats_{}".format(os.path.basename(os.path.splitext(self.input["gf"])[0]))
+
+    @property
+    def cmd(self):
+        load, output, input = self.load, self.output, self.input
+        cmd = "{load} mikado util stats {input[gf]} {output[stats]} > {log} 2>&1"
+        cmd = cmd.format(**locals())
+        return cmd
+
+    @property
+    def loader(self):
+        return ["mikado"]
+
+    @property
+    def threads(self):
+        return 1
+
+
+class AsmFlag(AtomicOperation):
+
+    def __init__(self, stats_runs: [AsmStats]):
+
+        super().__init__()
+        self.touch = True
+        outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
+        self.output["flag"] = os.path.join(outdir, "all.done")
+
+    @property
+    def rulename(self):
+        return "asm_all"
+
+    @property
+    def loader(self):
+        return []

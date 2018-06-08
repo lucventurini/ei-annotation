@@ -10,7 +10,8 @@ import subprocess
 def gmap_intron_lengths(loader, max_intron):
     """Function to check the exact format of GMAP intron lengths"""
     cmd = "{} gmap --help".format(loader)
-    output = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.read().decode()
+    output = subprocess.Popen(cmd, shell=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.read().decode()
     if "--max-intronlength-middle" in output:
         return "--max-intronlength-middle={mi} --max-intronlength-ends={mi}".format(mi=max_intron)
     else:
@@ -58,6 +59,7 @@ class GsnapFlag(AtomicOperation):
     def __init__(self, outdir, runs=[]):
 
         super().__init__()
+        self.input["runs"] = []
         for number, run in enumerate(runs):
             self.input["run{}".format(number)] = run
         self.output["flag"] = os.path.join(outdir, "gsnap.done")
@@ -122,6 +124,8 @@ class GsnapAligner(ShortAligner):
         super(GsnapAligner, self).__init__(configuration=configuration,
                                            sample=sample, run=run,
                                            outdir=outdir, index=index, ref_transcriptome=ref_transcriptome)
+        self.output["link"] = self.link
+        self.output["bam"] = os.path.join(self.bamdir, "gsnap.bam")
 
     @property
     def compression_option(self):
