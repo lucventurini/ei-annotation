@@ -1,4 +1,4 @@
-from .abstract import AsmStats, AsmFlag
+from .abstract import AsmStats, AsmFlag, ShortAssemblerWrapper
 from .class2 import Class2Wrapper
 from .stringtie import StringtieWrapper
 from .cufflinks import CufflinksWrapper
@@ -19,6 +19,7 @@ class AssemblyWrapper(EIWrapper):
 
         super().__init__()
         stats = []
+        self.__gfs = []
         for wrapper in self.wrappers.values():
             instance = wrapper(configuration, bams, aln_flag)
             instance.add_flag_to_inputs()
@@ -28,3 +29,10 @@ class AssemblyWrapper(EIWrapper):
 
         final_flag = AsmFlag(stats)
         self.add_edges_from([(stat, final_flag) for stat in stats])
+
+    @property
+    def gfs(self):
+        return self.__gfs
+
+    def __add_to_gfs(self, wrapper: ShortAssemblerWrapper):
+        self.__gfs.extend(wrapper.gfs)

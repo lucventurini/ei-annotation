@@ -35,7 +35,8 @@ class PortcullisWrapper(EIWrapper):
         self.configuration = configuration
         execute = self.configuration["programs"]["portcullis"]["execute"]
 
-        outdir = ""  # TODO: configure!
+        outdir = os.path.join(self.configuration["outdir"],
+                              "rnaseq", "3-portcullis")
         if execute and bams:
             preps = []
             filters = []

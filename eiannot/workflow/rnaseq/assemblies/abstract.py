@@ -195,7 +195,8 @@ class AsmStats(AtomicOperation):
         super().__init__()
         self.input["gf"] = asm_run.output["link"]
         self.output["stats"] = self.input["gf"] + ".stats"
-        self.log = "Computing assembly stats for: {input[gf]}"
+        self.message = "Computing assembly stats for: {input[gf]}"
+        self.log = self.output["stats"] + ".log"
 
     @property
     def rulename(self):
