@@ -72,9 +72,14 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
     @sample.setter
     def sample(self, sample):
-        if not isinstance(sample, ShortSample):
-            raise TypeError
-        self.__sample = sample
+        if isinstance(sample, ShortSample):
+            if sample.label not in self.configuration["short_reads"]:
+                raise KeyError("Sample {sample.label} not found in the configuration!".format(**locals()))
+            self.__sample = sample
+        elif isinstance(sample, (str, bytes)):
+            if sample not in self.configuration["short_reads"]:
+                raise KeyError("Sample {sample} not found in the configuration!".format(**locals()))
+            self.__sample = self.configuration["short_reads"][sample]
 
     @property
     def run(self):
@@ -177,6 +182,11 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
     def add_flag_to_inputs(self):
         for rule in self:
             rule.input["aln_flag"] = self.aln_flag
+
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["out_dir"], "rnaseq", "2-assemblies"))
+
 
 class AsmStats(AtomicOperation):
 

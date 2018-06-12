@@ -6,9 +6,8 @@ import itertools
 
 class CufflinksWrapper(ShortAssemblerWrapper):
 
-    def __init__(self, configuration, bams):
-        super().__init__()
-        self.configuration = configuration
+    def __init__(self, configuration, bams, aln_flag):
+        super().__init__(configuration, bams, aln_flag)
 
         if len(bams) > 0 and len(self.runs) > 0:
             cuffs = []

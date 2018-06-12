@@ -31,7 +31,7 @@ class HisatWrapper(EIWrapper):
                 hisat_run = HisatAligner(configuration=configuration,
                                          index=indexer.out_prefix,
                                          sample=sample,
-                                         outdir = outdir,
+                                         outdir=outdir,
                                          run=run,
                                          ref_transcriptome=splice_out)
                 hisat_runs.append(hisat_run)

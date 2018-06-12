@@ -1,5 +1,5 @@
 from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample
-from .abstract import IndexBuilder, ShortAligner
+from .abstract import IndexBuilder, ShortAligner, ShortWrapper
 import os
 import itertools
 import functools
@@ -18,33 +18,29 @@ def gmap_intron_lengths(loader, max_intron):
         return "--intronlength={}".format(max_intron)
 
 
-class GsnapWrapper(EIWrapper):
+class GsnapWrapper(ShortWrapper):
 
     def __init__(self, configuration, outdir):
 
         # First, we have to build the index
 
-        super().__init__()
+        super().__init__(configuration)
 
         # Then we have to do all the alignments
         # Retrieve the running parameters
-        runs = configuration["programs"]["gsnap"]["runs"]
-        samples = configuration["short_reads"]["samples"]
-
-        if len(runs) > 0:
+        if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = GmapIndex(configuration, outdir)
-            self.add_node(indexer)
+            self.add_node(self.indexer)
             # Optionally build the reference splice catalogue
             gsnap_runs = []
-            for sample, run in itertools.product(samples, range(len(runs))):
+            for sample, run in itertools.product(self.samples, range(len(self.runs))):
                 hisat_run = GsnapAligner(configuration=configuration,
-                                         index=indexer.out_prefix,
+                                         index=self.indexer.out_prefix,
                                          sample=sample,
-                                         outdir = outdir,
+                                         outdir=outdir,
                                          run=run)
                 gsnap_runs.append(hisat_run)
-            self.add_edges_from([(indexer, run) for run in gsnap_runs])
+            self.add_edges_from([(self.indexer, run) for run in gsnap_runs])
             flag = GsnapFlag(outdir, [run.output["link"] for run in gsnap_runs])
             self.add_edges_from([(run, flag) for run in gsnap_runs])
 

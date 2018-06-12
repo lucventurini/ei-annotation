@@ -1,5 +1,5 @@
 from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample, LongSample
-from .abstract import IndexBuilder, ShortAligner
+from .abstract import IndexBuilder, ShortAligner, ShortWrapper
 import os
 import itertools
 
@@ -124,32 +124,33 @@ class TopHat2Flag(AtomicOperation):
         self.touch = True
 
 
-class TopHat2Workflow(EIWrapper):
+class TopHat2Wrapper(ShortWrapper):
 
-    def __init__(self, configuration, outdir):
+    __indexer = TopHat2Index
+
+    def __init__(self, configuration, prepare_flag):
 
         # First, we have to build the index
 
-        super().__init__()
+        super().__init__(configuration, prepare_flag)
 
         # Then we have to do all the alignments
         # Retrieve the running parameters
-        runs = configuration["programs"]["tophat2"]["runs"]
-        samples = configuration["short_reads"]["samples"]
 
-        if len(runs) > 0:
+        if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = TopHat2Index(configuration, outdir)
+            indexer = self.indexer(configuration, self.outdir)
             self.add_node(indexer)
             # Optionally build the reference splice catalogue
             star_runs = []
-            for sample, run in itertools.product(samples, range(len(runs))):
+            for sample, run in itertools.product(self.samples, range(len(self.runs))):
                 hisat_run = TopHat2Aligner(configuration=configuration,
-                                        index=indexer.output["index"],
-                                        sample=sample,
-                                        outdir=outdir,
-                                        run=run)
+                                           index=indexer.output["index"],
+                                           sample=sample,
+                                           outdir=self.outdir,
+                                           run=run)
                 star_runs.append(hisat_run)
             self.add_edges_from([(indexer, run) for run in star_runs])
-            flag = TopHat2Flag(outdir, [run.output["link"] for run in star_runs])
+            flag = TopHat2Flag(self.outdir, [run.output["link"] for run in star_runs])
             self.add_edges_from([(run, flag) for run in star_runs])
+        self.add_flag_to_inputs()

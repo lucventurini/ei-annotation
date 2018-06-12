@@ -130,7 +130,7 @@ class StarFlag(AtomicOperation):
         self.touch = True
 
 
-class StarWorkflow(EIWrapper):
+class StarWrapper(EIWrapper):
 
     def __init__(self, configuration, outdir):
 

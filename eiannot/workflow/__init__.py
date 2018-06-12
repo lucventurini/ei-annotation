@@ -347,8 +347,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
     @property
     def genome(self):
-        # TODO: this will probably be changed
-        return self.configuration["reference"]["genome"]
+        return os.path.join(self.configuration["outdir"], "inputs", "reference", "genome.fa")
 
 
 class EIWorfkflow:
