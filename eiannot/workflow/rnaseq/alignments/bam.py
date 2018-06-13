@@ -112,7 +112,7 @@ class AlnFlag(AtomicOperation):
         super().__init__()
         self.touch = True
         outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
-        self.output["flag"] = os.path.join(outdir, "all.done")
+        self.output["flag"] = os.path.join(outdir, "short_reads.done")
 
     @property
     def rulename(self):

@@ -1,5 +1,5 @@
 from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample
-from .abstract import IndexBuilder, ShortAligner, ShortWrapper
+from .abstract import IndexBuilder, ShortAligner, ShortWrapper, LongWrapper, LongAligner
 import os
 import itertools
 import functools
@@ -115,11 +115,12 @@ class GmapIndex(IndexBuilder):
 class GsnapAligner(ShortAligner):
     # infiles = lambda wildcards: tophatInput(wildcards.sample)  # Can use tophat function safely here
 
-    def __init__(self, index, sample, run, configuration, outdir, ref_transcriptome=None):
+    def __init__(self,
+                 indexer,
+                 sample,
+                 run):
 
-        super(GsnapAligner, self).__init__(configuration=configuration,
-                                           sample=sample, run=run,
-                                           outdir=outdir, index=index, ref_transcriptome=ref_transcriptome)
+        super().__init__(indexer=indexer, sample=sample, run=run)
         self.output["link"] = self.link
         self.output["bam"] = os.path.join(self.bamdir, "gsnap.bam")
 
@@ -176,3 +177,11 @@ class GsnapAligner(ShortAligner):
     def strand(self):
         """GSNAP does not accept specifying the strand of reads, so this property returns an empty string."""
         return ""
+
+
+class GmapLongReads(LongAligner):
+
+    def __init__(self, indexer, sample, run):
+
+        super().__init__(indexer=indexer, sample=sample, run=run)
+

@@ -4,25 +4,52 @@ import os
 from .bam import BamStats
 
 
+class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
+
+    """Abstract class for building the index of a genome, given a tool"""
+
+    def __init__(self, configuration, outdir):
+        super(IndexBuilder, self).__init__()
+        self.input = {"genome": self.genome}
+        if configuration.get("reference", dict()).get("transcriptome", ""):
+            self.input["ref_transcriptome"] = os.path.abspath(configuration["reference"]["transcriptome"])
+        self._outdir = os.path.join(outdir, "rnaseq", "2-alignments", "index", self.toolname)
+        self.log = os.path.join(outdir, "rnaseq", "2-alignments", "index", "log", "{}.log".format(self.toolname))
+        self.__configuration = configuration
+
+    @property
+    def extra(self):
+        return self.__configuration["programs"][self.toolname]["index"]
+
+    @property
+    @abc.abstractmethod
+    def toolname(self):
+        pass
+
+    @property
+    def rulename(self):
+        return "{toolname}_index".format(toolname=self.toolname)
+
+    @property
+    @abc.abstractmethod
+    def index(self):
+        pass
+
+
 class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
-    def __init__(self, index, sample, run, configuration, outdir, ref_transcriptome=None):
+    def __init__(self, indexer, sample, run):
 
         super(ShortAligner, self).__init__()
         self.__configuration, self.__sample, self.__run = None, None, None
-        self.input = {"index": index}
-        self.configuration = configuration
+        self.input = {"index": indexer.index}
+        self.configuration = indexer.configuration
         self.sample = sample
         self.run = run
-        self.input["index"] = index
-        self.__ref_transcriptome = None
-        self.ref_transcriptome = ref_transcriptome
-        self._outdir = outdir
-        self.input["index"] = index
         self.input["read1"] = self.sample.read1
         if self.sample.read2 is not None:
             self.input["read2"] = self.sample.read2
-        self.log = os.path.join(self._outdir, "{toolname}-{sample}-{run}.log".format(
+        self.log = os.path.join(self.outdir, "{toolname}-{sample}-{run}.log".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run
         ))
 
@@ -39,7 +66,7 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def bamdir(self):
-        return os.path.join(self._outdir, self.toolname,
+        return os.path.join(self.outdir, self.toolname,
                             "{sample}-{run}".format(sample=self.sample.label, run=self.run))
 
     @property
@@ -132,22 +159,21 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
 class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
-    def __init__(self, index, sample, run, configuration, ref_transcriptome=None):
+    def __init__(self,
+                 indexer: IndexBuilder,
+                 sample,
+                 run):
 
         super().__init__()
+        self.__indexer = indexer
         self.__configuration, self.__sample, self.__run = None, None, None
-        self.input = {"index": index}
-        self.configuration = configuration
+        self.input = indexer.output
+        self.configuration = indexer.configuration
         self.__sample = None
         self.sample = sample
         self.run = run
-        self.input["index"] = index
-        self.__ref_transcriptome = None
-        self.ref_transcriptome = ref_transcriptome
-        self.input["index"] = index
+        self.input = {"indexer": indexer.index}
         self.input["read1"] = self.sample.read1
-        if self.sample.read2 is not None:
-            self.input["read2"] = self.sample.read2
         self.log = os.path.join(self._outdir, "{toolname}-{sample}-{run}.log".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run
         ))
@@ -183,33 +209,23 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
                 raise KeyError("Sample {sample} not found in the configuration!".format(**locals()))
             self.__sample = self.configuration["long_reads"][sample]
 
-
-class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
-
-    """Abstract class for building the index of a genome, given a tool"""
-
-    def __init__(self, configuration, outdir):
-        super(IndexBuilder, self).__init__()
-        self.input = {"genome": self.genome}
-        if configuration.get("reference", dict()).get("transcriptome", ""):
-            self.input["ref_transcriptome"] = os.path.abspath(configuration["reference"]["transcriptome"])
-        self._outdir = os.path.join(outdir, "rnaseq", "2-alignments", "index", self.toolname)
-        self.log = os.path.join(outdir, "rnaseq", "2-alignments", "index", "log", "{}.log".format(self.toolname))
-        self.__configuration = configuration
-
+    @property
+    def min_intron(self):
+        return max(self.configuration["reference"]["min_intron"], 20)
 
     @property
-    def extra(self):
-        return self.__configuration["programs"][self.toolname]["index"]
+    def max_intron(self):
+        return self.configuration["reference"]["max_intron"]
 
     @property
-    @abc.abstractmethod
-    def toolname(self):
-        pass
+    def indexer(self):
+        return self.__indexer
 
     @property
-    def rulename(self):
-        return "{toolname}_index".format(toolname=self.toolname)
+    def link(self):
+        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}.bam".format(
+            toolname=self.toolname, sample=self.sample.label, run=self.run)
+                            )
 
 
 class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
@@ -258,3 +274,46 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
     @property
     def outdir(self):
         return os.path.join(os.path.join(self.configuration["out_dir"], "rnaseq", "1-alignments"))
+
+
+class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
+
+    def __init__(self, configuration, prepare_flag):
+        self.__prepare_flag = prepare_flag
+        super().__init__()
+        self.__gf_rules = set()
+        self.configuration = configuration
+
+    def add_flag_to_inputs(self):
+        for rule in self:
+            rule.input["aln_flag"] = self.__prepare_flag
+
+    @property
+    @abc.abstractmethod
+    def indexer(self):
+        assert isinstance(self.__indexer, IndexBuilder)
+        return self.__indexer(self.configuration, self.outdir)
+
+    @property
+    def samples(self):
+        return self.configuration["long_reads"]
+
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["out_dir"], "rnaseq", "1-alignments"))
+
+    @property
+    @abc.abstractmethod
+    def toolname(self):
+        pass
+
+    def add_to_gtfs(self, rule):
+        if not isinstance(rule, ShortAligner):
+            raise TypeError
+        if "link" not in rule.output:
+            raise KeyError("Link not found for rule {}".format(rule.rulename))
+        self.__gf_rules.add(rule.rulename)
+
+    @property
+    def runs(self):
+        return self.configuration["programs"][self.toolname]["runs"]
