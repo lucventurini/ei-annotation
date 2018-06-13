@@ -62,13 +62,13 @@ class FaidxGenome(AtomicOperation):
         return cmd
 
 
-class SanitizeBlastDB(AtomicOperation):
+class SanitizeProteinBlastDB(AtomicOperation):
 
-    def __init__(self, configuration, db):
+    def __init__(self, configuration):
         super().__init__()
         self.configuration = configuration
-        self.input["db"] = db
-        self.output["db"] = ''  # TODO: implement this
+        self.input["db"] = self.protein_dbs
+        self.output["db"] = os.path.join(self.outdir, "homologyDB.fa")
         self.log = ""
 
     @property
@@ -84,4 +84,69 @@ class SanitizeBlastDB(AtomicOperation):
         cmd = "{load} sanitize_blast_db.py -o {output[db]} {input[db]} 2> {log} > {log}"
         cmd = cmd.format(**locals())
 
+        return cmd
+
+    @property
+    def outdir(self):
+
+        return os.path.join(self.configuration["outdir"], "inputs", "proteins")
+
+    @property
+    def protein_dbs(self):
+        return self.configuration["homology"]["prot_db"]
+
+
+class DiamondIndex(AtomicOperation):
+
+    def __init__(self, sanitizer: SanitizeProteinBlastDB):
+
+        super().__init__()
+        self.input = sanitizer.output
+        self.output["db"] = os.path.splitext(self.input["db"])[0] + ".dmnd"
+        self.outdir = os.path.dirname(self.output["db"])
+        self.log = os.path.join(self.outdir, "diamond.index.log")
+        self.message = "Making DIAMOND protein database for: {input[db]}".format(input=self.input)
+
+    @property
+    def loader(self):
+        return ["diamond"]
+
+    @property
+    def rulename(self):
+        return "diamond_protein_index"
+
+    @property
+    def cmd(self):
+        load = self.load
+        threads = self.threads
+        db = os.path.splitext(self.output["db"])[0]
+        input, log = self.input, self.log
+        cmd = "{load} diamond makedb --threads {threads} --in {input[db]} --db {db} > {log} 2>{log}".format(**locals())
+        return cmd
+
+
+class BlastxIndex(AtomicOperation):
+
+    def __init__(self, sanitizer: SanitizeProteinBlastDB):
+        super().__init__()
+        self.input = sanitizer.output
+        self.output["db"] = os.path.splitext(self.input["db"])[0] + ".pog"
+        self.outdir = os.path.dirname(self.output["db"])
+        self.log = os.path.join(self.outdir, "blast.index.log")
+        self.message = "Making BLASTX protein database for: {input[db]}".format(input=self.input)
+
+    @property
+    def loader(self):
+        return ["blast"]
+
+    @property
+    def rulename(self):
+        return "protein_blast_index"
+
+    @property
+    def cmd(self):
+        load = self.load
+        db = os.path.splitext(self.output["db"])[0]
+        log, input = self.log, self.input
+        cmd = "{load} makeblastb -in {input[db]} -out {db} -dbtype prot -parse_seqids > {log} 2>&1".format(**locals())
         return cmd

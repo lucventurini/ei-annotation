@@ -1,27 +1,75 @@
 from ... import AtomicOperation, EIWorfkflow, ShortSample, LongSample
 import os
-import abc
-from .prepare import MikadoPrepare
+# import abc
+from ..assemblies.workflow import AssemblyWrapper
+from ..alignments.workflow import ShortAlignmentsWrapper, LongAlignmentsWrapper, PortcullisWrapper
+from .prepare import MikadoPrepare, MikadoConfig
 from .orfs import OrfCaller
-from .homology import HomologyWrapper  # TODO: implement
+from .homology import MikadoHomologyWrapper
 from ...preparation import FaidxGenome
 
 
 class Mikado(EIWorfkflow):
 
-    def __init__(self):
+    def __init__(self,
+                 assemblies: AssemblyWrapper,
+                 short_alignments: ShortAlignmentsWrapper,
+                 long_alignments: LongAlignmentsWrapper):
 
         super().__init__()
+        self.configuration = assemblies.configuration
+        self.short_alignments = short_alignments
+        self.assemblies = assemblies
+        self.long_alignments = long_alignments
 
+        self.configurer = MikadoConfig(portcullis_wrapper=self.short_alignments.portcullis,
+                                       assemblies=self.assemblies,
+                                       long_aln_wrapper=long_alignments)
+        self.add_edges_from([step, self.configurer] for step in
+                            [self.assemblies, self.short_alignments, self.long_alignments])
+
+        self.preparer = MikadoPrepare(self.configuration)
+        self.add_edge(self.configuration, self.preparer)
+        self.orfs = OrfCaller(self.preparer)
+        self.add_edge(self.preparer, self.orfs)  # TODO: this will fail currently. I have to modify the abstract class
+        self.homologies = MikadoHomologyWrapper(self.preparer)
+        self.faidx_genome = FaidxGenome(self.configuration)
+        self.serialiser = MikadoSerialise(prepare=self.preparer,
+                                          homology=self.homologies,
+                                          orfs=self.orfs,
+                                          faidx=self.faidx_genome)
+        mikados = []
+        for mode in self.modes:
+            picker = MikadoPick(self.serialiser, mode)
+            self.add_edge(self.serialiser, picker)
+            stats = MikadoStats(picker)
+            self.add_edge(picker, stats)
+            mikados.append(stats)
+        collection = MikadoCollectStats(mikados)
+        self.add_edges_from([mikado, collection] for mikado in mikados)
+
+    @property
+    def gfs(self):
+        return self.assemblies.gfs
+
+    @property
+    def junctions(self):
+        return self.short_alignments.portcullis_junctions
+
+    @property
+    def modes(self):
+        # TODO: verify this is correct
+        return self.configuration["mikado"]["modes"]
 
 
 class MikadoSerialise(AtomicOperation):
 
     def __init__(self,
                  prepare: MikadoPrepare,
-                 homology: HomologyWrapper,
+                 homology: MikadoHomologyWrapper,
                  orfs: OrfCaller,
-                 faidx: FaidxGenome):
+                 faidx: FaidxGenome,
+                 portcullis=PortcullisWrapper):
 
         super().__init__()
         self.input = prepare.output
@@ -32,7 +80,9 @@ class MikadoSerialise(AtomicOperation):
         self.outdir = prepare.outdir
         self.output = {"db": os.path.join(self.outdir, "mikado.db")}
         self.log = os.path.join(self.outdir, "mikado_serialise.err")
+        self.homology = homology
         self.message = "Running Mikado serialise to move numerous data sources into a single database"
+        self.portcullis = portcullis
 
     @property
     def rulename(self):
@@ -44,17 +94,32 @@ class MikadoSerialise(AtomicOperation):
 
     @property
     def blast_xmls(self):
-        # TODO: implement
-        pass
+        pref = "--xml="
+        xmls = self.homology.blast_xmls
+        if len(xmls) == 0:
+            return ""
+        elif len(set([os.path.dirname(xml) for xml in xmls])) == 1:
+            return "{pref}{fold}".format(fold=os.path.dirname(xmls[0]), **locals())
+        else:
+            return "{pref}{commas}".format(",".join(xmls), **locals())
 
     @property
     def blast_targets(self):
-        # TODO: implement
-        pass
+        if self.homology.blast_targets:
+            return "--blast-targets={}".format(self.homology.blast_targets)
+        else:
+            return ""
 
     @property
     def orfs(self):
         return " --orfs={input[orfs]}".format(input=self.input)
+
+    @property
+    def junctions(self):
+        if self.portcullis:
+            return "--junctions={portcullis.junctions}".format(portcullis=self.portcullis)
+        else:
+            return ""
 
     @property
     def cmd(self):
@@ -62,10 +127,11 @@ class MikadoSerialise(AtomicOperation):
         cmd = "{load} "
         blast_xmls = self.blast_xmls
         blast_targets = self.blast_targets
+        junctions = self.junctions
         input = self.input
-        cmd += "mikado serialise {blast_xmls} {blast_targets} --start-method=spawn --transcripts={input[fa]} "
         orfs = self.orfs
-        cmd += "--genome_fai={input[fai]} --json-conf={input[cfg]} --force {orfs} "
+        cmd += "mikado serialise {blast_xmls} {blast_targets} {junctions} {orfs} --transcripts={input[fa]} "
+        cmd += "--genome_fai={input[fai]} --json-conf={input[cfg]} --force --start-method=spawn "
         outdir = self.outdir
         threads = self.threads
         log = self.log

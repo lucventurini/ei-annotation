@@ -59,10 +59,12 @@ class PortcullisWrapper(EIWrapper):
                 if refprep is not None:
                     self.add_edge(refprep, filt)
                 filters.append(filt)
-            merger = PortcullisMerge(configuration, filters)
-            self.add_edges_from([(filt, merger) for filt in filters])
+            self.merger = PortcullisMerge(configuration, filters)
+            self.add_edges_from([(filt, self.merger) for filt in filters])
 
-    pass
+    @property
+    def flag(self):
+        return self.merger.output["bed"]
 
 
 class PortcullisPrep(AtomicOperation):
@@ -292,6 +294,7 @@ class PortcullisMerge(AtomicOperation):
         self._outdir = filters[0]._outdir
         self.output = {"bed": os.path.join(self._outdir, "output", "portcullis.merged.bed"),
                        "tab": os.path.join(self._outdir, "output", "portcullis.merged.tab")}
+        self.configuration = filters[0].configuration
         self.message = "Taking the union of portcullis results"
         self.log = os.path.join(self._outdir, "logs", "portcullis.merge.log")
 
