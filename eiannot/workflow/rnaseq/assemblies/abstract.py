@@ -1,5 +1,5 @@
 import abc
-from eiannot.workflow import ShortSample, LongSample, AtomicOperation, Sample, EIWrapper
+from ...abstract import ShortSample, LongSample, AtomicOperation, Sample, EIWrapper
 import os
 import re
 

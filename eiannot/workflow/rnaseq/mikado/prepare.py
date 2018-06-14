@@ -1,4 +1,4 @@
-from ... import AtomicOperation, ShortSample, LongSample
+from ...abstract import AtomicOperation, ShortSample, LongSample
 from ..alignments.portcullis import PortcullisWrapper
 from ..assemblies.workflow import AssemblyWrapper
 from ..assemblies.abstract import ShortAssembler

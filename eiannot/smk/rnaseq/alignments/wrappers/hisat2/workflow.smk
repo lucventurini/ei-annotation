@@ -16,7 +16,6 @@ rule align_hisat_index:
 	message: "Indexing genome with hisat"
 	wrapper: "file://" + os.path.abspath(os.path.join(os.path.dirname(__name__), "index"))
 
-
 rule align_hisat:
 	input:
 	  # TODO: change the way we handle this, across the RNA-Seq

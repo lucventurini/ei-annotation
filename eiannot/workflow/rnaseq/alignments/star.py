@@ -1,4 +1,4 @@
-from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample, LongSample
+from ...abstract import AtomicOperation, EIWrapper, ShortSample, LongSample
 from .abstract import IndexBuilder, ShortAligner, LongAligner, ShortWrapper, LongWrapper
 import os
 import itertools

@@ -4,7 +4,7 @@ from .gmap import GsnapWrapper
 from .tophat2 import TopHat2Wrapper
 from .portcullis import PortcullisWrapper
 from .star import StarWrapper, StarLongWrapper
-from ... import EIWrapper, EIWorfkflow, AtomicOperation
+from ...abstract import EIWrapper, EIWorfkflow, AtomicOperation
 import os
 
 

@@ -1,4 +1,4 @@
-from ... import AtomicOperation, EIWorfkflow, ShortSample, LongSample
+from ...abstract import AtomicOperation, EIWorfkflow, ShortSample, LongSample
 import os
 # import abc
 from ..assemblies.workflow import AssemblyWrapper

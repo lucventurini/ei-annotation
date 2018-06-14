@@ -4,7 +4,7 @@ from .stringtie import StringtieWrapper
 from .cufflinks import CufflinksWrapper
 from .trinity_gg import TrinityGGWrapper
 from .scallop import ScallopWrapper
-from ... import EIWrapper, EIWorfkflow
+from ...abstract import EIWrapper, EIWorfkflow
 
 
 class AssemblyWrapper(EIWrapper):

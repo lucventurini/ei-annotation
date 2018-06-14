@@ -1,4 +1,4 @@
-from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample
+from ...abstract import AtomicOperation, EIWrapper, ShortSample
 from .abstract import IndexBuilder, ShortAligner, ShortWrapper, LongWrapper, LongAligner
 import os
 import itertools
@@ -111,6 +111,14 @@ class GmapIndex(IndexBuilder):
     def loader(self):
         return ["gmap"]
 
+    @property
+    def indexdir(self):
+        return os.path.abspath(os.path.dirname(os.path.dirname(self.output["index"])))
+
+    @property
+    def dbname(self):
+        return os.path.basename(os.path.dirname(self.output["index"]))
+
 
 class GsnapAligner(ShortAligner):
     # infiles = lambda wildcards: tophatInput(wildcards.sample)  # Can use tophat function safely here
@@ -151,7 +159,9 @@ class GsnapAligner(ShortAligner):
         output = self.output
         threads = self.threads
         cmd = "{load}"
-        cmd += "gsnap --dir={index_dir} --db={species} {extra} --novelsplicing=1 "
+        indexdir = self.indexer.indexdir
+        dbname = self.indexer.dbname
+        cmd += "gsnap --dir={indexdir} --db={dbname} {extra} --novelsplicing=1 "
         min_intron, max_intron = self.min_intron, self.max_intron
         extra = self.extra
         bamdir = self.bamdir
@@ -174,6 +184,10 @@ class GsnapAligner(ShortAligner):
         return "gsnap"
 
     @property
+    def indexname(self):
+        return "gmap"
+
+    @property
     def strand(self):
         """GSNAP does not accept specifying the strand of reads, so this property returns an empty string."""
         return ""
@@ -181,11 +195,12 @@ class GsnapAligner(ShortAligner):
 
 class GmapLongReads(LongAligner):
 
-    def __init__(self, indexer, sample, run):
+    def __init__(self, indexer: GmapIndex, sample, run):
 
-        super().__init__(indexer=indexer, sample=sample, run=run)
+        super().__init__(indexer=indexer,
+                         sample=sample, run=run)
         self.output = {"link": self.link,
-                       "gf": os.path.join() }
+                       "gf": os.path.join()}
 
         self.message = "Mapping long reads to the genome with gmap (sample: {sample.label} - run: {run})".format(
             sample=self.sample, run=self.run)
@@ -213,10 +228,9 @@ class GmapLongReads(LongAligner):
         max_intron = self.max_intron_cli
         threads = self.threads
         min_intron = self.min_intron
-        index =
-        dbname =
+        index = self.indexer.indexdir
+        dbname = self.indexer.dbname
         cmd = "{load} gmap --dir={index} --db {dbname} --min-intronlength={min_intron} {max_intron}"
-
         input, output, log = self.input, self.output, self.log
         cmd += "--format=3 {input[read1]} > {output[gf]} 2> {log} "
         link_src = os.path.relpath(self.link, start=os.path.dirname(self.output["gf"]))
@@ -228,17 +242,3 @@ class GmapLongReads(LongAligner):
     @property
     def max_intron_cli(self):
         return gmap_intron_lengths(self.load, self.max_intron)
-
-    # rule lr_gmap:
-    # 	input:
-    # 		index=rules.gmap_index.output,
-    # 		reads=lambda wildcards: L_INPUT_MAP[wildcards.lsample]
-    # 	output: link=ALIGN_DIR+"/lr_output/lr_gmap-{lsample}-{lrun}.gff",
-    # 		gff=ALIGN_DIR+"/gmap/{lsample}-{lrun}/lr_gmap-{lsample}-{lrun}.gff"
-    # 	params: load=loadPre(config, "gmap"),
-    # 		link_src="../gmap/{lsample}-{lrun}/lr_gmap-{lsample}-{lrun}.gff",
-    # 		intron_length=gmap_intron_lengths(loadPre(config, "gmap"), MAX_INTRON)
-    # 	log: ALIGN_DIR+"/gmap-{lsample}-{lrun}.log"
-    # 	threads: THREADS
-    # 	message: "Mapping long reads to the genome with gmap (sample: {wildcards.lsample} - run: {wildcards.lrun})"
-    # 	shell: "--format=3 {input.reads} > {output.gff} 2> {log} && ln -sf {params.link_src} {output.link} && touch -h {output.link}"

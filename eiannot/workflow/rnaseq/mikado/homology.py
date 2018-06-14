@@ -1,6 +1,6 @@
 import os
 import abc
-from ... import AtomicOperation, EIWrapper
+from ...abstract import AtomicOperation, EIWrapper
 from .prepare import MikadoPrepare
 from ...preparation import DiamondIndex, BlastxIndex, SanitizeProteinBlastDB
 

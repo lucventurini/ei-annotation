@@ -1,4 +1,4 @@
-from .. import AtomicOperation, EIWrapper
+from ..abstract import AtomicOperation, EIWrapper
 import os
 
 
@@ -10,7 +10,8 @@ class SanitizeGenome(AtomicOperation):
         self.configuration = configuration
         self.input["genome"] = genome
         self.output["genome"] = self.genome
-        self.log = ""  # TODO: implement this
+        self.log = os.path.join(os.path.dirname(self.genome), 'sanitize.log')
+        self.message = 'Sanitizing the genome FASTA file before any other operation.'
 
     @property
     def loader(self):
@@ -94,6 +95,10 @@ class SanitizeProteinBlastDB(AtomicOperation):
     @property
     def protein_dbs(self):
         return self.configuration["homology"]["prot_db"]
+
+    @property
+    def rulename(self):
+        return "sanitize_protein_db"
 
 
 class DiamondIndex(AtomicOperation):

@@ -1,5 +1,5 @@
 from .abstract import ShortAssembler, ShortAssemblerWrapper
-from ... import AtomicOperation, EIWrapper, ShortSample
+from ...abstract import AtomicOperation, EIWrapper, ShortSample
 from ..alignments.gmap import GmapIndex, gmap_intron_lengths
 from ..alignments.abstract import ShortAligner  # TODO: got to decide how to set the links
 import functools
@@ -57,7 +57,7 @@ class TrinityFlag(AtomicOperation):
         super().__init__()
         self.input = {"gffs": [gmap.output["gf"] for gmap in gmaps]}
         self.touch = True
-        self.output = {"flag": os.path.join(outdir, "trinity.done")}
+        self.output = {"flag": os.path.join(outdir, "trinity_gg.done")}
 
 
 class TrinityGG(ShortAssembler):
@@ -161,6 +161,7 @@ class TrinityGmap(ShortAssembler):
         outdir = trinitygg._outdir
         super().__init__(bam=None, run=run, configuration=configuration, outdir=outdir)
         self.input['transcripts'] = trinitygg.output["transcripts"]
+        self.input.update(index.output)
         self.message = "Mapping trinity transcripts to the genome: {input[transcripts]}".format(
             input=self.input
         )
@@ -168,6 +169,21 @@ class TrinityGmap(ShortAssembler):
         self._gmapdb = index
         self.log = os.path.join(self._outdir, "logs", "trinitygmap-{run}-{alrun}.log".format(
             run=run, alrun=trinitygg.alrun))
+
+    @property
+    def strand(self):
+        if self.sample.stranded:
+            return " -z sense_force "
+        else:
+            return ""
+
+    @property
+    def input_reads(self):
+        return self.input["transcripts"]
+
+    @property
+    def suffix(self):
+        return ".gff"
 
     @property
     def rulename(self):
@@ -202,19 +218,18 @@ class TrinityGmap(ShortAssembler):
         strand = self.strand
         min_intron = self.min_intron
         max_intron = gmap_intron_lengths(self.load, self.max_intron)
-        cmd += "gmap --dir={index_dir} {strand} --db {db} --min-intronlength={min_intron}"
-        cmd += "{max_intron}"
+        cmd += "gmap --dir={index_dir} {strand} --db {db} --min-intronlength={min_intron} "
+        cmd += "{max_intron} "
         identity = self.identity
         coverage = self.coverage
         paths = self.paths
-        cmd += "--format=3 --min-trimmed-coverage={coverage} --min-identity={identity} -n {paths}"
+        cmd += "--format=3 --min-trimmed-coverage={coverage} --min-identity={identity} -n {paths} "
         threads = self.threads
         input = self.input
         output = self.output
         log = self.log
-        cmd += "-t {threads} {input[transcripts]} > {output[gf]} 2> {log}"
-        link_src = ""
-        gff = ""
+        cmd += "-t {threads} {input[transcripts]} > {output[gf]} 2> {log} "
+        link_src = self.link_src
         cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd

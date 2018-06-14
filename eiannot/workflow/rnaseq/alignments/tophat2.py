@@ -1,4 +1,4 @@
-from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample, LongSample
+from ...abstract import AtomicOperation, EIWrapper, ShortSample, LongSample
 from .abstract import IndexBuilder, ShortAligner, ShortWrapper
 import os
 import itertools
@@ -154,3 +154,11 @@ class TopHat2Wrapper(ShortWrapper):
             flag = TopHat2Flag(self.outdir, [run.output["link"] for run in star_runs])
             self.add_edges_from([(run, flag) for run in star_runs])
         self.add_flag_to_inputs()
+
+    @property
+    def toolname(self):
+        return "tophat2"
+
+    @property
+    def indexer(self):
+        return TopHat2Index

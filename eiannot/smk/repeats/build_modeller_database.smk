@@ -13,5 +13,3 @@ rule build_rm_db:
     name=os.path.join(outdir, "RModel", "genome"),
     refdir=os.path.join(outdir, "RModel")
   shell: """{params.load} mkdir -p {params.refdir} && BuildDatabase -name {params.name} -engine ncbi {input}"""
-
-

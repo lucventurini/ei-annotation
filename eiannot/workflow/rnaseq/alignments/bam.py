@@ -1,4 +1,4 @@
-from eiannot.workflow import AtomicOperation, EIWrapper
+from ...abstract import AtomicOperation, EIWrapper
 import os
 
 

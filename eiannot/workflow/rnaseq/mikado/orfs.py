@@ -1,5 +1,5 @@
 import os
-from ... import AtomicOperation
+from ...abstract import AtomicOperation
 import abc
 from Bio.Data import CodonTable
 from .prepare import MikadoPrepare

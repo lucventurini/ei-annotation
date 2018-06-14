@@ -1,5 +1,5 @@
 import abc
-from eiannot.workflow import ShortSample, LongSample, AtomicOperation, Sample, EIWrapper
+from ...abstract import ShortSample, LongSample, AtomicOperation, Sample, EIWrapper
 import os
 from .bam import BamStats
 
@@ -35,6 +35,10 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
     def index(self):
         pass
 
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "indices", self.toolname)
+
 
 class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
@@ -58,6 +62,11 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
             sample=self.sample.label,
             run=self.run
         )
+        self.__indexer = indexer
+
+    @property
+    def indexer(self):
+        return self.__indexer
 
     @property
     @abc.abstractmethod

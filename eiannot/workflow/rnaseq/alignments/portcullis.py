@@ -1,4 +1,4 @@
-from eiannot.workflow import AtomicOperation, EIWrapper, ShortSample
+from ...abstract import AtomicOperation, EIWrapper, ShortSample
 import os
 import re
 import functools

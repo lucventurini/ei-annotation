@@ -4,7 +4,7 @@
 and to create the sample objects to be put inside the configuration."""
 
 
-from .. import ShortSample, LongSample
+from ..abstract import ShortSample, LongSample
 import os
 import csv
 
@@ -46,3 +46,4 @@ def parse_samplesheet(samplesheet, configuration):
             configuration[tag][label] = sample
 
     return configuration
+

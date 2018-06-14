@@ -1,4 +1,4 @@
-from eiannot.workflow import AtomicOperation, EIWorfkflow
+from eiannot.workflow.abstract import AtomicOperation, EIWorfkflow
 import snakemake
 import tempfile
 import os
@@ -55,7 +55,6 @@ class Outer(AtomicOperation):
     @property
     def loader(self):
         return []
-
 
 
 if __name__ == '__main__':

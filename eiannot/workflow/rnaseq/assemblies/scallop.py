@@ -1,5 +1,5 @@
 from .abstract import ShortAssembler, ShortAssemblerWrapper
-from ... import AtomicOperation, EIWrapper, ShortSample
+from ...abstract import AtomicOperation, EIWrapper, ShortSample
 import os
 import itertools
 
