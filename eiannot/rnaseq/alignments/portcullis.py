@@ -1,4 +1,5 @@
 from ...abstract import AtomicOperation, EIWrapper, ShortSample
+from .abstract import ShortWrapper
 import os
 import re
 import functools
@@ -29,15 +30,14 @@ def portcullisStrandOption(sample: ShortSample, command, step):
 class PortcullisWrapper(EIWrapper):
 
     # TODO: probably I need something here to start the runs
-    def __init__(self, configuration, bams):
+    def __init__(self, short_alignments: ShortAlignmentsWrapper):
 
-        super().__init__()
-        self.configuration = configuration
+        super().__init__(configuration = short_alignments.configuration)
         execute = self.configuration["programs"]["portcullis"]["execute"]
 
         outdir = os.path.join(self.configuration["outdir"],
                               "rnaseq", "3-portcullis")
-        if execute and bams:
+        if execute and short_alignments.bams:
             preps = []
             filters = []
             refprep = PortcullisPrepRef(configuration, outdir=outdir)
@@ -60,11 +60,12 @@ class PortcullisWrapper(EIWrapper):
                     self.add_edge(refprep, filt)
                 filters.append(filt)
             self.merger = PortcullisMerge(configuration, filters)
+            self.flag = PortcullisFlag(merger=self.merger)
             self.add_edges_from([(filt, self.merger) for filt in filters])
 
     @property
     def flag(self):
-        return self.merger.output["bed"]
+        return self.merger
 
 
 class PortcullisPrep(AtomicOperation):
@@ -329,3 +330,23 @@ class PortcullisMerge(AtomicOperation):
             cmd += "junctools convert -if portcullis -of ebed -o {output[bed]}  {output[tab]}"
         cmd = cmd.format(**locals())
         return cmd
+
+
+class PortcullisFlag(AtomicOperation):
+
+    def __init__(self, merger: PortcullisMerge):
+
+        super().__init__()
+        self.configuration = merger.configuration
+        self.input = merger.output
+        self.message = "Flagging portcullis as complete"
+        self.output = {"flag": os.path.join(os.path.dirname(self.input["bed"]), "portcullis.done")}
+        self.touch = True
+
+    @property
+    def loader(self):
+        return []
+
+    @property
+    def rulename(self):
+        return "portcullis_flag"

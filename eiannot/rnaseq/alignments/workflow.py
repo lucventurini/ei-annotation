@@ -22,9 +22,11 @@ class ShortAlignmentsWrapper(EIWrapper):
         bams = []
         self.configuration = prepare_wrapper.configuration
         prepare_flag = prepare_wrapper.output
+        instances = []
         for wrapper in self.wrappers.values():
             instance = wrapper(self.configuration, bams, prepare_flag)
             instance.add_flag_to_inputs()
+            instances.append(instance)
             self.merge([instance])
             bams.extend(instance.bams)
             for bam in instance.bams:
@@ -40,21 +42,6 @@ class ShortAlignmentsWrapper(EIWrapper):
 
         final_flag = AlnFlag(stats)
         self.add_edges_from([(stat, final_flag) for stat in stats])
-        if self.execute_portcullis is True:
-            self.portcullis = PortcullisWrapper(self.configuration, bams)
-            self.merge(self.portcullis)
-            flag = self.portcullis.flag
-            self.add_edges_from([stat, flag] for stat in stats)
-
-    @property
-    def execute_portcullis(self):
-
-        # TODO: probably we should push this somewhere else
-        return self.configuration["portcullis"]["execute"]
-
-    @property
-    def portcullis_junctions(self):
-        return self.portcullis.output["bed"]
 
 
 class LongAlignmentsWrapper(EIWrapper):

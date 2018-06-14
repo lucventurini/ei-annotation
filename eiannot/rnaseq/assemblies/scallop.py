@@ -6,9 +6,9 @@ import itertools
 
 class ScallopWrapper(ShortAssemblerWrapper):
 
-    def __init__(self, configuration, bams, aln_flag):
+    def __init__(self, aln_wrapper):
 
-        super().__init__(configuration, bams, aln_flag)
+        super().__init__(aln_wrapper)
 
         if len(self.runs) > 0 and len(bams) > 0:
             scallops = []

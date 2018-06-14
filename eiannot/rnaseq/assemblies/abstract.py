@@ -151,12 +151,11 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
 class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
-    def __init__(self, configuration, bams, aln_flag):
-        super().__init__()
+    def __init__(self, aln_wrapper):
+        super().__init__(configuration=aln_wrapper.configuration)
         self.__gf_rules = set()
-        self.aln_flag = aln_flag
-        self.configuration = configuration
-        self.bams = bams
+        self.aln_flag = aln_wrapper.output
+        self.bams = aln_wrapper.bams
 
     @property
     @abc.abstractmethod

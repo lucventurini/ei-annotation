@@ -15,13 +15,14 @@ class AssemblyWrapper(EIWrapper):
                 "class2": Class2Wrapper,
                 "stringtie": StringtieWrapper}
 
-    def __init__(self, configuration, bams, aln_flag):
+    def __init__(self, short_assemblies: ShortAssemblerWrapper):
 
-        super().__init__()
+        super().__init__(configuration=short_assemblies.configuration)
+
         stats = []
         self.__gfs = []
         for wrapper in self.wrappers.values():
-            instance = wrapper(configuration, bams, aln_flag)
+            instance = wrapper(short_assemblies)
             instance.add_flag_to_inputs()
             self.merge([instance])
             stats.extend([AsmStats(rule) for rule in instance.gfs])

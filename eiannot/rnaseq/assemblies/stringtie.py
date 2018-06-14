@@ -7,9 +7,8 @@ import re
 
 class StringtieWrapper(ShortAssemblerWrapper):
 
-    def __init__(self, configuration, bams):
-        super().__init__()
-        self.configuration = configuration
+    def __init__(self, aln_wrapper):
+        super().__init__(aln_wrapper)
 
         if len(bams) > 0 and len(self.runs) > 0:
             stringties = []

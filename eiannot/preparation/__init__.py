@@ -101,6 +101,16 @@ class SanitizeProteinBlastDB(AtomicOperation):
         return "sanitize_protein_db"
 
 
+class PrepareWrapper(EIWrapper):
+
+    def __init__(self, configuration, genome):
+
+        super().__init__(configuration)
+        self.sanitizer = SanitizeGenome(configuration, genome)
+        self.faidx = FaidxGenome(self.sanitizer)
+        self.add_edge(self.sanitizer, self.faidx)
+
+
 class DiamondIndex(AtomicOperation):
 
     def __init__(self, sanitizer: SanitizeProteinBlastDB):

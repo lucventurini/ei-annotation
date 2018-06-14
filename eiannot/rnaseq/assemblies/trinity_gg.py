@@ -24,9 +24,8 @@ def trinity_version(loader):
 
 class TrinityGGWrapper(ShortAssemblerWrapper):
 
-    def __init__(self, configuration, bams):
-        super().__init__(configuration)
-        self.configuration = configuration
+    def __init__(self, aln_wrapper):
+        super().__init__(aln_wrapper)
 
         if len(self.runs) > 0 and len(bams) > 0:
             indexer = GmapIndex(configuration, self.outdir)
