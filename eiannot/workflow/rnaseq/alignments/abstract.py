@@ -223,8 +223,8 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def link(self):
-        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}.bam".format(
-            toolname=self.toolname, sample=self.sample.label, run=self.run)
+        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}.{suffix}".format(
+            toolname=self.toolname, sample=self.sample.label, run=self.run, suffix=self.suffix)
                             )
 
 

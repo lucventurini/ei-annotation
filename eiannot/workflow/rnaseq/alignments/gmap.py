@@ -184,4 +184,61 @@ class GmapLongReads(LongAligner):
     def __init__(self, indexer, sample, run):
 
         super().__init__(indexer=indexer, sample=sample, run=run)
+        self.output = {"link": self.link,
+                       "gf": os.path.join() }
 
+        self.message = "Mapping long reads to the genome with gmap (sample: {sample.label} - run: {run})".format(
+            sample=self.sample, run=self.run)
+
+    @property
+    def loader(self):
+        return ["gmap"]
+
+    @property
+    def toolname(self):
+        return "gmap"
+
+    @property
+    def suffix(self):
+        return ".gff"
+
+    @property
+    def rulename(self):
+        return "gmap_long_{sample.label}_{run}".format(sample=self.sample, run=self.run)
+
+    @property
+    def cmd(self):
+
+        load = self.load
+        max_intron = self.max_intron_cli
+        threads = self.threads
+        min_intron = self.min_intron
+        index =
+        dbname =
+        cmd = "{load} gmap --dir={index} --db {dbname} --min-intronlength={min_intron} {max_intron}"
+
+        input, output, log = self.input, self.output, self.log
+        cmd += "--format=3 {input[read1]} > {output[gf]} 2> {log} "
+        link_src = os.path.relpath(self.link, start=os.path.dirname(self.output["gf"]))
+        cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+
+        cmd = cmd.format(**locals())
+        return cmd
+
+    @property
+    def max_intron_cli(self):
+        return gmap_intron_lengths(self.load, self.max_intron)
+
+    # rule lr_gmap:
+    # 	input:
+    # 		index=rules.gmap_index.output,
+    # 		reads=lambda wildcards: L_INPUT_MAP[wildcards.lsample]
+    # 	output: link=ALIGN_DIR+"/lr_output/lr_gmap-{lsample}-{lrun}.gff",
+    # 		gff=ALIGN_DIR+"/gmap/{lsample}-{lrun}/lr_gmap-{lsample}-{lrun}.gff"
+    # 	params: load=loadPre(config, "gmap"),
+    # 		link_src="../gmap/{lsample}-{lrun}/lr_gmap-{lsample}-{lrun}.gff",
+    # 		intron_length=gmap_intron_lengths(loadPre(config, "gmap"), MAX_INTRON)
+    # 	log: ALIGN_DIR+"/gmap-{lsample}-{lrun}.log"
+    # 	threads: THREADS
+    # 	message: "Mapping long reads to the genome with gmap (sample: {wildcards.lsample} - run: {wildcards.lrun})"
+    # 	shell: "--format=3 {input.reads} > {output.gff} 2> {log} && ln -sf {params.link_src} {output.link} && touch -h {output.link}"
