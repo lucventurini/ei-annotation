@@ -1,4 +1,4 @@
-from eiannot.workflow.abstract import AtomicOperation, EIWorfkflow
+from eiannot.abstract import AtomicOperation, EIWorfkflow
 import snakemake
 import tempfile
 import os
