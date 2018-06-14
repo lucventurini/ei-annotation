@@ -1,5 +1,5 @@
 from ...abstract import AtomicOperation, EIWrapper, ShortSample
-from .abstract import ShortWrapper
+from .workflow import ShortAlignmentsWrapper
 import os
 import re
 import functools
@@ -40,15 +40,15 @@ class PortcullisWrapper(EIWrapper):
         if execute and short_alignments.bams:
             preps = []
             filters = []
-            refprep = PortcullisPrepRef(configuration, outdir=outdir)
+            refprep = PortcullisPrepRef(self.configuration, outdir=outdir)
             refout = refprep.output["refbed"]
             if refout is not None:
                 self.add_node(refprep)
             else:
                 refprep = None
 
-            for bam in bams:
-                prep = PortcullisPrep(bam, configuration, outdir)
+            for bam in short_alignments.bams:
+                prep = PortcullisPrep(bam, self.configuration, outdir)
                 preps.append(prep)
 
                 junc = PortcullisJunc(prep)
@@ -59,13 +59,14 @@ class PortcullisWrapper(EIWrapper):
                 if refprep is not None:
                     self.add_edge(refprep, filt)
                 filters.append(filt)
-            self.merger = PortcullisMerge(configuration, filters)
+            self.merger = PortcullisMerge(self.configuration, filters)
             self.flag = PortcullisFlag(merger=self.merger)
             self.add_edges_from([(filt, self.merger) for filt in filters])
 
     @property
-    def flag(self):
-        return self.merger
+    def junctions(self):
+
+        return self.merger.output["bed"]
 
 
 class PortcullisPrep(AtomicOperation):

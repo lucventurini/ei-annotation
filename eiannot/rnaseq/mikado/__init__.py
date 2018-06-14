@@ -13,20 +13,20 @@ class Mikado(EIWorfkflow):
 
     def __init__(self,
                  assemblies: AssemblyWrapper,
-                 short_alignments: ShortAlignmentsWrapper,
-                 long_alignments: LongAlignmentsWrapper):
+                 long_alignments: LongAlignmentsWrapper,
+                 portcullis: PortcullisWrapper):
 
         super().__init__()
         self.configuration = assemblies.configuration
-        self.short_alignments = short_alignments
         self.assemblies = assemblies
         self.long_alignments = long_alignments
+        self.portcullis = portcullis
 
-        self.configurer = MikadoConfig(portcullis_wrapper=self.short_alignments.portcullis,
+        self.configurer = MikadoConfig(portcullis_wrapper=self.portcullis,
                                        assemblies=self.assemblies,
                                        long_aln_wrapper=long_alignments)
         self.add_edges_from([step, self.configurer] for step in
-                            [self.assemblies, self.short_alignments, self.long_alignments])
+                            [self.assemblies, self.long_alignments, self.portcullis])
 
         self.preparer = MikadoPrepare(self.configuration)
         self.add_edge(self.configuration, self.preparer)
@@ -54,7 +54,7 @@ class Mikado(EIWorfkflow):
 
     @property
     def junctions(self):
-        return self.short_alignments.portcullis_junctions
+        return self.portcullis.junctions
 
     @property
     def modes(self):

@@ -155,6 +155,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         super().__init__(configuration=aln_wrapper.configuration)
         self.__gf_rules = set()
         self.aln_flag = aln_wrapper.output
+        self.__bams = []
         self.bams = aln_wrapper.bams
 
     @property
@@ -185,6 +186,16 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
     @property
     def outdir(self):
         return os.path.join(os.path.join(self.configuration["out_dir"], "rnaseq", "2-assemblies"))
+
+    @property
+    def bams(self):
+        return self.__bams
+
+    @bams.setter
+    def bams(self, bams):
+        assert isinstance(bams, list) and all(isinstance(bam, AtomicOperation) for bam in bams)
+        assert all("bam" in bam.output for bam in bams)
+        self.__bams = bams
 
 
 class AsmStats(AtomicOperation):

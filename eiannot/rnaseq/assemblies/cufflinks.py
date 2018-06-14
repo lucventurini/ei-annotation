@@ -9,10 +9,10 @@ class CufflinksWrapper(ShortAssemblerWrapper):
     def __init__(self, align_wrapper):
         super().__init__(align_wrapper)
 
-        if len(bams) > 0 and len(self.runs) > 0:
+        if len(self.bams) > 0 and len(self.runs) > 0:
             cuffs = []
-            for bam, run in itertools.product(bams, range(len(self.runs))):
-                cufflinks = Cufflinks(bam, run, configuration, self.outdir)
+            for bam, run in itertools.product(self.bams, range(len(self.runs))):
+                cufflinks = Cufflinks(bam, run, self.configuration, self.outdir)
                 cuffs.append(cufflinks)
                 self.add_to_gf(cuffs)
             flag = CufflinksFlag(cuffs, self.outdir)

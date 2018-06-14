@@ -19,7 +19,7 @@ class ShortAlignmentsWrapper(EIWrapper):
 
         super().__init__()
         stats = []
-        bams = []
+        self.bams = []
         self.configuration = prepare_wrapper.configuration
         prepare_flag = prepare_wrapper.output
         instances = []
@@ -28,7 +28,7 @@ class ShortAlignmentsWrapper(EIWrapper):
             instance.add_flag_to_inputs()
             instances.append(instance)
             self.merge([instance])
-            bams.extend(instance.bams)
+            self.bams.extend(instance.bams)
             for bam in instance.bams:
                 # TODO: here add the entrance from the "preparation" stage
                 # self.add_edges_from()
@@ -118,21 +118,3 @@ class LongAlignersFlag(AtomicOperation):
     @property
     def loader(self):
         return []
-
-
-    # rule lr_gmap:
-    #     input:
-    #         index = rules.gmap_index.output,
-    #         reads = lambda wildcards: L_INPUT_MAP[wildcards.lsample]
-    # output: link = ALIGN_DIR + "/lr_output/lr_gmap-{lsample}-{lrun}.gff",
-    # gff = ALIGN_DIR + "/gmap/{lsample}-{lrun}/lr_gmap-{lsample}-{lrun}.gff"
-    # params:
-    #     load = loadPre(config, "gmap"),
-    #     link_src = "../gmap/{lsample}-{lrun}/lr_gmap-{lsample}-{lrun}.gff",
-    #     intron_length = gmap_intron_lengths(loadPre(config, "gmap"), MAX_INTRON)
-    # log: ALIGN_DIR + "/gmap-{lsample}-{lrun}.log"
-    # threads: THREADS
-    # message: "Mapping long reads to the genome with gmap (sample: {wildcards.lsample} - run: {wildcards.lrun})"
-    # shell: "{params.load} gmap --dir={ALIGN_DIR}/gmap/index --db={NAME} --min-intronlength={MIN_INTRON} {params.intron_length} --format=3 {input.reads} > {output.gff} 2> {log} && ln -sf {params.link_src} {output.link} && touch -h {output.link}"
-
-

@@ -5,6 +5,7 @@ from .cufflinks import CufflinksWrapper
 from .trinity_gg import TrinityGGWrapper
 from .scallop import ScallopWrapper
 from ...abstract import EIWrapper, EIWorfkflow
+from ..alignments.workflow import ShortAlignmentsWrapper
 
 
 class AssemblyWrapper(EIWrapper):
@@ -15,14 +16,14 @@ class AssemblyWrapper(EIWrapper):
                 "class2": Class2Wrapper,
                 "stringtie": StringtieWrapper}
 
-    def __init__(self, short_assemblies: ShortAssemblerWrapper):
+    def __init__(self, short_alignments: ShortAlignmentsWrapper):
 
-        super().__init__(configuration=short_assemblies.configuration)
+        super().__init__(configuration=short_alignments.configuration)
 
         stats = []
         self.__gfs = []
         for wrapper in self.wrappers.values():
-            instance = wrapper(short_assemblies)
+            instance = wrapper(short_alignments)
             instance.add_flag_to_inputs()
             self.merge([instance])
             stats.extend([AsmStats(rule) for rule in instance.gfs])
