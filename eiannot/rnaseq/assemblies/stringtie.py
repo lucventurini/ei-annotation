@@ -17,6 +17,7 @@ class StringtieWrapper(ShortAssemblerWrapper):
                 stringties.append(stringtie)
                 self.add_to_gf(stringtie)
             flag = StringtieFlag(stringties, self.outdir)
+            self.add_node(flag)
             self.add_edges_from([(stringtie, flag) for stringtie in stringties])
             return
 
@@ -32,6 +33,14 @@ class StringtieFlag(AtomicOperation):
         self.input = {"gtfs": [stringtie.output["link"] for stringtie in stringties]}
         self.touch = True
         self.output = {"flag": os.path.join(outdir, "stringtie.done")}
+
+    @property
+    def rulename(self):
+        return "stringtie_flag"
+
+    @property
+    def loader(self):
+        return []
 
 
 class Stringtie(ShortAssembler):
@@ -70,7 +79,8 @@ class Stringtie(ShortAssembler):
             trans = "-G {ref_transcriptome}".format(ref_transcriptome=self.ref_transcriptome)
         else:
             trans = ""
-        cmd += "stringtie {input[bam]} -l Stringtie_{} {extra}"
+        alrun = self.alrun
+        cmd += "stringtie {input[bam]} -l Stringtie_{alrun} {extra}"
         cmd += "{trans} -o {output[gf]} -p {threads} > {log} 2>&1 "
         cmd += "ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
@@ -83,3 +93,7 @@ class Stringtie(ShortAssembler):
     @property
     def strand(self):
         return ''
+
+    @property
+    def input_reads(self):
+        return ""

@@ -267,7 +267,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         """This property defines how to "load" a module for use in cluster environments."""
 
         # TODO: this will have to be revised once we have the configuration
-        to_load = [self.__configuration["programs"].get(_, dict()).get("load", '') for _ in self.loader]
+        to_load = [self.configuration["programs"].get(_, dict()).get("load", '') for _ in self.loader]
         cmd = loadPreCmd(*to_load)
         if cmd:
             return cmd

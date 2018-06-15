@@ -1,22 +1,24 @@
 import abc
 from ...abstract import ShortSample, LongSample, AtomicOperation, Sample, EIWrapper
+from ..alignments.bam import BamStats
 import os
 import re
 
 
 class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
-    def __init__(self, bam, run, ref_transcriptome=None):
+    def __init__(self, bam: BamStats, run, ref_transcriptome=None):
 
         super(ShortAssembler, self).__init__()
-        self.__configuration, self.__sample, self.__run = None, None, None
+        self.__sample, self.__run = None, None
         self.configuration = bam.configuration
-        self.sample = self.get_sample()
+        self.sample = bam.sample
         self.run = run
+        self.alrun = bam.align_run
         self.__ref_transcriptome = None
         self.ref_transcriptome = ref_transcriptome
         if bam is not None:
-            self.input["bam"] = bam
+            self.input["bam"] = bam.input["bam"]
         self.log = os.path.join(self.outdir, "{toolname}-{sample}-{run}-{alrun}.log".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run,
             alrun=self.alrun
@@ -36,22 +38,6 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def toolname(self):
         pass
-
-    def get_sample(self):
-        bam = os.path.basename(self.input["bam"])
-        groups = re.search("(.*)-([^-]*)-([^-]*)", os.path.splitext(bam)[0]).groups()
-        if groups is None:
-            raise ValueError(bam)
-        return "{groups[1]}".format(**locals())
-
-    @property
-    def alrun(self):
-        """This method will infer the alignment run from the name of the BAM file."""
-        bam = os.path.basename(self.input["bam"])
-        groups = re.search("(.*)-([^-]*)-([^-]*)", os.path.splitext(bam)[0]).groups()
-        if groups is None:
-            raise ValueError(bam)
-        return "{groups[0]}-{groups[2]}".format(**locals())
 
     @property
     def gfdir(self):
@@ -88,14 +74,14 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
     def run(self, run):
         if not isinstance(run, int):
             raise TypeError
-        runs = self.__configuration["programs"][self.toolname]["runs"]
+        runs = self.configuration["programs"][self.toolname]["runs"]
         if run not in range(len(runs)):
             raise ValueError
         self.__run = run
 
     @property
     def extra(self):
-        return self.__configuration["programs"][self.toolname]["runs"][self.run]
+        return self.configuration["programs"][self.toolname]["runs"][self.run]
 
     @property
     def ref_transcriptome(self):
@@ -103,6 +89,8 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
     @ref_transcriptome.setter
     def ref_transcriptome(self, ref):
+        if ref is None:
+            return
         if not os.path.exists(os.path.abspath(ref)):
             raise ValueError
         self.__ref_transcriptome = ref
@@ -139,7 +127,7 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
     def link_src(self):
         return os.path.join("..", self.toolname,
                             "{sample}-{run}-{alrun}".format(sample=self.sample.label, run=self.run, alrun=self.alrun),
-                            os.path.basename(self.output["bam"]))
+                            os.path.basename(self.output["gf"]))
 
     @property
     def rulename(self):
@@ -157,7 +145,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
     def __init__(self, aln_wrapper):
         super().__init__(configuration=aln_wrapper.configuration)
         self.__gf_rules = set()
-        self.aln_flag = aln_wrapper.output
+        self.aln_flag = aln_wrapper.exit
         self.__bams = []
         self.bams = aln_wrapper.bams
         self.configuration = aln_wrapper.configuration
@@ -172,7 +160,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
             raise TypeError
         if "link" not in rule.output:
             raise KeyError("Link not found for rule {}".format(rule.rulename))
-        self.__gf_rules.add(rule.rulename)
+        self.__gf_rules.add(rule)
 
     @property
     def gfs(self):
@@ -185,7 +173,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     def add_flag_to_inputs(self):
         for rule in self:
-            rule.input["aln_flag"] = self.aln_flag
+            rule.input["aln_flag"] = self.aln_flag.output["flag"]
 
     @property
     def outdir(self):
@@ -196,9 +184,9 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         return self.__bams
 
     @bams.setter
-    def bams(self, bams):
+    def bams(self, bams: BamStats):
         assert isinstance(bams, list) and all(isinstance(bam, AtomicOperation) for bam in bams)
-        assert all("bam" in bam.output for bam in bams)
+        assert all("bam" in bam.input for bam in bams), [bam.output for bam in bams]
         self.__bams = bams
 
     @property
@@ -211,6 +199,7 @@ class AsmStats(AtomicOperation):
     def __init__(self, asm_run: ShortAssembler):
 
         super().__init__()
+        self.configuration = asm_run.configuration
         self.input["gf"] = asm_run.output["link"]
         self.output["stats"] = self.input["gf"] + ".stats"
         self.message = "Computing assembly stats for: {input[gf]}"
@@ -223,6 +212,7 @@ class AsmStats(AtomicOperation):
     @property
     def cmd(self):
         load, output, input = self.load, self.output, self.input
+        log = self.log
         cmd = "{load} mikado util stats {input[gf]} {output[stats]} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd

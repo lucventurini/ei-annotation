@@ -32,7 +32,7 @@ class PortcullisWrapper(EIWrapper):
     # TODO: probably I need something here to start the runs
     def __init__(self, short_alignments: ShortAlignmentsWrapper):
 
-        super().__init__(configuration = short_alignments.configuration)
+        super().__init__(configuration=short_alignments.configuration)
 
         filters = []
         if self.execute and short_alignments.bams:
@@ -40,13 +40,14 @@ class PortcullisWrapper(EIWrapper):
             filters = []
             refprep = PortcullisPrepRef(self.configuration, outdir=self.outdir)
             refout = refprep.output["refbed"]
-            if refout is not None:
+            if refout:
                 self.add_node(refprep)
             else:
                 refprep = None
 
             for bam in short_alignments.bams:
-                prep = PortcullisPrep(bam, self.configuration, self.outdir)
+                prep = PortcullisPrep(bam, self.outdir)
+                self.add_edge(short_alignments.exit, prep)
                 preps.append(prep)
 
                 junc = PortcullisJunc(prep)
@@ -77,16 +78,16 @@ class PortcullisWrapper(EIWrapper):
 
     @property
     def execute(self):
-        return self.configuration["programs"].get("portcullis", dict()).get("execute", False)
+        return self.configuration["programs"].get("portcullis", dict()).get("execute", True)
 
 
 class PortcullisPrep(AtomicOperation):
 
-    def __init__(self, bam, configuration, outdir):
+    def __init__(self, bam, outdir):
         super().__init__()
-        self.configuration = configuration
-        self.input = {"genome": self.genome, "bam": bam}
-        self.sample = self.get_sample()
+        self.configuration = bam.configuration
+        self.input = {"genome": self.genome, "bam": bam.input["bam"], "index": bam.input["index"]}
+        self.sample = bam.sample
         self._outdir = outdir
         self.output = {"bai": os.path.join(
             self.sample_dir,
@@ -94,7 +95,8 @@ class PortcullisPrep(AtomicOperation):
         self.log = os.path.join(self._outdir, "log", "portcullis_{alrun}-prep.log".format(alrun=self.alrun))
         if not os.path.exists(os.path.dirname(self.log)):
             os.makedirs(os.path.dirname(self.log))
-        self.message = "Using portcullis to prepare: {bam}".format(bam=self.input["bam"])
+        self.message = "Using portcullis to prepare in folder {sample_dir}: {bam}".format(bam=self.input["bam"],
+                                                                                          sample_dir=self.sample_dir)
 
     def get_sample(self):
         bam = os.path.basename(self.input["bam"])
@@ -106,9 +108,7 @@ class PortcullisPrep(AtomicOperation):
 
     @property
     def sample_dir(self):
-        return os.path.join(self._outdir, "portcullis_{alrun}".format(
-            alrun=self.alrun
-        ))
+        return os.path.join(self._outdir, self.alrun)
 
     @property
     def alrun(self):
@@ -140,9 +140,9 @@ class PortcullisPrepRef(AtomicOperation):
     def __init__(self, configuration, outdir):
         super().__init__()
         self.configuration = configuration
-        self.input = {"reference": self.configuration["reference"]["transcriptome"]}
-        if self.input["reference"] is None:
-            self.output = {"refbed": None}
+        self.input = {"reference": self.configuration["reference"].get("ref_transcriptome", "")}
+        if not self.input["reference"]:
+            self.output = {"refbed": ""}
             return
         self._outdir = outdir
         self.output = {"refbed": os.path.join(self._outdir, "ref_juncs.bed")}
@@ -174,13 +174,16 @@ class PortcullisJunc(AtomicOperation):
 
         super().__init__()
         self.configuration, self.sample = portcullis_prep.configuration, portcullis_prep.sample
-        self.sample_dir = portcullis_prep.sample_dir
         self._outdir = portcullis_prep._outdir
         self.input = {"bai": portcullis_prep.output["bai"]}
         self.alrun = portcullis_prep.alrun
         self.output = {"tab": os.path.join(self.sample_dir,
                                            "2-junc",
-                                           "{alrun}.junctions.tab".format(alrun=self.alrun)
+                                           "portcullis.junctions.tab"
+                                           ),
+                       "bed": os.path.join(self.sample_dir,
+                                           "2-junc",
+                                           "portcullis.junctions.bed"
                                            )}
         self.log = os.path.join(self._outdir, "log", "portcullis_{alrun}-junc.log".format(alrun=self.alrun))
         self.message = "Using portcullis to analyse potential junctions: {alrun}".format(
@@ -209,9 +212,13 @@ class PortcullisJunc(AtomicOperation):
         threads = self.threads
         alrun = self.alrun
         cmd = "{load}"
-        cmd += "portcullis junc -o {outdir}/{alrun} {strand} -t {threads} {prepdir} > {log} 2>&1"
+        cmd += " portcullis junc -o {outdir}/portcullis {strand} -t {threads} {prepdir} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def sample_dir(self):
+        return os.path.join(self._outdir, self.alrun)
 
 
 class PortcullisFilter(AtomicOperation):
@@ -223,6 +230,8 @@ class PortcullisFilter(AtomicOperation):
         self.sample, self.configuration = portcullis_junc.sample, portcullis_junc.configuration
         self.input = portcullis_junc.output
         self.alrun = portcullis_junc.alrun
+        self.sample = portcullis_junc.sample
+        self.sample_dir = portcullis_junc.sample_dir
         self._outdir = portcullis_junc._outdir
         self.output = {"bed_link": os.path.join(self._outdir,
                                                 "output",
@@ -246,7 +255,7 @@ class PortcullisFilter(AtomicOperation):
 
     @property
     def canonical_option(self):
-        return self.configuration["programs"]["portcullis"]["canonical_juncs"]
+        return self.configuration["programs"]["portcullis"].get("canonical_juncs", "OFF")
 
     @property
     def min_intron(self):
@@ -261,36 +270,40 @@ class PortcullisFilter(AtomicOperation):
 
         load = self.load
         cmd = "{load}"
-        outdir = ""  # TODO
+        outdir = os.path.join(self.sample_dir, "3-filt", "portcullis")
         threads = self.threads
         canonical = self.canonical_option
-        cmd += "portcullis filter -o {outdir} --canonical={canonical}"
+        cmd += " (portcullis filter -o {outdir} --canonical={canonical} "
         max_intron = self.max_intron
         if "refbed" in self.input:
             trans = "--reference {input[refbed]}"
         else:
             trans = ""
-        prepdir = os.path.join(self._outdir, "portcullis_{alrun}", "1-prep").format(alrun=self.alrun)
-        cmd += "--max_length={max_intron} {trans} --threads={threads} {prepdir}"
+        prepdir = os.path.join(self.sample_dir, "1-prep").format(alrun=self.alrun)
+        cmd += " --max_length={max_intron} {trans} --threads={threads} {prepdir} "
         input = self.input
         log = self.log
-        cmd += "{input[tab]} > {log} 2>&1"
+        cmd += " {input[tab]} > {log} 2>&1"
 
         # Now time for the links
         output = self.output
-        bed_link_src = os.path.join("..", "portcullis_{alrun}", "3-filt", "{alrun}.pass.junctions.bed").format(
-            alrun=self.alrun)
-        tab_link_src = os.path.join("..", "portcullis_{alrun}", "3-filt", "{alrun}.pass.junctions.tab").format(
-            alrun=self.alrun)
+        bed_link_src = os.path.relpath(os.path.join(self.sample_dir, "3-filt", "portcullis.pass.junctions.bed"),
+                                       start=os.path.dirname(self.output["bed_link"]))
+        tab_link_src = os.path.relpath(os.path.join(self.sample_dir, "3-filt", "portcullis.pass.junctions.bed"),
+                                       start=os.path.dirname(self.output["tab_link"]))
+
         # We need the unfiltered files because, if there are too few reads, portcullis filter will fail
         # as this is not recoverable (it's by design) we provide the unfiltered junctions instead
-        bed_link_unfilt = os.path.join("..", "portcullis_{alrun}", "2-junc", "{alrun}.junctions.bed").format(
-            alrun=self.alrun)
-        tab_link_unfilt = os.path.join("..", "portcullis_{alrun}", "2-junc", "{alrun}.junctions.tab").format(
-            alrun=self.alrun)
+        bed_link_unfilt = os.path.relpath(self.input["bed"],
+                                          start=os.path.dirname(self.output["bed_link"]))
+        #
+        # bed_link_unfilt = os.path.join("..", "portcullis_{alrun}", "2-junc", "{alrun}.junctions.bed").format(
+        #     alrun=self.alrun)
+        tab_link_unfilt = os.path.relpath(self.input["tab"],
+                                          start=os.path.dirname(self.output["tab_link"]))
 
-        cmd += " && ln -sf {bed_link_src} {output[bed_link]} || ln -sf {bed_link_unfilt} {output[bed_link]}"
-        cmd += " && ln -sf {tab_link_src} {output[tab_link]} || ln -sf {tab_link_unfilt} {output[tab_link]}"
+        cmd += " && ln -sf {bed_link_src} {output[bed_link]} && ln -sf {tab_link_src} {output[tab_link]} )"
+        cmd += " || ln -sf {bed_link_unfilt} {output[bed_link]} && ln -sf {tab_link_unfilt} {output[tab_link]}"
         cmd += " && touch -h {output[tab_link]} && touch -h {output[bed_link]}"
         cmd = cmd.format(**locals())
         return cmd

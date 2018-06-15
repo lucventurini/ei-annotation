@@ -23,9 +23,9 @@ class AnnotationWorklow(EIWorfkflow):
         self.long_wrapper = LongAlignmentsWrapper(self.prepare)
         self.portcullis = PortcullisWrapper(self.short_wrapper)
         self.merge([self.short_wrapper, self.long_wrapper, self.portcullis])
-        # self.assemblies = AssemblyWrapper(self.short_wrapper)
-        # self.merge([self.assemblies])
+        self.assemblies = AssemblyWrapper(self.short_wrapper)
+        self.merge([self.assemblies])
         print([(e[0].rulename, e[1].rulename) for e in self.edges])
 
-        # self.mikado = Mikado(assemblies=self.assemblies, long_alignments=self.long_wrapper, portcullis=self.portcullis)
-        # self.merge([self.mikado])
+        self.mikado = Mikado(assemblies=self.assemblies, long_alignments=self.long_wrapper, portcullis=self.portcullis)
+        self.merge([self.mikado])

@@ -9,6 +9,8 @@ class BamSort(AtomicOperation):
     def __init__(self, bamrule):
 
         super().__init__()
+        self.alrun = bamrule.alrun
+        self.sample = bamrule.sample
         self.configuration = bamrule.configuration
         self.input = {"bam": bamrule.output["link"]}
         self.output = {"bam": os.path.splitext(self.input["bam"])[0] + ".sorted.bam"}
@@ -45,6 +47,8 @@ class BamIndex(AtomicOperation):
 
     def __init__(self, bamrule):
         super().__init__()
+        self.alrun = bamrule.alrun
+        self.sample = bamrule.sample
         self.configuration = bamrule.configuration
         self.input = {"bam": bamrule.output["bam"]}
         self.output = {"index": self.input["bam"] + ".bai"}
@@ -84,7 +88,9 @@ class BamStats(AtomicOperation):
     def __init__(self, bamrule: BamIndex):
 
         super().__init__()
+        self.sample = bamrule.sample
         self.configuration = bamrule.configuration
+        self.alrun = bamrule.alrun
         self.input = {"bam": bamrule.input["bam"], "index": bamrule.output["index"]}
         self.output = {"stats": bamrule.input["bam"] + ".stats"}
         input, output = self.input, self.output

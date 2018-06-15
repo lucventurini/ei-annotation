@@ -188,6 +188,11 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
     def outdir(self):
         return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
 
+    @property
+    def alrun(self):
+        return "{toolname}-{sample.label}-{run}".format(toolname=self.toolname,
+                                                        sample=self.sample, run=self.run)
+
 
 class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
@@ -280,6 +285,8 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
         if self.__finalised:
             return
+        new_bams = set()
+
         for bam in self.bams:
             sorter = BamSort(bam)
             self.add_edge(bam, sorter)
@@ -287,7 +294,9 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
             self.add_edge(sorter, indexer)
             stater = BamStats(indexer)
             self.add_edge(indexer, stater)
+            new_bams.add(stater)
             self.__stats.append(stater)
+        self.__bam_rules = new_bams
         self.flag = ShortAlnFlag(self.outdir, runs=self.__stats, toolname=self.toolname)
         self.add_node(self.flag)
         self.add_edges_from([(stat, self.flag) for stat in self.__stats])

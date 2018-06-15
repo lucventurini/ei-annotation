@@ -17,5 +17,6 @@ programs:
   samtools:
     load: ''
   portcullis:
+    execute: true
     load: ''
 outdir: "Eiannot"
