@@ -1,0 +1,21 @@
+reference:
+  min_intron: 20
+  max_intron: 10000
+proteins:
+  chunks: 10
+  files:
+    uniprot: uniprot_sprot_plants.fasta
+programs:
+  mikado:
+    load: ''
+  stringtie:
+    load: ''
+    runs: ['']
+  hisat2:
+    load: ''
+    runs: ['']
+  samtools:
+    load: ''
+  portcullis:
+    load: ''
+outdir: "Eiannot"

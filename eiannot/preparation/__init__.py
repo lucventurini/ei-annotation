@@ -58,7 +58,7 @@ class FaidxGenome(AtomicOperation):
 
     @property
     def cmd(self):
-        cmd = "{load} samtools index {input[genome]} > {log} 2>&1".format(load=self.load, input=self.input,
+        cmd = "{load} samtools faidx {input[genome]} > {log} 2>&1".format(load=self.load, input=self.input,
                                                                           log=self.log)
         return cmd
 

@@ -153,7 +153,7 @@ class TopHat2Wrapper(ShortWrapper):
             self.add_edges_from([(indexer, run) for run in star_runs])
             flag = TopHat2Flag(self.outdir, [run.output["link"] for run in star_runs])
             self.add_edges_from([(run, flag) for run in star_runs])
-        self.add_flag_to_inputs()
+        self.finalise()
 
     @property
     def toolname(self):

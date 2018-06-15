@@ -20,12 +20,11 @@ class Class2Wrapper(ShortAssemblerWrapper):
     def __init__(self, aln_wrapper):
 
         super().__init__(aln_wrapper)
-        self.configuration = configuration
         outdir = ''  # TODO: implement!
-        if len(self.runs) > 0 and len(bams) > 0:
+        if len(self.runs) > 0 and len(self.bams) > 0:
             scallops = []
-            for bam, run in itertools.product(bams, range(len(self.runs))):
-                scallop = Class2(bam, run, configuration, outdir)
+            for bam, run in itertools.product(self.bams, range(len(self.runs))):
+                scallop = Class2(bam, run)
                 scallops.append(scallop)
                 self.add_to_gf(scallop)
                 continue

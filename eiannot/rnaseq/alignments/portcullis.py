@@ -14,14 +14,14 @@ def portcullis_help(command, step):
 
 
 @functools.lru_cache(maxsize=8, typed=True)
-def portcullisStrandOption(sample: ShortSample, command, step):
+def portcullisStrandOption(strandedness, command, step):
     cmd = portcullis_help(command, step)
     if not any("strandedness" in _ for _ in cmd.split("\n")):
         return ""
     else:
-        if sample.strandedness == "fr-firststrand":
+        if strandedness == "fr-firststrand":
             return "--strandedness=firststrand"
-        elif sample.strandedness == "fr-secondstrand":
+        elif strandedness == "fr-secondstrand":
             return "--strandedness=secondstrand"
         else:
             return "--strandedness=unstranded"
@@ -33,14 +33,12 @@ class PortcullisWrapper(EIWrapper):
     def __init__(self, short_alignments: ShortAlignmentsWrapper):
 
         super().__init__(configuration = short_alignments.configuration)
-        execute = self.configuration["programs"]["portcullis"]["execute"]
 
-        outdir = os.path.join(self.configuration["outdir"],
-                              "rnaseq", "3-portcullis")
-        if execute and short_alignments.bams:
+        filters = []
+        if self.execute and short_alignments.bams:
             preps = []
             filters = []
-            refprep = PortcullisPrepRef(self.configuration, outdir=outdir)
+            refprep = PortcullisPrepRef(self.configuration, outdir=self.outdir)
             refout = refprep.output["refbed"]
             if refout is not None:
                 self.add_node(refprep)
@@ -48,7 +46,7 @@ class PortcullisWrapper(EIWrapper):
                 refprep = None
 
             for bam in short_alignments.bams:
-                prep = PortcullisPrep(bam, self.configuration, outdir)
+                prep = PortcullisPrep(bam, self.configuration, self.outdir)
                 preps.append(prep)
 
                 junc = PortcullisJunc(prep)
@@ -59,14 +57,27 @@ class PortcullisWrapper(EIWrapper):
                 if refprep is not None:
                     self.add_edge(refprep, filt)
                 filters.append(filt)
-            self.merger = PortcullisMerge(self.configuration, filters)
-            self.flag = PortcullisFlag(merger=self.merger)
-            self.add_edges_from([(filt, self.merger) for filt in filters])
+        self.merger = PortcullisMerge(self.configuration, filters, self.outdir)
+        self.add_edges_from([(filt, self.merger) for filt in filters])
+        self.flag = PortcullisFlag(merger=self.merger)
+        self.add_edge(self.merger, self.flag)
 
     @property
     def junctions(self):
 
         return self.merger.output["bed"]
+
+    @property
+    def toolname(self):
+        return 'portcullis'
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "rnaseq", "3-portcullis")
+
+    @property
+    def execute(self):
+        return self.configuration["programs"].get("portcullis", dict()).get("execute", False)
 
 
 class PortcullisPrep(AtomicOperation):
@@ -186,7 +197,7 @@ class PortcullisJunc(AtomicOperation):
 
     @property
     def strand(self):
-        return portcullisStrandOption(self.sample, self.load, "junc")
+        return portcullisStrandOption(self.sample.strandedness, self.load, "junc")
 
     @property
     def cmd(self):
@@ -287,18 +298,23 @@ class PortcullisFilter(AtomicOperation):
 
 class PortcullisMerge(AtomicOperation):
 
-    def __init__(self, configuration, filters: [PortcullisFilter]):
+    def __init__(self, configuration, filters: [PortcullisFilter], outdir):
         super().__init__()
         assert hasattr(filters, "__iter__") and all(isinstance(_, PortcullisFilter) for _ in filters)
-        assert len(filters) > 0
+        # assert len(filters) > 0
+        self.outdir = outdir
+        if filters:
+            self.configuration = filters[0].configuration
+        else:
+            self.configuration = configuration
+
         self.input = {"beds": [filter.output["bed_link"] for filter in filters],
                       "tabs": [filter.output["tab_link"] for filter in filters]}
-        self._outdir = filters[0]._outdir
-        self.output = {"bed": os.path.join(self._outdir, "output", "portcullis.merged.bed"),
-                       "tab": os.path.join(self._outdir, "output", "portcullis.merged.tab")}
-        self.configuration = filters[0].configuration
+        self.output = {"bed": os.path.join(self.outdir, "output", "portcullis.merged.bed"),
+                       "tab": os.path.join(self.outdir, "output", "portcullis.merged.tab")}
+
         self.message = "Taking the union of portcullis results"
-        self.log = os.path.join(self._outdir, "logs", "portcullis.merge.log")
+        self.log = os.path.join(self.outdir, "logs", "portcullis.merge.log")
 
     @property
     def loader(self):
@@ -319,8 +335,10 @@ class PortcullisMerge(AtomicOperation):
         tabs = " ".join(self.input["tabs"])
         output = self.output
 
-        if len(self.input["beds"]) == 1:
-            cmd = "cat {beds} > {output[beds]} && cat {tabs} > {output[tab]}".format(**locals())
+        if len(self.input["beds"]) == 0:
+            cmd = "touch {output[bed]} && touch {output[tab]}".format(**locals())
+        elif len(self.input["beds"]) == 1:
+            cmd = "cat {beds} > {output[bed]} && cat {tabs} > {output[tab]}".format(**locals())
         else:
             load = self.load
             prefix = "--prefix=portcullis_merged"

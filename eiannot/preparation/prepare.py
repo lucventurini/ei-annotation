@@ -15,12 +15,15 @@ def parse_samplesheet(samplesheet, configuration):
 
     configuration["long_reads"] = dict()
     configuration["short_reads"] = dict()
-    outdir = os.path.join(configuration["out_dir"], "inputs", "reads")
+    outdir = os.path.join(configuration["outdir"], "inputs", "reads")
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     elif os.path.exists(outdir) and not os.path.isdir(outdir):
         raise OSError("Read directory is not a directory at all: {}".format(outdir))
+
+    if samplesheet is None:
+        return configuration
 
     with open(samplesheet) as sheet:
         for line in csv.reader(sheet, delimiter="\t"):
@@ -44,6 +47,8 @@ def parse_samplesheet(samplesheet, configuration):
                         **locals()))
 
             configuration[tag][label] = sample
+
+    print(configuration)
 
     return configuration
 

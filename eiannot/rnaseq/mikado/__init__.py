@@ -2,7 +2,8 @@ from ...abstract import AtomicOperation, EIWorfkflow, ShortSample, LongSample
 import os
 # import abc
 from ..assemblies.workflow import AssemblyWrapper
-from ..alignments.workflow import ShortAlignmentsWrapper, LongAlignmentsWrapper, PortcullisWrapper
+from ..alignments.workflow import LongAlignmentsWrapper
+from ..alignments.portcullis import PortcullisWrapper
 from .prepare import MikadoPrepare, MikadoConfig
 from .orfs import OrfCaller
 from .homology import MikadoHomologyWrapper

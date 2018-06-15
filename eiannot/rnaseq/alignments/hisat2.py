@@ -1,70 +1,53 @@
 from ...abstract import AtomicOperation, EIWrapper, ShortSample
-from .abstract import IndexBuilder, ShortAligner
+from .abstract import IndexBuilder, ShortAligner, ShortWrapper
 import os
 import itertools
 
 
-class HisatWrapper(EIWrapper):
+class HisatWrapper(ShortWrapper):
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration, prepare_flag):
 
         # First, we have to build the index
 
-        super().__init__()
+        super().__init__(configuration, prepare_flag)
 
         # Then we have to do all the alignments
         # Retrieve the running parameters
-        runs = configuration["programs"]["hisat"]["runs"]
-        samples = configuration["short_reads"]["samples"]
 
-        if len(runs) > 0:
+        if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = HisatBuild(configuration, outdir)
+            indexer = self.indexer(configuration, self.outdir)
             self.add_node(indexer)
+            assert len(indexer.output) == 1, indexer.output
             # Optionally build the reference splice catalogue
-            splices = HisatExtractSplices(configuration, outdir)
-            splice_out = splices.output["splices"]
+            splices = HisatExtractSplices(configuration, self.outdir)
+            splice_out = splices.output.get("splices", None)
             if splice_out:
                 self.add_node(splices)
-            hisat_runs = []
-            for sample, run in itertools.product(samples, range(len(runs))):
-                hisat_run = HisatAligner(configuration=configuration,
-                                         index=indexer.out_prefix,
-                                         sample=sample,
-                                         outdir=outdir,
-                                         run=run,
-                                         ref_transcriptome=splice_out)
-                hisat_runs.append(hisat_run)
-            self.add_edges_from([(indexer, run) for run in hisat_runs])
+            for sample, run in itertools.product(self.samples, range(len(self.runs))):
+                hisat_run = HisatAligner(indexer, sample, run)
+                # hisat_runs.append(hisat_run)
+                self.add_to_bams(hisat_run)
+            self.add_edges_from([(indexer, run) for run in self.bams])
             if splice_out:
-                self.add_edges_from([(splices, run) for run in hisat_runs])
-            flag = HisatFlag(outdir, [run.output["link"] for run in hisat_runs])
-            self.add_edges_from([(run, flag) for run in hisat_runs])
+                self.add_edges_from([(splices, run) for run in self.bams])
+            assert len(indexer.output) == 1
 
+    @property
+    def indexer(self):
+        return HisatBuild
 
-class HisatFlag(AtomicOperation):
-
-    # rule hisat_all:
-    # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
-    # 	output: ALIGN_DIR+"/hisat.done"
-    # 	shell: "touch {output}"
-
-    def __init__(self, outdir, runs=[]):
-
-        super().__init__()
-        for number, run in enumerate(runs):
-            self.input["run{}".format(number)] = run
-        self.output["flag"] = os.path.join(outdir, "hisat.done")
-        self.touch = True
+    @property
+    def toolname(self):
+        return "hisat2"
 
 
 class HisatAligner(ShortAligner):
 
-    def __init__(self, configuration, index, outdir, sample: ShortSample, run: int, ref_transcriptome=None):
+    def __init__(self, indexer, sample: ShortSample, run: int):
 
-        super().__init__(configuration=configuration, sample=sample,
-                         run=run, index=index, ref_transcriptome=ref_transcriptome,
-                         outdir=outdir)
+        super().__init__(indexer=indexer, sample=sample, run=run)
         self.output = {"bam": os.path.join(self.bamdir,
                                            "hisat.bam"),
                        "link": self.link}
@@ -85,7 +68,8 @@ class HisatAligner(ShortAligner):
         threads = self.threads
         output = self.output
         index = self.index
-        cmd += "{strand} {extra} -x {index} {infiles} > {log}"
+        log = self.log
+        cmd += "{strand} {extra} -x {index} {infiles} 2> {log}"
         cmd += "| samtools view -b -@ {threads} - > {output[bam]}"
         link_src = self.link_src
         cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
@@ -117,11 +101,11 @@ class HisatAligner(ShortAligner):
 
     @property
     def loader(self):
-        return ["hisat", "samtools"]
+        return ["hisat2", "samtools"]
 
     @property
     def toolname(self):
-        return "hisat"
+        return "hisat2"
 
 
 class HisatExtractSplices(AtomicOperation):
@@ -133,9 +117,9 @@ class HisatExtractSplices(AtomicOperation):
         super().__init__()
         self._outdir = outdir
         self.input = {"ref_trans": configuration.get("reference", dict()).get("transcriptome", "")}
-        self.__configuration = configuration
+        self.configuration = configuration
         if self.input["ref_trans"]:
-            self.output = {"splices":  os.path.join(outdir, "rnaseq", "2-alignments", "index", "splice_sites.txt")}
+            self.output = {"splices":  os.path.join(outdir, "index", "splice_sites.txt")}
         else:
             self.output = dict()
 
@@ -152,7 +136,7 @@ class HisatExtractSplices(AtomicOperation):
 
     @property
     def loader(self):
-        return ["hisat"]
+        return ["hisat2"]
 
     @property
     def rulename(self):
@@ -165,31 +149,32 @@ class HisatBuild(IndexBuilder):
 
         super().__init__(configuration, outdir)
         # TODO: probably the input should be the cleaned up genome
-        self.output = {"flag": os.path.join(self._outdir, "hisat_index.done")}
+        self.output = {"flag": os.path.join(self.outdir, "hisat_index.done")}
         self.touch = True
 
     @property
     def toolname(self):
-        return "hisat"
+        return "hisat2"
 
     @property
     def out_prefix(self):
-        return os.path.abspath(os.path.join(self._outdir[0], self.species))
+        return os.path.abspath(os.path.join(self.outdir, self.species))
 
     @property
     def message(self):
 
         return "Building the HISAT2 index for {} in {}".format(self.input["genome"],
-                                                               self._outdir)
+                                                               self.outdir)
 
     @property
     def cmd(self):
 
-        load = None
+        load = self.load
         threads = self.threads
         input = self.input
         out_prefix = self.out_prefix
         log = self.log
+        extra = self.extra
         cmd = "{load} hisat2-build {extra} -p {threads} {input[genome]} {out_prefix} > {log} 2>&1".format(
             **locals()
         )
@@ -197,4 +182,8 @@ class HisatBuild(IndexBuilder):
 
     @property
     def loader(self):
-        return ["hisat"]
+        return ["hisat2"]
+
+    @property
+    def index(self):
+        return self.out_prefix

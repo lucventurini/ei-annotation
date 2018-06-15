@@ -3,6 +3,8 @@ import networkx as nx
 from eicore.external_process.snakemake_helper import loadPreCmd
 import os
 from frozendict import frozendict
+import re
+import copy
 
 
 class Sample(metaclass=abc.ABCMeta):
@@ -85,40 +87,40 @@ class ShortSample(Sample):
                 os.symlink(os.path.abspath(read2), r2out)
             self.__read2 = r2out
 
-        @property
-        def read1(self):
-            return self.__read1
+    @property
+    def read1(self):
+        return self.__read1
 
-        @property
-        def read2(self):
-            return self.__read2
+    @property
+    def read2(self):
+        return self.__read2
 
-        @property
-        def paired(self):
-            return self.read2 is not None
+    @property
+    def paired(self):
+        return self.read2 is not None
 
-        @property
-        def stranded(self):
-            return self.strandedness is not None and self.strandedness != "fr-unstranded"
+    @property
+    def stranded(self):
+        return self.strandedness is not None and self.strandedness != "fr-unstranded"
 
-        @property
-        def strandedness(self):
-            """Returns the exact strandedness of the sample."""
-            # We will check the exact type of the
-            return self.__strandedness
+    @property
+    def strandedness(self):
+        """Returns the exact strandedness of the sample."""
+        # We will check the exact type of the
+        return self.__strandedness
 
-        @property
-        def suffix(self):
-            return self.__suffix
+    @property
+    def suffix(self):
+        return self.__suffix
 
-        @property
-        def reader(self):
-            if not self.suffix:
-                return ""
-            elif self.suffix == ".gz":
-                return "zcat"
-            elif self.suffix == ".bz2":
-                return "bzcat"
+    @property
+    def reader(self):
+        if not self.suffix:
+            return ""
+        elif self.suffix == ".gz":
+            return "zcat"
+        elif self.suffix == ".bz2":
+            return "bzcat"
 
 
 class AtomicOperation(metaclass=abc.ABCMeta):
@@ -221,7 +223,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         elif not all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes, list)) for _ in
                        inputs.items()):
             raise ValueError("Input dictionaries must contain only strings")
-        self.__inputs = inputs
+        self.__inputs = copy.deepcopy(inputs)
 
     @property
     def output(self):
@@ -235,7 +237,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         elif not all(isinstance(_[0], (str, bytes)) and isinstance(_[1], (str, bytes)) for _ in
                        outputs.items()):
             raise ValueError("Input dictionaries must contain only strings")
-        self.__outputs = outputs
+        self.__outputs = copy.deepcopy(outputs)
 
     def add_to_params(self, key, value):
         """This method is used to add a key/value to params.
@@ -265,8 +267,12 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         """This property defines how to "load" a module for use in cluster environments."""
 
         # TODO: this will have to be revised once we have the configuration
-        to_load = [self.__configuration["programs"][_]["runs"] for _ in self.loader]
-        return loadPreCmd(*to_load)
+        to_load = [self.__configuration["programs"].get(_, dict()).get("load", '') for _ in self.loader]
+        cmd = loadPreCmd(*to_load)
+        if cmd:
+            return cmd
+        else:
+            return ''
 
     def delete_from_params(self, key):
         if key in self.__params:
@@ -276,17 +282,8 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         """This will create the SnakeMake-like block of code."""
 
         d = dict()
-        key = "rule {}".format(self.rulename)
-        d[key] = dict()
-        if self.message:
-            d[key]["message"] = self.message
-        if self.log:
-            d[key]["log"] = self.log
-        d[key]["input"] = self.input
-        d[key]["output"] = self.output
-        if self.cmd:
-            d[key]["shell"] = self.cmd
-        string = ["rule {}:".format(self.rulename)]
+        rulename = re.sub("\.", "_", re.sub("-", "_", self.rulename))
+        string = ["rule {}:".format(rulename)]
         # Inputs now are always dictionaries
         string.append("  input:")
         for key, value in self.input.items():
@@ -300,18 +297,19 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         string.append("  output:")
         for key, value in self.output.items():
             if self.touch is True:
-                assert len(self.output) == 1
+                assert len(self.output) == 1, (self.rulename, self.input, self.output)
                 string.append("    {key}=touch(\"{value}\")".format(**locals()))
             else:
-                string.append("    {key}={value},".format(**locals()))
+                string.append("    {key}=\"{value}\",".format(**locals()))
         string[-1] = string[-1].rstrip(",")
         if self.message:
             string.append("  message: \"{}\" """.format(self.message))
         if self.log:
             string.append("  log: \"{}\"".format(self.log))
+        if self.threads > 1:
+            string.append("  threads: {}".format(self.threads))
         if self.cmd:
             string.append("  shell: \"{}\"".format(self.cmd))
-        string.append("  threads: {}".format(self.threads))
 
         return "\n".join(string) + "\n"
 
@@ -321,8 +319,8 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
     @configuration.setter
     def configuration(self, d):
-        if not isinstance(d, dict):
-            raise ValueError
+        if not isinstance(d, (dict, frozendict)):
+            raise TypeError("Invalid configuration type: {}".format(type(d)))
         self.__configuration = d
 
     @property
@@ -385,7 +383,9 @@ class EIWorfkflow:
         """Here we are going to exploit the fact that adding an edge will automatically add the nodes
         in the graph."""
         if not isinstance(in_edge, AtomicOperation) or not isinstance(out_edge, AtomicOperation):
-            raise TypeError("Invalid types for adding edges - only AtomicOperations are allowed")
+            raise TypeError("Invalid types for adding edges - only AtomicOperations are allowed. Types: {},  {}".format(
+                type(in_edge), type(out_edge)
+            ))
 
         self.__graph.add_edge(in_edge, out_edge)
 
@@ -394,7 +394,9 @@ class EIWorfkflow:
         # First check that everything is actually an AtomicOperations
         for el in tasks:
             if len(el) != 2:
-                raise TypeError("Invalid task edge")
+                raise TypeError("Invalid task edge: {}".format(el))
+            if not all(isinstance(_, AtomicOperation) for _ in el):
+                raise TypeError("Invalid node! {}, {}".format(type(el[0]), type(el[1])))
             self.add_edge(*el)
         return
 
@@ -409,6 +411,9 @@ class EIWorfkflow:
 
         return snake
 
+    def __len__(self):
+        return len(self.graph)
+
     def connect(self, inbound: AtomicOperation, outbound: AtomicOperation, name):
 
         self.add_edge(inbound, outbound)
@@ -420,10 +425,10 @@ class EIWorfkflow:
 
     def merge(self, others):
 
-        self.__graph = nx.compose_all([self.__graph] + others)
+        self.__graph = nx.compose_all([self.__graph] + [other.graph for other in others])
 
     def __iter__(self):
-        return iter(self.__graph)
+        return iter(self.__graph.nodes)
 
     @property
     def adj(self):
@@ -441,6 +446,14 @@ class EIWorfkflow:
         else:
             raise TypeError
 
+    @property
+    def nodes(self):
+        return self.graph.nodes
+
+    @property
+    def edges(self):
+        return self.graph.edges
+
 
 class EIWrapper(EIWorfkflow):
 
@@ -454,6 +467,13 @@ class EIWrapper(EIWorfkflow):
     @property
     def exit(self):
         nodes = [_ for _ in self if not self.adj[_]]
+        if len(nodes) == 0:
+            raise ValueError("Something has gone wrong. Total nodes:\n{}".format(
+                '\n'.join(self)
+            ))
+
         if not len(nodes) == 1 and len(nodes[0].output) == 1:
-            raise ValueError("EI wrappers must have at most one output!")
+            raise ValueError("EI wrappers must have at most one output! Output nodes:\n{}".format(
+                "\n".join(_.rulename for _ in nodes)
+            ))
         return nodes[0]

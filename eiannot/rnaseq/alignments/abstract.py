@@ -1,7 +1,7 @@
 import abc
-from ...abstract import ShortSample, LongSample, AtomicOperation, Sample, EIWrapper
+from ...abstract import ShortSample, LongSample, AtomicOperation, EIWrapper
 import os
-from .bam import BamStats
+from .bam import BamIndex, BamSort, BamStats
 
 
 class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
@@ -10,12 +10,12 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
 
     def __init__(self, configuration, outdir):
         super(IndexBuilder, self).__init__()
+        self.configuration = configuration
         self.input = {"genome": self.genome}
-        if configuration.get("reference", dict()).get("transcriptome", ""):
-            self.input["ref_transcriptome"] = os.path.abspath(configuration["reference"]["transcriptome"])
-        self._outdir = os.path.join(outdir, "rnaseq", "2-alignments", "index", self.toolname)
-        self.log = os.path.join(outdir, "rnaseq", "2-alignments", "index", "log", "{}.log".format(self.toolname))
-        self.__configuration = configuration
+
+        if self.configuration.get("reference", dict()).get("transcriptome", ""):
+            self.input["ref_transcriptome"] = os.path.abspath(self.configuration["reference"]["transcriptome"])
+        self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
 
     @property
     def extra(self):
@@ -39,15 +39,21 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "indices", self.toolname)
 
+    @property
+    def extra(self):
+        return self.configuration["programs"].get(self.toolname, dict()).get("index_extra", '')
+
 
 class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     def __init__(self, indexer, sample, run):
 
         super(ShortAligner, self).__init__()
+        self.__indexer = indexer
         self.__configuration, self.__sample, self.__run = None, None, None
-        self.input = {"index": indexer.index}
+        self.input = indexer.output
         self.configuration = indexer.configuration
+        self.__sample = None
         self.sample = sample
         self.run = run
         self.input["read1"] = self.sample.read1
@@ -62,7 +68,6 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
             sample=self.sample.label,
             run=self.run
         )
-        self.__indexer = indexer
 
     @property
     def indexer(self):
@@ -80,7 +85,7 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def link(self):
-        return os.path.join(self._outdir, "output", "{toolname}-{sample}-{run}.bam".format(
+        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}.bam".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run)
         )
 
@@ -107,14 +112,17 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
     def run(self, run):
         if not isinstance(run, int):
             raise TypeError
-        runs = self.__configuration["programs"][self.toolname]["runs"]
+        runs = self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
         if run not in range(len(runs)):
             raise ValueError
         self.__run = run
 
     @property
     def extra(self):
-        return self.__configuration["programs"][self.toolname]["runs"][self.run]
+        try:
+            return self.configuration["programs"][self.toolname]["runs"][self.run]
+        except (IndexError, TypeError) as exc:
+            raise TypeError(self.configuration["programs"][self.toolname])
 
     @property
     def ref_transcriptome(self):
@@ -129,7 +137,7 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def index(self):
-        return self.input["index"]
+        return self.indexer.index
 
     @property
     @abc.abstractmethod
@@ -164,6 +172,21 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
     @property
     def sample(self):
         return self.__sample
+
+    @sample.setter
+    def sample(self, sample):
+        if isinstance(sample, str):
+            if sample not in self.configuration['short_reads']:
+                raise KeyError(sample)
+            sample = self.configuration['short_reads'][sample]
+        elif isinstance(sample, ShortSample):
+            if sample.label not in self.configuration['short_reads']:
+                raise KeyError(sample.label)
+        self.__sample = sample
+
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
 
 
 class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
@@ -240,22 +263,43 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     def __init__(self, configuration, prepare_flag):
+        self.__finalised = False
         self.__prepare_flag = prepare_flag
         super().__init__()
+        self.add_node(prepare_flag.exit)
         self.__bam_rules = set()
         self.configuration = configuration
+        self.__stats = []
 
     @property
     @abc.abstractmethod
     def toolname(self):
         pass
 
+    def finalise(self):
+
+        if self.__finalised:
+            return
+        for bam in self.bams:
+            sorter = BamSort(bam)
+            self.add_edge(bam, sorter)
+            indexer = BamIndex(sorter)
+            self.add_edge(sorter, indexer)
+            stater = BamStats(indexer)
+            self.add_edge(indexer, stater)
+            self.__stats.append(stater)
+        self.flag = ShortAlnFlag(self.outdir, runs=self.__stats, toolname=self.toolname)
+        self.add_node(self.flag)
+        self.add_edges_from([(stat, self.flag) for stat in self.__stats])
+        self.__add_flag_to_inputs()
+        self.__finalised = True
+
     def add_to_bams(self, rule):
         if not isinstance(rule, ShortAligner):
             raise TypeError
         if "link" not in rule.output:
             raise KeyError("Link not found for rule {}".format(rule.rulename))
-        self.__bam_rules.add(rule.rulename)
+        self.__bam_rules.add(rule)
 
     @property
     def bams(self):
@@ -264,11 +308,14 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def runs(self):
-        return self.configuration["programs"][self.toolname]["runs"]
+        return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
 
-    def add_flag_to_inputs(self):
-        for rule in self:
-            rule.input["aln_flag"] = self.__prepare_flag
+    def __add_flag_to_inputs(self):
+        for rule in self.nodes:
+            if rule == self.__prepare_flag.exit:
+                continue
+            rule.input["prep_flag"] = self.__prepare_flag.output["fai"]
+            self.add_edge(self.__prepare_flag.exit, rule)
 
     @property
     @abc.abstractmethod
@@ -282,7 +329,25 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def outdir(self):
-        return os.path.join(os.path.join(self.configuration["out_dir"], "rnaseq", "1-alignments"))
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
+
+
+class ShortAlnFlag(AtomicOperation):
+
+    def __init__(self, outdir, toolname, runs=[]):
+        super().__init__()
+        self.__toolname = toolname
+        self.input["runs"] = [run.output["stats"] for run in runs]
+        self.output = {"flag": os.path.join(outdir, "{toolname}.done".format(**locals()))}
+        self.touch = True
+
+    @property
+    def rulename(self):
+        return "{}_flag".format(self.__toolname)
+
+    @property
+    def loader(self):
+        return []
 
 
 class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
@@ -309,7 +374,7 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def outdir(self):
-        return os.path.join(os.path.join(self.configuration["out_dir"], "rnaseq", "1-alignments"))
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
 
     @property
     @abc.abstractmethod
@@ -325,4 +390,8 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def runs(self):
-        return self.configuration["programs"][self.toolname]["runs"]
+        return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
+
+    @property
+    def gfs(self):
+        return self.__gf_rules

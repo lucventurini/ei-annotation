@@ -6,24 +6,23 @@ import re
 
 class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
-    def __init__(self, bam, run, configuration, outdir, ref_transcriptome=None):
+    def __init__(self, bam, run, ref_transcriptome=None):
 
         super(ShortAssembler, self).__init__()
         self.__configuration, self.__sample, self.__run = None, None, None
-        self.configuration = configuration
+        self.configuration = bam.configuration
         self.sample = self.get_sample()
         self.run = run
         self.__ref_transcriptome = None
         self.ref_transcriptome = ref_transcriptome
-        self._outdir = outdir
         if bam is not None:
             self.input["bam"] = bam
-        self.log = os.path.join(self._outdir, "{toolname}-{sample}-{run}-{alrun}.log".format(
+        self.log = os.path.join(self.outdir, "{toolname}-{sample}-{run}-{alrun}.log".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run,
             alrun=self.alrun
         ))
         self.output["link"] = os.path.join(
-          self._outdir, "output", "{toolname}-{sample}-{run}-{alrun}.{suffix}".format(
+          self.outdir, "output", "{toolname}-{sample}-{run}-{alrun}.{suffix}".format(
                 toolname=self.toolname, sample=self.sample, run=self.run,
                 suffix=self.suffix, alrun=self.alrun
             )
@@ -56,13 +55,13 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def gfdir(self):
-        return os.path.join(self._outdir, self.toolname,
+        return os.path.join(self.outdir, self.toolname,
                             "{sample}-{run}-{alrun}".format(sample=self.sample.label, run=self.run,
                                                             alrun=self.alrun))
 
     @property
     def link(self):
-        return os.path.join(self._outdir, "output", "{toolname}-{sample}-{run}-".format(
+        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}-".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run)
         )
 
@@ -148,6 +147,10 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
         return "{toolname}-{run}-{alrun}".format(alrun=self.alrun,
                                                  run=self.run, toolname=self.toolname)
 
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "2-assemblies"))
+
 
 class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
@@ -157,6 +160,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         self.aln_flag = aln_wrapper.output
         self.__bams = []
         self.bams = aln_wrapper.bams
+        self.configuration = aln_wrapper.configuration
 
     @property
     @abc.abstractmethod
@@ -177,7 +181,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def runs(self):
-        return self.configuration["programs"][self.toolname]["runs"]
+        return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
 
     def add_flag_to_inputs(self):
         for rule in self:
@@ -185,7 +189,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def outdir(self):
-        return os.path.join(os.path.join(self.configuration["out_dir"], "rnaseq", "2-assemblies"))
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "2-assemblies"))
 
     @property
     def bams(self):
@@ -196,6 +200,10 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         assert isinstance(bams, list) and all(isinstance(bam, AtomicOperation) for bam in bams)
         assert all("bam" in bam.output for bam in bams)
         self.__bams = bams
+
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "2-assemblies"))
 
 
 class AsmStats(AtomicOperation):
@@ -230,11 +238,14 @@ class AsmStats(AtomicOperation):
 
 class AsmFlag(AtomicOperation):
 
-    def __init__(self, stats_runs: [AsmStats]):
+    def __init__(self, stats_runs: [AsmStats], outdir=None):
 
         super().__init__()
         self.touch = True
-        outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
+        if stats_runs:
+            outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
+        else:
+            assert outdir is not None
         self.output["flag"] = os.path.join(outdir, "all.done")
 
     @property

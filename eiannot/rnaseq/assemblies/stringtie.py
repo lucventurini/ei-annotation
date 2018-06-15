@@ -10,15 +10,19 @@ class StringtieWrapper(ShortAssemblerWrapper):
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
 
-        if len(bams) > 0 and len(self.runs) > 0:
+        if len(self.bams) > 0 and len(self.runs) > 0:
             stringties = []
-            for bam, run in itertools.product(bams, range(len(self.runs))):
-                stringtie = Stringtie(bam, run, configuration, self.outdir)
+            for bam, run in itertools.product(self.bams, range(len(self.runs))):
+                stringtie = Stringtie(bam, run)
                 stringties.append(stringtie)
                 self.add_to_gf(stringtie)
             flag = StringtieFlag(stringties, self.outdir)
             self.add_edges_from([(stringtie, flag) for stringtie in stringties])
             return
+
+    @property
+    def toolname(self):
+        return "stringtie"
 
 
 class StringtieFlag(AtomicOperation):
@@ -32,9 +36,9 @@ class StringtieFlag(AtomicOperation):
 
 class Stringtie(ShortAssembler):
 
-    def __init__(self, bam, run, configuration, outdir):
+    def __init__(self, bam, run):
 
-        super().__init__(bam, run, configuration, outdir)
+        super().__init__(bam, run)
 
     @property
     def toolname(self):

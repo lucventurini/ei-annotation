@@ -20,50 +20,35 @@ def gmap_intron_lengths(loader, max_intron):
 
 class GsnapWrapper(ShortWrapper):
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration, prepare_flag):
 
         # First, we have to build the index
 
-        super().__init__(configuration)
+        super().__init__(configuration, prepare_flag=prepare_flag)
 
         # Then we have to do all the alignments
         # Retrieve the running parameters
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            self.add_node(self.indexer)
+            self.add_node(self.indexer(configuration, self.outdir))
             # Optionally build the reference splice catalogue
             gsnap_runs = []
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                hisat_run = GsnapAligner(configuration=configuration,
-                                         index=self.indexer.out_prefix,
+                hisat_run = GsnapAligner(indexer=self.indexer,
                                          sample=sample,
-                                         outdir=outdir,
                                          run=run)
                 gsnap_runs.append(hisat_run)
             self.add_edges_from([(self.indexer, run) for run in gsnap_runs])
-            flag = GsnapFlag(outdir, [run.output["link"] for run in gsnap_runs])
+            flag = GsnapFlag(self.outdir, [run.output["link"] for run in gsnap_runs])
             self.add_edges_from([(run, flag) for run in gsnap_runs])
 
-
-class GsnapFlag(AtomicOperation):
-
-    # rule hisat_all:
-    # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
-    # 	output: ALIGN_DIR+"/hisat.done"
-    # 	shell: "touch {output}"
-
-    def __init__(self, outdir, runs=[]):
-
-        super().__init__()
-        self.input["runs"] = []
-        for number, run in enumerate(runs):
-            self.input["run{}".format(number)] = run
-        self.output["flag"] = os.path.join(outdir, "gsnap.done")
-        self.touch = True
+    @property
+    def toolname(self):
+        return "gsnap"  # TODO: double check
 
     @property
-    def rulename(self):
-        return "gsnap_flag"
+    def indexer(self):
+        return GmapIndex
 
 
 class GmapIndex(IndexBuilder):

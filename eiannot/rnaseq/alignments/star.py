@@ -290,6 +290,7 @@ class StarLongWrapper(LongWrapper):
                 self.add_edge(indexer, star_run)
                 bam2gtf_run = StarBam2Gtf(star_run)
                 star_runs.append(bam2gtf_run)
+                self.add_to_gtfs(bam2gtf_run)
 
             flag = StarLongFlag(self.outdir, [run.output["gf"] for run in star_runs])
             self.add_edges_from([(run, flag) for run in star_runs])

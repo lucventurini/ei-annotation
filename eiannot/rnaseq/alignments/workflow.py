@@ -1,10 +1,10 @@
-from .bam import BamStats, BamIndex, BamSort, AlnFlag
+from .bam import BamStats, BamIndex, BamSort
 from .hisat2 import HisatWrapper
 from .gmap import GsnapWrapper
 from .tophat2 import TopHat2Wrapper
-from .portcullis import PortcullisWrapper
 from .star import StarWrapper, StarLongWrapper
-from ...abstract import EIWrapper, EIWorfkflow, AtomicOperation
+from .abstract import ShortAlnFlag
+from ...abstract import EIWrapper, AtomicOperation
 import os
 
 
@@ -18,30 +18,40 @@ class ShortAlignmentsWrapper(EIWrapper):
     def __init__(self, prepare_wrapper: EIWrapper):
 
         super().__init__()
-        stats = []
-        self.bams = []
+        self.__bams = []
         self.configuration = prepare_wrapper.configuration
-        prepare_flag = prepare_wrapper.output
+        self.__prepare_flag = prepare_wrapper
         instances = []
+        print(self.samples)
+        flags = []
         for wrapper in self.wrappers.values():
-            instance = wrapper(self.configuration, bams, prepare_flag)
-            instance.add_flag_to_inputs()
-            instances.append(instance)
-            self.merge([instance])
-            self.bams.extend(instance.bams)
-            for bam in instance.bams:
-                # TODO: here add the entrance from the "preparation" stage
-                # self.add_edges_from()
-                sorter = BamSort(bam)
-                self.add_edge(bam, sorter)
-                indexer = BamIndex(sorter)
-                self.add_edge(sorter, indexer)
-                stater = BamStats(indexer)
-                self.add_edge(indexer, stater)
-                stats.append(stater)
+            instance = wrapper(self.configuration, self.__prepare_flag)
+            instance.finalise()
+            if len(instance.bams) > 0:
+                instances.append(instance)
+                flags.append(instance.exit)
+                print("Exit", instance.exit.rulename, instance.output, instance.exit.input)
+                self.merge([instance])
+                self.__bams.extend(instance.bams)
+            else:
+                print(instance.__class__)
 
-        final_flag = AlnFlag(stats)
-        self.add_edges_from([(stat, final_flag) for stat in stats])
+        final_flag = AlnFlag(flags, outdir=self.outdir, prepare_wrapper=prepare_wrapper)
+        self.add_node(final_flag)  # We have to add the node, otherwise the workflow will be empty
+        self.add_edges_from([(flag, final_flag) for flag in flags])
+        assert self.exit == final_flag, self.nodes
+
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
+
+    @property
+    def samples(self):
+        return self.configuration["short_reads"]
+
+    @property
+    def bams(self):
+        return self.__bams.copy()
 
 
 class LongAlignmentsWrapper(EIWrapper):
@@ -52,7 +62,7 @@ class LongAlignmentsWrapper(EIWrapper):
 
         super().__init__()
         stats = []
-        gfs = []
+        self.__gf_rules = []
         self.configuration = prepare_wrapper.configuration
         prepare_flag = prepare_wrapper.output
 
@@ -60,15 +70,24 @@ class LongAlignmentsWrapper(EIWrapper):
             instance = wrapper(self.configuration, prepare_flag)
             instance.add_flag_to_inputs()
             self.merge([instance])
-            gfs.extend(instance.gfs)
-            for gf in gfs:
+            self.__gf_rules.extend(instance.gfs)
+            for gf in instance.gfs:
                 stat = LongAlignerStats(gf)
                 self.add_edge(gf, stat)
                 stats.append(stat)
 
-        flag = LongAlignersFlag(stats)
+        flag = LongAlignersFlag(stats, outdir=self.outdir)
+        self.add_node(flag)
         self.add_edges_from([(stat, flag) for stat in stats])
         pass
+
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
+
+    @property
+    def gfs(self):
+        return self.__gf_rules
 
 
 class LongAlignerStats(AtomicOperation):
@@ -104,12 +123,39 @@ class LongAlignerStats(AtomicOperation):
 
 class LongAlignersFlag(AtomicOperation):
 
-    def __init__(self, stats_runs: [LongAlignerStats]):
+    def __init__(self, stats_runs: [LongAlignerStats], outdir=None):
 
         super().__init__()
         self.touch = True
-        outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
+        if stats_runs:
+            outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
+        else:
+            assert outdir is not None
         self.output["flag"] = os.path.join(outdir, "long_reads.done")
+
+    @property
+    def rulename(self):
+        return "aln_all"
+
+    @property
+    def loader(self):
+        return []
+
+
+class AlnFlag(AtomicOperation):
+
+    def __init__(self, flags: [ShortAlnFlag], prepare_wrapper=None, outdir=None):
+
+        super().__init__()
+        self.touch = True
+        if flags:
+            self.input = {"flags": [flag.output["flag"] for flag in flags]}
+            outdir = os.path.dirname(os.path.dirname(flags[0].output["flag"]))
+        else:
+            assert outdir is not None
+            assert prepare_wrapper is not None
+            self.input = prepare_wrapper.output
+        self.output["flag"] = os.path.join(outdir, "short_reads.done")
 
     @property
     def rulename(self):

@@ -10,15 +10,19 @@ class ScallopWrapper(ShortAssemblerWrapper):
 
         super().__init__(aln_wrapper)
 
-        if len(self.runs) > 0 and len(bams) > 0:
+        if len(self.runs) > 0 and len(self.bams) > 0:
             scallops = []
-            for bam, run in itertools.product(bams, range(len(self.runs))):
-                scallop = Scallop(bam, run, configuration, self.outdir)
+            for bam, run in itertools.product(self.bams, range(len(self.runs))):
+                scallop = Scallop(bam, run, self.configuration)
                 scallops.append(scallop)
                 self.add_to_gf(scallop)
                 continue
             flag = ScallopFlag(scallops, self.outdir)
             self.add_edges_from([(scallop, flag) for scallop in scallops])
+
+    @property
+    def toolname(self):
+        return "scallop"
 
 
 class ScallopFlag(AtomicOperation):
@@ -32,9 +36,9 @@ class ScallopFlag(AtomicOperation):
 
 class Scallop(ShortAssembler):
 
-    def __init__(self, bam, run, configuration, outdir):
+    def __init__(self, bam, run, configuration):
 
-        super().__init__(bam, run, configuration, outdir)
+        super().__init__(bam, run, configuration)
 
     @property
     def toolname(self):
@@ -80,3 +84,7 @@ class Scallop(ShortAssembler):
     @property
     def suffix(self):
         return "gtf"
+
+    @property
+    def toolname(self):
+        return "scallop"

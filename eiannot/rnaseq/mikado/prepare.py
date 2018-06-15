@@ -21,16 +21,14 @@ class MikadoConfig(AtomicOperation):
         self.input["asm_list"] = os.path.join(self.outdir, "models_list.txt")
         self.input["gfs"] = [gf.output["gf"] for gf in assemblies.gfs]
         self.input["gfs"].extend([gf.output["gf"] for gf in long_aln_wrapper.gfs])  # TODO: implement
-        self.input["portcullis"] = self.portcullis.output["bed"]
+        self.input["portcullis"] = self.portcullis.junctions
         self.__create_file_list()
         self.output = {"cfg": os.path.join(self.outdir, "mikado.yaml")}
-
 
     @property
     def outdir(self):
 
-        return os.path.join(self.configuration["out_dir"],
-                            "rnaseq", "4-mikado")
+        return os.path.join(self.configuration["outdir"], "rnaseq", "4-mikado")
 
     @property
     def threads(self):
@@ -89,6 +87,10 @@ class MikadoConfig(AtomicOperation):
             return "--junctions{portcullis.output[bed]}".format(portcullis=self.portcullis)
         else:
             return ""
+
+    @property
+    def rulename(self):
+        return 'mikado_config'
 
 
 class MikadoPrepare(AtomicOperation):

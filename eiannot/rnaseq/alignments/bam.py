@@ -1,4 +1,4 @@
-from ...abstract import AtomicOperation, EIWrapper
+from ...abstract import AtomicOperation
 import os
 
 
@@ -10,7 +10,7 @@ class BamSort(AtomicOperation):
 
         super().__init__()
         self.configuration = bamrule.configuration
-        self.input = {"bam": bamrule.output["bam"]}
+        self.input = {"bam": bamrule.output["link"]}
         self.output = {"bam": os.path.splitext(self.input["bam"])[0] + ".sorted.bam"}
         output = self.output
         input = self.input
@@ -49,8 +49,7 @@ class BamIndex(AtomicOperation):
         self.input = {"bam": bamrule.output["bam"]}
         self.output = {"index": self.input["bam"] + ".bai"}
         self.message = "Using samtools to index: {input[bam]}".format(input=self.input)
-        self.cmd = "{}"
-
+        self.log = os.path.join(self.input["bam"] + ".index.log")
 
     @property
     def loader(self):
@@ -68,6 +67,15 @@ class BamIndex(AtomicOperation):
     def rulename(self):
         return "{name}-{align_run}".format(name=self.__name__, align_run=self.align_run)
 
+    @property
+    def cmd(self):
+        load = self.load
+        input = self.input
+        log = self.log
+        cmd = "{load} samtools index {input[bam]} >{log} 2>&1".format(**locals())
+
+        return cmd
+
 
 class BamStats(AtomicOperation):
 
@@ -77,13 +85,14 @@ class BamStats(AtomicOperation):
 
         super().__init__()
         self.configuration = bamrule.configuration
-        self.input = {"bam": bamrule.input["bam"], "index": bamrule.output[".bai"]}
+        self.input = {"bam": bamrule.input["bam"], "index": bamrule.output["index"]}
         self.output = {"stats": bamrule.input["bam"] + ".stats"}
         input, output = self.input, self.output
         plot_dir = os.path.join(os.path.dirname(bamrule.input["bam"]), "plots", self.align_run, self.align_run)
         if not os.path.exists(plot_dir):
             os.makedirs(plot_dir)
         self.message = "Using samtools to collect stats for: {input[bam]}".format(input=self.input)
+        load = self.load
         self.cmd = "{load} samtools stats {input[bam]} > {output[stats]}"
         self.cmd += " && plot-bamstats -p {plot_dir} {output[stats]}"
         self.cmd = self.cmd.format(**locals())
@@ -103,21 +112,3 @@ class BamStats(AtomicOperation):
     @property
     def threads(self):
         return 1
-
-
-class AlnFlag(AtomicOperation):
-
-    def __init__(self, stats_runs: [BamStats]):
-
-        super().__init__()
-        self.touch = True
-        outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
-        self.output["flag"] = os.path.join(outdir, "short_reads.done")
-
-    @property
-    def rulename(self):
-        return "aln_all"
-
-    @property
-    def loader(self):
-        return []
