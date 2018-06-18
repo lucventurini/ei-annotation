@@ -2,8 +2,9 @@ from ...abstract import AtomicOperation, ShortSample, LongSample
 from ..alignments.portcullis import PortcullisWrapper
 from ..assemblies.workflow import AssemblyWrapper
 from ..assemblies.abstract import ShortAssembler
-# from ..alignments.workflow import LongAlignmentsWrapper, LongAligner
+from ..alignments.workflow import LongAlignmentsWrapper  # , LongAligner
 import os
+import itertools
 
 
 class MikadoConfig(AtomicOperation):
@@ -11,7 +12,7 @@ class MikadoConfig(AtomicOperation):
     def __init__(self,
                  portcullis_wrapper: PortcullisWrapper,
                  assemblies: AssemblyWrapper,
-                 long_aln_wrapper):
+                 long_aln_wrapper: LongAlignmentsWrapper):
         super().__init__()
         self.configuration = portcullis_wrapper.configuration
         self.portcullis = portcullis_wrapper
@@ -52,30 +53,28 @@ class MikadoConfig(AtomicOperation):
         load = self.load
         cmd = "{load} "
         scoring_file = self.scoring_file
-        os.makedirs(os.path.dirname(self.input["asm_list"]))
+        if not os.path.exists(os.path.dirname(self.input["asm_list"])):
+            os.makedirs(os.path.dirname(self.input["asm_list"]))
         file_list = self.input["asm_list"]
 
         cmd += "mikado configure --scoring={scoring_file} --list={input[asm_list]} "
         log = self.log
         input, output = self.input, self.output
-        external = ''  # TODO: implement
-        cmd += "--reference={input[genome]} --external={external} {output[cfg]} > {log} 2>&1"
+        external = self.external
+        cmd += "--reference={input[genome]} {external} {output[cfg]} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 
     def __create_file_list(self):
-        with open(self.input["asm_list"], mode="wt") as file_list:
-            for gf in self.assemblies.gfs:
-                # this GFs are the *rules*
-                assert isinstance(gf, ShortAssembler)
-                sample = gf.sample
-                assert isinstance(sample, ShortSample)
-                print(gf.output["gf"], sample.label, sample.stranded, sep="\t", file=file_list)
-            for gf in self.long_aln_wrapper:
-                # assert isinstance(gf, LongAligner)
-                sample = gf.sample
-                assert isinstance(sample, LongSample)
-                print(gf.output["gf"], sample.label, sample.stranded, sep="\t", file=file_list)
+        if not os.path.exists(os.path.dirname(self.input["asm_list"])):
+            os.makedirs(os.path.dirname(self.input["asm_list"]))
+
+        if not os.path.exists(self.input["asm_list"]):
+            with open(self.input["asm_list"], mode="wt") as file_list:
+                for gf in itertools.chain(self.assemblies.gfs, self.long_aln_wrapper.gfs):
+                    # Write out the location of the file, and all other details
+                    line = [gf.output["link"], gf.label, gf.sample.stranded]
+                    print(*line, file=file_list, sep="\t")
 
     @property
     def scoring_file(self):
@@ -92,6 +91,11 @@ class MikadoConfig(AtomicOperation):
     def rulename(self):
         return 'mikado_config'
 
+    @property
+    def external(self):
+        # TODO: implement
+        return ""
+
 
 class MikadoPrepare(AtomicOperation):
 
@@ -99,10 +103,13 @@ class MikadoPrepare(AtomicOperation):
         super().__init__()
         self.outdir = config.outdir
         self.configuration = config.configuration
+        assert 'programs' in config.configuration, config.configuration
+        assert 'mikado' in config.configuration["programs"], config.configuration["programs"]
         self.input = config.output
         self.output = {"gtf": os.path.join(self.outdir, "mikado_prepared.gtf"),
                        "fa": os.path.join(self.outdir, "mikado_prepared.fasta")}
         self.message = "Preparing transcripts using Mikado"
+        self.log = os.path.join(os.path.dirname(self.output["gtf"]), "mikado_prepare.log")
 
     @property
     def rulename(self):
@@ -117,10 +124,11 @@ class MikadoPrepare(AtomicOperation):
         log = self.log
         threads = self.threads
         input, output = self.input, self.output
+        load = self.load
         cmd = "{load} "
         outdir = self.outdir
-        cmd += "mikado prepare --procs={threads} --fasta={input[ref]} "
-        cmd += "--json-conf={input[cfg]} -od {outdir} > {log} 2> &1"
+        cmd += "mikado prepare --procs={threads} "
+        cmd += "--json-conf={input[cfg]} -od {outdir} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 

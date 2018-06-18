@@ -60,13 +60,13 @@ class Stringtie(ShortAssembler):
     @property
     def cmd(self):
         load = self.load
-        cmd = "{load}"
+        cmd = " {load} "
         extra = self.extra
         # Default options for Stringtie. We do not want to overcome those provided by
         if not re.search("\-f ([0-9]|\.)*", extra):
-            extra += "-f 0.05 "
+            extra += " -f 0.05 "
         if not re.search("\-m [0-9]*", extra):
-            extra += "-m 200 "
+            extra += " -m 200 "
 
         threads = self.threads
         outdir = self.gfdir
@@ -76,12 +76,12 @@ class Stringtie(ShortAssembler):
         log = self.log
         gtf = os.path.join(self.gfdir, "transcripts.gtf")
         if self.ref_transcriptome is not None:
-            trans = "-G {ref_transcriptome}".format(ref_transcriptome=self.ref_transcriptome)
+            trans = " -G {ref_transcriptome} ".format(ref_transcriptome=self.ref_transcriptome)
         else:
-            trans = ""
+            trans = " "
         alrun = self.alrun
-        cmd += "stringtie {input[bam]} -l Stringtie_{alrun} {extra}"
-        cmd += "{trans} -o {output[gf]} -p {threads} > {log} 2>&1 "
+        cmd += " stringtie {input[bam]} -l Stringtie_{alrun} {extra} "
+        cmd += " {trans} -o {output[gf]} -p {threads} > {log} 2>&1 && "
         cmd += "ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd

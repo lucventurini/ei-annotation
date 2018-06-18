@@ -27,6 +27,7 @@ class AssemblyWrapper(EIWrapper):
             instance = wrapper(short_alignments)
             instance.add_flag_to_inputs()
             self.merge([instance])
+            self.__add_to_gfs(instance)
             stats.extend([AsmStats(rule) for rule in instance.gfs])
             self.add_edges_from([(instance.exit, stat) for stat in stats])
 

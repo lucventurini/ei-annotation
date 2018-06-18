@@ -267,7 +267,10 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         """This property defines how to "load" a module for use in cluster environments."""
 
         # TODO: this will have to be revised once we have the configuration
-        to_load = [self.configuration["programs"].get(_, dict()).get("load", '') for _ in self.loader]
+        try:
+            to_load = [self.configuration["programs"].get(_, dict()).get("load", '') for _ in self.loader]
+        except KeyError:
+            raise KeyError("{}:\n{}".format(self.rulename, self.configuration))
         cmd = loadPreCmd(*to_load)
         if cmd:
             return cmd
@@ -289,16 +292,18 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         for key, value in self.input.items():
             if isinstance(value, bytes):
                 value = value.decode()
-            if not isinstance(value, list):
-                string.append("    {key}=\"{value}\",".format(**locals()))
-            else:
+            if isinstance(value, list):
                 string.append("    {key}={value},".format(**locals()))
+            else:
+                string.append("    {key}=\"{value}\",".format(**locals()))
         string[-1] = string[-1].rstrip(",")  # Remove trailing comma
         string.append("  output:")
         for key, value in self.output.items():
             if self.touch is True:
                 assert len(self.output) == 1, (self.rulename, self.input, self.output)
                 string.append("    {key}=touch(\"{value}\")".format(**locals()))
+            elif isinstance(value, list):
+                string.append("    {key}={value},".format(**locals()))
             else:
                 string.append("    {key}=\"{value}\",".format(**locals()))
         string[-1] = string[-1].rstrip(",")
@@ -379,14 +384,29 @@ class EIWorfkflow:
 
         self.add_node(node)
 
+    def __contains__(self, item):
+
+        if isinstance(item, AtomicOperation):
+            return item in self.graph
+        elif isinstance(item, (str, bytes)):
+            return any(rule.rulename == item for rule in self)
+        else:
+            return False
+
     def add_edge(self, in_edge, out_edge):
         """Here we are going to exploit the fact that adding an edge will automatically add the nodes
         in the graph."""
-        if not isinstance(in_edge, AtomicOperation) or not isinstance(out_edge, AtomicOperation):
-            raise TypeError("Invalid types for adding edges - only AtomicOperations are allowed. Types: {},  {}".format(
-                type(in_edge), type(out_edge)
-            ))
-
+        if isinstance(in_edge, EIWrapper):
+            self.merge([in_edge])
+            in_edge = in_edge.exit
+        elif not isinstance(in_edge, AtomicOperation):
+            raise TypeError("Input edge must be an Atomic operation, not {}!".format(type(in_edge)))
+        if isinstance(out_edge, EIWrapper):
+            self.add_edges_from([(in_edge, entry) for entry in out_edge.entries])
+            self.merge([out_edge])
+            return
+        elif not isinstance(out_edge, AtomicOperation):
+            raise TypeError("Outgoing node must be an Atomic operation, not {}".format(type(out_edge)))
         self.__graph.add_edge(in_edge, out_edge)
 
     def add_edges_from(self, tasks):
@@ -395,8 +415,6 @@ class EIWorfkflow:
         for el in tasks:
             if len(el) != 2:
                 raise TypeError("Invalid task edge: {}".format(el))
-            if not all(isinstance(_, AtomicOperation) for _ in el):
-                raise TypeError("Invalid node! {}, {}".format(type(el[0]), type(el[1])))
             self.add_edge(*el)
         return
 
@@ -430,6 +448,12 @@ class EIWorfkflow:
     def __iter__(self):
         return iter(self.__graph.nodes)
 
+    def remove_nodes(self, nodes):
+        self.__graph.remove_nodes_from(nodes)
+
+    def remove_node(self, node):
+        self.__graph.remove_node(node)
+
     @property
     def adj(self):
         return self.__graph.adj
@@ -441,7 +465,7 @@ class EIWorfkflow:
     @configuration.setter
     def configuration(self, conf):
         # TODO: this should be powered by JSON schemas
-        if conf is None or isinstance(conf, dict):
+        if conf is None or isinstance(conf, (frozendict, dict)):
             self.__configuration = conf
         else:
             raise TypeError
@@ -477,3 +501,10 @@ class EIWrapper(EIWorfkflow):
                 "\n".join(_.rulename for _ in nodes)
             ))
         return nodes[0]
+
+    @property
+    def entries(self):
+        """This property returns the roots of the workflow. Contrary to exits, there can be multiple
+        entry points into a wrapper."""
+        in_edges, out_edges = zip(*self.graph.in_edges)
+        return set.difference(set(in_edges), set(out_edges))

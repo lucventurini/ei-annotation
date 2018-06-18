@@ -50,7 +50,9 @@ class Prodigal(OrfCaller):
 
     @property
     def genecode(self):
-        return CodonTable.generic_by_name[self.configuration["homology"]["genecode"]].id
+        code = self.configuration.get("homology", dict()).get("genecode", "Standard")
+
+        return CodonTable.generic_by_name[code].id
 
     @property
     def cmd(self):

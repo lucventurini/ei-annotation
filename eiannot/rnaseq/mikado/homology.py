@@ -12,7 +12,9 @@ class SplitMikadoFasta(AtomicOperation):
         self.configuration = prepare.configuration
         self.input = prepare.output
         self.outdir = prepare.outdir
-        self.output = {"split": os.path.join(self.outdir, 'homology', 'split.done')}
+        self.output["split_flag"] = os.path.join(self.outdir, 'homology', 'split.done')
+        self.output["split"] =["{outprefix}_{chunk}.fasta".format(
+            outprefix=self.outprefix, chunk=str(_).zfill(3)) for _ in range(1, self.chunks + 1)]
 
     @property
     def message(self):
@@ -20,7 +22,7 @@ class SplitMikadoFasta(AtomicOperation):
 
     @property
     def chunks(self):
-        return self.configuration["mikado"]["blastx"]["chunks"]
+        return self.configuration["homology"]["chunks"]
 
     @property
     def loader(self):
@@ -32,11 +34,11 @@ class SplitMikadoFasta(AtomicOperation):
 
     @property
     def log(self):
-        return os.path.join(os.path.dirname(self.output["split"]), "split.log")
+        return os.path.join(os.path.dirname(self.output["split_flag"]), "split.log")
 
     @property
     def outprefix(self):
-        return os.path.join(os.path.dirname(self.output["split"]), "fastas", "chunk")
+        return os.path.join(os.path.dirname(self.output["split_flag"]), "fastas", "chunk")
 
     @property
     def cmd(self):
@@ -46,12 +48,13 @@ class SplitMikadoFasta(AtomicOperation):
         chunks = self.chunks
         outprefix = self.outprefix
 
-        cmd = "{load} split_fasta.py -m {chunks} {input[fa]} {outprefix} && touch -h {output[split]}".format(
+        cmd = "{load} split_fasta.py -m {chunks} {input[fa]} {outprefix} && touch {output[split_flag]}".format(
             **locals()
         )
 
         cmd = cmd.format(**locals())
         return cmd
+
 
 class MikadoHomology(AtomicOperation, metaclass=abc.ABCMeta):
 
@@ -70,6 +73,7 @@ class MikadoHomology(AtomicOperation, metaclass=abc.ABCMeta):
         self.input["db"] = index.output["db"]
         self.__chunk_id = chunk_id
         chunk_id = self.chunk_id
+        del self.input["split"]
         self.input["chunk"] = os.path.join(self.outdir,
                                            "homology",
                                            "fastas",
@@ -94,7 +98,8 @@ class MikadoHomology(AtomicOperation, metaclass=abc.ABCMeta):
     @property
     def log(self):
         logdir = os.path.join(self.outdir, "homology", "logs")
-        os.makedirs(logdir)
+        if not os.path.exists(logdir):
+            os.makedirs(logdir)
         name = self.loader[0]
         return os.path.join(logdir, "{name}_{chunk_id}.log".format(chunk_id=self.chunk_id, name=name))
 
@@ -206,15 +211,19 @@ class MikadoHomologyWrapper(EIWrapper):
                 raise KeyError("Unrecognised homology assessment program")
 
             indexer = indexer(self.sanitizer)
+            assert indexer.configuration["programs"]
             self.add_edge(self.sanitizer, indexer)
             executers = []
             for chunk in range(1, self.chunks + 1):
                 exe = executer(chunk, split, indexer)
                 self.add_edge(indexer, exe)
+                self.add_edge(split, exe)
                 executers.append(exe)
 
             self.flag = MikadoHomologyFlag(executers)
             self.add_edges_from([(exe, self.flag) for exe in executers])
+        else:
+            self.remove_node(self.sanitizer)
 
     @property
     def chunks(self):

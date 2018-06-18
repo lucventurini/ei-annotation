@@ -391,7 +391,7 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         pass
 
     def add_to_gtfs(self, rule):
-        if not isinstance(rule, ShortAligner):
+        if not isinstance(rule, LongAligner):
             raise TypeError
         if "link" not in rule.output:
             raise KeyError("Link not found for rule {}".format(rule.rulename))

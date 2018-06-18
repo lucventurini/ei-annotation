@@ -1,6 +1,6 @@
-from .bam import BamStats, BamIndex, BamSort
+# from .bam import BamStats, BamIndex, BamSort
 from .hisat2 import HisatWrapper
-from .gmap import GsnapWrapper
+from .gmap import GsnapWrapper, GmapLongReads
 from .tophat2 import TopHat2Wrapper
 from .star import StarWrapper, StarLongWrapper
 from .abstract import ShortAlnFlag
@@ -56,7 +56,9 @@ class ShortAlignmentsWrapper(EIWrapper):
 
 class LongAlignmentsWrapper(EIWrapper):
 
-    wrappers = {"star": StarLongWrapper}
+    wrappers = {"star": StarLongWrapper,
+                # "gmap": G  # TODO: finish GMAP here
+                }
 
     def __init__(self, prepare_wrapper):
 

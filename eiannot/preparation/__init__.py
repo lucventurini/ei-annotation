@@ -35,12 +35,18 @@ class SanitizeGenome(AtomicOperation):
 
 class FaidxGenome(AtomicOperation):
 
-    def __init__(self, sanitised: SanitizeGenome):
+    def __init__(self, sanitiser, configuration=None):
 
         super().__init__()
-        self.input = sanitised.output
+        if sanitiser is None:
+            self.configuration = configuration
+            self.input["genome"] = self.genome
+
+        else:
+            self.input = sanitiser.output
+            self.configuration = sanitiser.configuration
+
         self.output["fai"] = self.input["genome"] + ".fai"
-        self.configuration = sanitised.configuration
         self.log = os.path.join(os.path.dirname(self.input["genome"]), "faidx.log")
         self.message = "Indexing the sanitised genome with SAMtools"
 
@@ -70,7 +76,7 @@ class SanitizeProteinBlastDB(AtomicOperation):
         self.configuration = configuration
         self.input["db"] = self.protein_dbs
         self.output["db"] = os.path.join(self.outdir, "homologyDB.fa")
-        self.log = ""
+        self.log = os.path.join(os.path.dirname(self.output["db"]), "sanitize.log")
 
     @property
     def loader(self):
@@ -81,8 +87,9 @@ class SanitizeProteinBlastDB(AtomicOperation):
         load = self.load
         input, output = self.input, self.output
         log = self.log
+        dbs = " ".join(self.input["db"])
 
-        cmd = "{load} sanitize_blast_db.py -o {output[db]} {input[db]} 2> {log} > {log}"
+        cmd = "{load} sanitize_blast_db.py -o {output[db]} {dbs} 2> {log} > {log}"
         cmd = cmd.format(**locals())
 
         return cmd
@@ -117,6 +124,7 @@ class DiamondIndex(AtomicOperation):
 
         super().__init__()
         self.input = sanitizer.output
+        self.configuration = sanitizer.configuration
         self.output["db"] = os.path.splitext(self.input["db"])[0] + ".dmnd"
         self.outdir = os.path.dirname(self.output["db"])
         self.log = os.path.join(self.outdir, "diamond.index.log")
@@ -145,6 +153,7 @@ class BlastxIndex(AtomicOperation):
     def __init__(self, sanitizer: SanitizeProteinBlastDB):
         super().__init__()
         self.input = sanitizer.output
+        self.configuration = sanitizer.configuration
         self.output["db"] = os.path.splitext(self.input["db"])[0] + ".pog"
         self.outdir = os.path.dirname(self.output["db"])
         self.log = os.path.join(self.outdir, "blast.index.log")

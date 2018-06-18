@@ -139,6 +139,14 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
     def outdir(self):
         return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "2-assemblies"))
 
+    @property
+    def label(self):
+        alrun = re.sub("--", "-", re.sub(self.sample.label, '', self.alrun))
+        alrun = re.sub(".sorted", "", alrun)
+        return "{sample}-{run}-{alrun}".format(sample=self.sample.label,
+                                               run=self.run,
+                                               alrun=alrun)
+
 
 class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
@@ -169,7 +177,9 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def runs(self):
+        print(self.toolname, self.configuration["programs"].get(self.toolname, dict()).get("runs", []))
         return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
+
 
     def add_flag_to_inputs(self):
         for rule in self:
