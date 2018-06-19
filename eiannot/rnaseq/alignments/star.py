@@ -10,7 +10,7 @@ class StarIndex(IndexBuilder):
 
         super().__init__(configuration, outdir)
 
-        self.output = {"index": os.path.join(self._outdir, "SAindex")}
+        self.output = {"index": os.path.join(self.outdir, "SAindex")}
         self.touch = False
         self.message = "Indexing genome with star"
 
@@ -187,11 +187,17 @@ class StarLong(LongAligner):
     @property
     def cmd(self):
         log = self.log  # TODO: implement
-        index = os.path.dirname(self.input["index"])
+        try:
+            index = os.path.dirname(self.input["index"])
+        except KeyError:
+            raise KeyError(self.input)
         input_reads = self.input_reads
         threads = self.threads
         min_intron, max_intron = self.min_intron, self.max_intron
         ref_transcriptome = self.ref_transcriptome
+        load = self.load
+        outdir = os.path.dirname(self.output["bam"])
+        extra = self.extra
 
         cmd = "{load} STARlong --runThreadN {threads} --runMode alignReads --outSAMattributes NH HI NM MD "
         cmd += " --readNameSeparator space --outFilterMultimapScoreRange 1 --outFilterMismatchNmax 2000 "
@@ -199,9 +205,9 @@ class StarLong(LongAligner):
         cmd += "--scoreInsOpen -1 --scoreInsBase -1 --alignEndsType Local --seedSearchStartLmax 50 "
         cmd += " --seedPerReadNmax 100000 --seedPerWindowNmax 1000 --alignTranscriptsPerReadNmax 100000 "
         cmd += " --alignTranscriptsPerWindowNmax 10000 --genomeDir {index}"
-        cmd += " {params.infiles} --outSAMtype BAM Unsorted --outSAMstrandField intronMotif "
+        cmd += " {input_reads} --outSAMtype BAM Unsorted --outSAMstrandField intronMotif "
         cmd += " --alignIntronMin {min_intron} --alignIntronMax {max_intron} "
-        cmd += " {ref_transcriptome} --outFileNamePrefix {params.outdir}/ > {log} 2>&1"
+        cmd += " {ref_transcriptome} --outFileNamePrefix {outdir}/ > {log} 2>&1"
 
         cmd = cmd.format(**locals())
         return cmd
@@ -227,7 +233,7 @@ class StarLong(LongAligner):
 
     @property
     def toolname(self):
-        return "star"
+        return "star_long"
 
     @property
     def suffix(self):
@@ -239,8 +245,8 @@ class StarBam2Gtf(LongAligner):
     def __init__(self, aligner: StarLong):
         super().__init__(indexer=aligner.indexer, sample=aligner.sample, run=aligner.run)
         self.input = aligner.output
-        self.output = {"gf": os.path.join(self.outdir, "lr_output", "lr_star-{sample}-{run}.gtf").format(
-            sample=self.sample.label, run=self.run)}
+        self.output = {"link": self.link,
+                       "gf": os.path.splitext(aligner.output["bam"])[0] + self.suffix}
         self.message = "Converting STAR long reads from BAM to GTF (sample: {sample.label} - run: {run})".format(
             sample=self.sample, run=self.run)
 
@@ -264,24 +270,27 @@ class StarBam2Gtf(LongAligner):
     def cmd(self):
         load = self.load
         input, output, log = self.input, self.output, self.log
-        cmd = "{load} bam2gtf.py {input[bam]} > {output[gf]} 2> {log}".format(**locals())
+        link_source = os.path.relpath(self.output["gf"], start=os.path.dirname(self.link))
+        link = self.link
+        cmd = "{load} bam2gtf.py {input[bam]} > {output[gf]} 2> {log} && ln -sf {link_source} {output[link]}".format(
+            **locals())
         return cmd
 
 
 class StarLongWrapper(LongWrapper):
 
-    def __init__(self, configuration, prepare_flag):
+    def __init__(self, prepare_flag):
 
         # First, we have to build the index
 
-        super().__init__(configuration, prepare_flag)
+        super().__init__(prepare_flag)
 
         # Then we have to do all the alignments
         # Retrieve the running parameters
 
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = self.indexer(configuration, self.outdir)
+            indexer = self.indexer(self.configuration, self.outdir)
             self.add_node(indexer)
             # Optionally build the reference splice catalogue
             star_runs = []
@@ -290,10 +299,8 @@ class StarLongWrapper(LongWrapper):
                 self.add_edge(indexer, star_run)
                 bam2gtf_run = StarBam2Gtf(star_run)
                 star_runs.append(bam2gtf_run)
-                self.add_to_gtfs(bam2gtf_run)
-
-            flag = StarLongFlag(self.outdir, [run.output["gf"] for run in star_runs])
-            self.add_edges_from([(run, flag) for run in star_runs])
+                self.add_to_gfs(bam2gtf_run)
+                self.add_edge(star_run, bam2gtf_run)
 
     @property
     def toolname(self):
@@ -314,7 +321,14 @@ class StarLongFlag(AtomicOperation):
     def __init__(self, outdir, runs=[]):
 
         super().__init__()
-        for number, run in enumerate(runs):
-            self.input["run{}".format(number)] = run
+        self.input["runs"] = [run.output["link"] for run in runs]
         self.output["flag"] = os.path.join(outdir, "star_long.done")
         self.touch = True
+
+    @property
+    def loader(self):
+        return []
+
+    @property
+    def rulename(self):
+        return "star_long_all"

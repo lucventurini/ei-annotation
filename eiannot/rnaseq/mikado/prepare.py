@@ -21,7 +21,11 @@ class MikadoConfig(AtomicOperation):
         self.input["genome"] = self.genome
         self.input["asm_list"] = os.path.join(self.outdir, "models_list.txt")
         self.input["gfs"] = [gf.output["gf"] for gf in assemblies.gfs]
-        self.input["gfs"].extend([gf.output["gf"] for gf in long_aln_wrapper.gfs])  # TODO: implement
+        for gf in long_aln_wrapper.gfs:
+            try:
+                self.input["gfs"].append(gf.input["gf"])
+            except KeyError:
+                raise KeyError((gf.rulename, gf.output))
         self.input["portcullis"] = self.portcullis.junctions
         self.__create_file_list()
         self.output = {"cfg": os.path.join(self.outdir, "mikado.yaml")}
@@ -29,7 +33,7 @@ class MikadoConfig(AtomicOperation):
     @property
     def outdir(self):
 
-        return os.path.join(self.configuration["outdir"], "rnaseq", "4-mikado")
+        return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado")
 
     @property
     def threads(self):
@@ -73,7 +77,10 @@ class MikadoConfig(AtomicOperation):
             with open(self.input["asm_list"], mode="wt") as file_list:
                 for gf in itertools.chain(self.assemblies.gfs, self.long_aln_wrapper.gfs):
                     # Write out the location of the file, and all other details
-                    line = [gf.output["link"], gf.label, gf.sample.stranded]
+                    try:
+                        line = [gf.output["link"], gf.label, gf.sample.stranded]
+                    except KeyError:
+                        raise KeyError((gf.rulename, gf.output))
                     print(*line, file=file_list, sep="\t")
 
     @property

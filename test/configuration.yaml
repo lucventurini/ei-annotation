@@ -14,10 +14,22 @@ programs:
   hisat2:
     load: ''
     runs: ['']
+  tophat2:
+    load: ''
+    runs: ['']
   samtools:
     load: ''
   portcullis:
     execute: true
+    load: ''
+  gmap_long:
+    runs: ['']
+    load: ''
+  star_long:
+    runs: ['']
+    load: ''
+  trinity:
+    runs: ['']
     load: ''
 outdir: "Eiannot"
 homology:

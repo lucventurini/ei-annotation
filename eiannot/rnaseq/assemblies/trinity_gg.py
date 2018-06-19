@@ -1,7 +1,6 @@
 from .abstract import ShortAssembler, ShortAssemblerWrapper
-from ...abstract import AtomicOperation, EIWrapper, ShortSample
+from ...abstract import AtomicOperation, ShortSample
 from ..alignments.gmap import GmapIndex, gmap_intron_lengths
-from ..alignments.abstract import ShortAligner  # TODO: got to decide how to set the links
 import functools
 import subprocess as sp
 import re
@@ -27,14 +26,14 @@ class TrinityGGWrapper(ShortAssemblerWrapper):
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
 
-        if len(self.runs) > 0 and len(bams) > 0:
-            indexer = GmapIndex(configuration, self.outdir)
+        if len(self.runs) > 0 and len(self.bams) > 0:
+            indexer = GmapIndex(aln_wrapper.configuration, self.outdir)
 
             trinities = []
             mappers = []
 
-            for bam, run in itertools.product(bams, range(len(self.runs))):
-                trinity = TrinityGG(bam, configuration, self.outdir, run)
+            for bam, run in itertools.product(self.bams, range(len(self.runs))):
+                trinity = TrinityGG(bam, run)
                 trinities.append(trinity)
                 mapper = TrinityGmap(trinity, indexer)
                 self.add_edge(trinity, mapper)
@@ -61,11 +60,11 @@ class TrinityFlag(AtomicOperation):
 
 class TrinityGG(ShortAssembler):
 
-    def __init__(self, bam, configuration, outdir, run):
-        super().__init__(bam, configuration, outdir, run)
+    def __init__(self, bam, run):
+        super().__init__(bam, run)
         self.input["reference"] = self.genome
 
-        self.output = {"transcripts": os.path.join(self._outdir, "Trinity.fasta")}
+        self.output = {"transcripts": os.path.join(self.outdir, "Trinity.fasta")}
 
         self.message = "Using trinity in genome guided mode to assemble (run {run}): {input[bam]}".format(
             input=self.input, run=run
@@ -155,10 +154,7 @@ class TrinityGmap(ShortAssembler):
 
     def __init__(self, trinitygg: TrinityGG, index: GmapIndex):
 
-        run = trinitygg.run
-        configuration = trinitygg.configuration
-        outdir = trinitygg._outdir
-        super().__init__(bam=None, run=run, configuration=configuration, outdir=outdir)
+        super().__init__(bam=trinitygg, run=trinitygg.run)
         self.input['transcripts'] = trinitygg.output["transcripts"]
         self.input.update(index.output)
         self.message = "Mapping trinity transcripts to the genome: {input[transcripts]}".format(
@@ -166,8 +162,8 @@ class TrinityGmap(ShortAssembler):
         )
         self._trinitygg = trinitygg
         self._gmapdb = index
-        self.log = os.path.join(self._outdir, "logs", "trinitygmap-{run}-{alrun}.log".format(
-            run=run, alrun=trinitygg.alrun))
+        self.log = os.path.join(self.outdir, "logs", "trinitygmap-{run}-{alrun}.log".format(
+            run=self.run, alrun=trinitygg.alrun))
 
     @property
     def strand(self):
@@ -232,10 +228,3 @@ class TrinityGmap(ShortAssembler):
         cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
-
-    @property
-    def strand(self):
-        if self.sample.stranded:
-            return "-z sense_filter"
-        else:
-            return ""

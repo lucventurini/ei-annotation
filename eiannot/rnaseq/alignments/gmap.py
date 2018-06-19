@@ -57,7 +57,7 @@ class GmapIndex(IndexBuilder):
 
         super().__init__(configuration, outdir)
         # TODO: probably the input should be the cleaned up genome
-        self.output = {"index": os.path.join(self._outdir, "{}.sachildguide1024".format(self.species))}
+        self.output = {"index": os.path.join(self.outdir, "{}.sachildguide1024".format(self.species))}
         self.touch = True
 
     @property
@@ -72,7 +72,7 @@ class GmapIndex(IndexBuilder):
     def message(self):
 
         return "Building the GMAP index for {} in {}".format(self.input["genome"],
-                                                             self._outdir)
+                                                             self.outdir)
 
     @property
     def threads(self):
@@ -81,12 +81,13 @@ class GmapIndex(IndexBuilder):
     @property
     def cmd(self):
 
-        load = None
-        threads = self.threads
-        input = self.input["genome"]
+        load = self.load
+        input = self.input
         outdir = os.path.dirname(os.path.dirname(self.output["index"]))
         species = self.species
         log = self.log
+        extra = self.extra
+
         cmd = "{load} gmap_build --dir={outdir} --db={species} {extra} {input[genome]} > {log} 2>&1".format(
             **locals()
         )
@@ -103,6 +104,10 @@ class GmapIndex(IndexBuilder):
     @property
     def dbname(self):
         return os.path.basename(os.path.dirname(self.output["index"]))
+
+    @property
+    def index(self):
+        return self.dbname
 
 
 class GsnapAligner(ShortAligner):
@@ -184,8 +189,10 @@ class GmapLongReads(LongAligner):
 
         super().__init__(indexer=indexer,
                          sample=sample, run=run)
+
         self.output = {"link": self.link,
-                       "gf": os.path.join()}
+                       "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "star-{sample}-{run}.{suffix}").format(
+                           sample=self.sample.label, run=self.run, suffix=self.suffix)}
 
         self.message = "Mapping long reads to the genome with gmap (sample: {sample.label} - run: {run})".format(
             sample=self.sample, run=self.run)
@@ -227,3 +234,35 @@ class GmapLongReads(LongAligner):
     @property
     def max_intron_cli(self):
         return gmap_intron_lengths(self.load, self.max_intron)
+
+
+class GmapLongWrapper(LongWrapper):
+
+    def __init__(self, prepare_flag):
+
+        # First, we have to build the index
+
+        super().__init__(prepare_flag)
+
+        # Then we have to do all the alignments
+        # Retrieve the running parameters
+
+        if len(self.runs) > 0 and len(self.samples) > 0:
+            # Start creating the parameters necessary for the run
+            indexer = self.indexer(self.configuration, self.outdir)
+            self.add_node(indexer)
+            # Optionally build the reference splice catalogue
+            gmap_runs = []
+            for sample, run in itertools.product(self.samples, range(len(self.runs))):
+                gmap_run = GmapLongReads(indexer=indexer, sample=sample, run=run)
+                gmap_runs.append(gmap_run)
+                self.add_edge(indexer, gmap_run)
+                self.add_to_gfs(gmap_run)
+
+    @property
+    def toolname(self):
+        return "gmap_long"
+
+    @property
+    def indexer(self):
+        return GmapIndex

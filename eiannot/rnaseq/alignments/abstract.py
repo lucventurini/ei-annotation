@@ -209,9 +209,9 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
         self.__sample = None
         self.sample = sample
         self.run = run
-        self.input = {"indexer": indexer.index}
+        # self.input = {"indexer": indexer.index}
         self.input["read1"] = self.sample.read1
-        self.log = os.path.join(self._outdir, "{toolname}-{sample}-{run}.log".format(
+        self.log = os.path.join(self.outdir, "{toolname}-{sample}-{run}.log".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run
         ))
 
@@ -264,6 +264,14 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
             toolname=self.toolname, sample=self.sample.label, run=self.run, suffix=self.suffix)
                             )
 
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "rnaseq", "4-long-alignments")
+
+    @property
+    def extra(self):
+        return self.configuration["programs"][self.toolname]["runs"][self.run]
+
 
 class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
@@ -297,7 +305,7 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
             new_bams.add(stater)
             self.__stats.append(stater)
         self.__bam_rules = new_bams
-        self.flag = ShortAlnFlag(self.outdir, runs=self.__stats, toolname=self.toolname)
+        self.flag = AlnFlag(self.outdir, runs=self.__stats, toolname=self.toolname)
         self.add_node(self.flag)
         self.add_edges_from([(stat, self.flag) for stat in self.__stats])
         self.__add_flag_to_inputs()
@@ -341,7 +349,7 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
         return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
 
 
-class ShortAlnFlag(AtomicOperation):
+class AlnFlag(AtomicOperation):
 
     def __init__(self, outdir, toolname, runs=[]):
         super().__init__()
@@ -361,15 +369,31 @@ class ShortAlnFlag(AtomicOperation):
 
 class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
-    def __init__(self, configuration, prepare_flag):
+    def __init__(self, prepare_flag):
         self.__prepare_flag = prepare_flag
         super().__init__()
         self.__gf_rules = set()
-        self.configuration = configuration
+        self.configuration = prepare_flag.configuration
+        self.__finalised = False
 
-    def add_flag_to_inputs(self):
-        for rule in self:
-            rule.input["aln_flag"] = self.__prepare_flag
+    def finalise(self):
+        if self.__finalised is True:
+            return
+        if self.__finalised:
+            return
+        new_gfs = set()
+
+        for gf in self.gfs:
+            stats = LongAlignerStats(gf)
+            self.add_edge(gf, stats)
+            new_gfs.add(stats)
+
+        self.__gf_rules = new_gfs
+        self.flag = AlnFlag(self.outdir, runs=list(self.gfs), toolname=self.toolname)
+        self.add_node(self.flag)
+        self.add_edges_from([(stat, self.flag) for stat in self.gfs])
+        self.__add_flag_to_inputs()
+        self.__finalised = True
 
     @property
     @abc.abstractmethod
@@ -383,19 +407,19 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def outdir(self):
-        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "4-long-alignments"))
 
     @property
     @abc.abstractmethod
     def toolname(self):
         pass
 
-    def add_to_gtfs(self, rule):
+    def add_to_gfs(self, rule):
         if not isinstance(rule, LongAligner):
             raise TypeError
         if "link" not in rule.output:
             raise KeyError("Link not found for rule {}".format(rule.rulename))
-        self.__gf_rules.add(rule.rulename)
+        self.__gf_rules.add(rule)
 
     @property
     def runs(self):
@@ -404,3 +428,51 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
     @property
     def gfs(self):
         return self.__gf_rules
+
+    def __add_flag_to_inputs(self):
+        self.add_node(self.__prepare_flag.exit)
+        for rule in self.nodes:
+            if rule == self.__prepare_flag.exit:
+                continue
+            rule.input["prep_flag"] = self.__prepare_flag.output["fai"]
+            self.add_edge(self.__prepare_flag.exit, rule)
+
+
+class LongAlignerStats(AtomicOperation):
+
+    def __init__(self, aligner: LongAligner):
+        super().__init__()
+        self.configuration = aligner.configuration
+        self.__aligner = aligner
+        self.input = aligner.output
+        self.outdir = aligner.outdir
+        try:
+            self.output = {"stats": os.path.splitext(self.input["link"])[0] + "stats"}
+        except KeyError:
+            raise KeyError(type(aligner), aligner.rulename)
+        self.message = "Calculating statistics for: {input[link]}".format(input=self.input)
+        self.log = self.output["stats"] + ".log"
+
+    @property
+    def rulename(self):
+        return "long_alignment_stats_{toolname}-{sample}_{run}".format(
+            toolname=self.__aligner.toolname,
+            sample=self.__aligner.sample,
+            run=self.__aligner.run
+        )
+
+    @property
+    def loader(self):
+        return ["mikado"]
+
+    @property
+    def loci_dir(self):
+        return os.path.dirname(self.input["gf"])
+
+    @property
+    def cmd(self):
+        load = self.load
+        input, output, log = self.input, self.output, self.log
+        cmd = "{load} mikado util stats {input[link]} {output[stats]} > {log} 2>&1"
+        cmd = cmd.format(**locals())
+        return cmd

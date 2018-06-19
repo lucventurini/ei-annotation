@@ -1,9 +1,9 @@
 # from .bam import BamStats, BamIndex, BamSort
 from .hisat2 import HisatWrapper
-from .gmap import GsnapWrapper, GmapLongReads
+from .gmap import GsnapWrapper, GmapLongWrapper
 from .tophat2 import TopHat2Wrapper
 from .star import StarWrapper, StarLongWrapper
-from .abstract import ShortAlnFlag
+from .abstract import AlnFlag
 from ...abstract import EIWrapper, AtomicOperation
 import os
 
@@ -32,7 +32,7 @@ class ShortAlignmentsWrapper(EIWrapper):
                 self.merge([instance])
                 self.__bams.extend(instance.bams)
 
-        final_flag = AlnFlag(flags, outdir=self.outdir, prepare_wrapper=prepare_wrapper)
+        final_flag = ShortAlignersFlag(flags, outdir=self.outdir, prepare_wrapper=prepare_wrapper)
         self.add_node(final_flag)  # We have to add the node, otherwise the workflow will be empty
         self.add_edges_from([(flag, final_flag) for flag in flags])
         assert self.exit == final_flag, self.nodes
@@ -52,81 +52,59 @@ class ShortAlignmentsWrapper(EIWrapper):
 
 class LongAlignmentsWrapper(EIWrapper):
 
-    wrappers = {"star": StarLongWrapper,
-                # "gmap": G  # TODO: finish GMAP here
-                }
+    wrappers = {
+        "star": StarLongWrapper,
+        "gmap": GmapLongWrapper,
+    }
 
     def __init__(self, prepare_wrapper):
 
         super().__init__()
-        stats = []
         self.__gf_rules = []
         self.configuration = prepare_wrapper.configuration
-        prepare_flag = prepare_wrapper.output
+        self.__prepare_flag = prepare_wrapper
+        flags = []
 
         for wrapper in self.wrappers.values():
-            instance = wrapper(self.configuration, prepare_flag)
-            instance.add_flag_to_inputs()
+            instance = wrapper(self.__prepare_flag)
+            instance.finalise()
+            assert instance.exit
             self.merge([instance])
             self.__gf_rules.extend(instance.gfs)
-            for gf in instance.gfs:
-                stat = LongAlignerStats(gf)
-                self.add_edge(gf, stat)
-                stats.append(stat)
+            flags.append(instance.exit)
 
-        flag = LongAlignersFlag(stats, outdir=self.outdir)
+        flag = LongAlignersFlag(flags, outdir=self.outdir)
         self.add_node(flag)
-        self.add_edges_from([(stat, flag) for stat in stats])
-        pass
+        self.add_edges_from([(f_flag, flag) for f_flag in flags])
+        self.add_flag_to_inputs()
 
     @property
     def outdir(self):
-        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "4-long-alignments"))
 
     @property
     def gfs(self):
         return self.__gf_rules
 
-
-class LongAlignerStats(AtomicOperation):
-
-    def __init__(self, aligner):
-        super().__init__()
-        self.input = aligner.output
-        self.outdir = aligner.outdir
-        self.output = {"stats": os.path.splitext(self.input["gf"])[0] + ".stats"}
-        self.message = "Calculating statistics for: {input[gf]}".format(input=self.input)
-        self.log = self.output["stats"] + ".log"
-
-    @property
-    def rulename(self):
-        return
-
-    @property
-    def loader(self):
-        return ["mikado"]
-
-    @property
-    def loci_dir(self):
-        return os.path.dirname(self.input["gf"])
-
-    @property
-    def cmd(self):
-        load = self.load
-        input, output, log = self.input, self.output, self.log
-        cmd = "{load} mikado util stats {input[gf]} {output[stats]} > {log} 2>&1"
-        cmd = cmd.format(**locals())
-        return cmd
+    def add_flag_to_inputs(self):
+        for rule in self.nodes:
+            if rule == self.__prepare_flag.exit:
+                continue
+            rule.input["prep_flag"] = self.__prepare_flag.output["fai"]
+            self.add_edge(self.__prepare_flag.exit, rule)
 
 
 class LongAlignersFlag(AtomicOperation):
 
-    def __init__(self, stats_runs: [LongAlignerStats], outdir=None):
+    def __init__(self, stats_runs: [AlnFlag], outdir=None):
 
         super().__init__()
         self.touch = True
         if stats_runs:
-            outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
+            try:
+                outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["flag"]))
+            except KeyError:
+                raise KeyError((stats_runs[0].input, stats_runs[0].output))
         else:
             assert outdir is not None
         self.output["flag"] = os.path.join(outdir, "long_reads.done")
@@ -140,9 +118,9 @@ class LongAlignersFlag(AtomicOperation):
         return []
 
 
-class AlnFlag(AtomicOperation):
+class ShortAlignersFlag(AtomicOperation):
 
-    def __init__(self, flags: [ShortAlnFlag], prepare_wrapper=None, outdir=None):
+    def __init__(self, flags: [AlnFlag], prepare_wrapper=None, outdir=None):
 
         super().__init__()
         self.touch = True
