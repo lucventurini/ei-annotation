@@ -1,4 +1,4 @@
-from ...abstract import AtomicOperation, EIWrapper, ShortSample
+# from ...abstract import AtomicOperation, EIWrapper, ShortSample
 from .abstract import IndexBuilder, ShortAligner, ShortWrapper, LongWrapper, LongAligner
 import os
 import itertools
@@ -33,14 +33,15 @@ class GsnapWrapper(ShortWrapper):
             self.add_node(self.indexer(configuration, self.outdir))
             # Optionally build the reference splice catalogue
             gsnap_runs = []
+            indexer = self.indexer(self.configuration, self.outdir)
+            self.add_node(indexer)
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                hisat_run = GsnapAligner(indexer=self.indexer,
+                gsnap_run = GsnapAligner(indexer=indexer,
                                          sample=sample,
                                          run=run)
-                gsnap_runs.append(hisat_run)
-            self.add_edges_from([(self.indexer, run) for run in gsnap_runs])
-            flag = GsnapFlag(self.outdir, [run.output["link"] for run in gsnap_runs])
-            self.add_edges_from([(run, flag) for run in gsnap_runs])
+                self.add_to_bams(gsnap_run)
+                gsnap_runs.append(gsnap_run)
+            self.add_edges_from([(indexer, run) for run in gsnap_runs])
 
     @property
     def toolname(self):
@@ -161,6 +162,7 @@ class GsnapAligner(ShortAligner):
         cmd += "{infiles} 2> {log}"
         cmd += "| samtools view -b -@ {threads} - > {output[bam]}"
         cwd = os.getcwd()
+        link_src = os.path.relpath(output["bam"], start=os.path.dirname(self.output["link"]))
         cmd += " && cd {cwd} && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
@@ -190,9 +192,11 @@ class GmapLongReads(LongAligner):
         super().__init__(indexer=indexer,
                          sample=sample, run=run)
 
-        self.output = {"link": self.link,
-                       "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "star-{sample}-{run}.{suffix}").format(
-                           sample=self.sample.label, run=self.run, suffix=self.suffix)}
+        self.output = {
+            "link": self.link,
+            "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "star-{sample}-{run}.{suffix}").format(
+                sample=self.sample.label, run=self.run, suffix=self.suffix)
+        }
 
         self.message = "Mapping long reads to the genome with gmap (sample: {sample.label} - run: {run})".format(
             sample=self.sample, run=self.run)
