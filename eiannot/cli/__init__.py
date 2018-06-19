@@ -23,7 +23,6 @@ def main():
     args.configuration = yaml.load(open(args.configuration))
 
     workflow = AnnotationWorklow(args.configuration, args.genome, args.samplesheet)
-    print(workflow.graph)
 
     with open(args.out, 'wt') as out:
         print(workflow, file=out)

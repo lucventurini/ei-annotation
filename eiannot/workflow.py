@@ -1,10 +1,11 @@
-from .abstract import EIWorfkflow
+from .abstract import EIWorfkflow, FinalFlag
 from .preparation import PrepareWrapper
 from .preparation.prepare import parse_samplesheet
 from .rnaseq.alignments.workflow import ShortAlignmentsWrapper, LongAlignmentsWrapper
 from .rnaseq.alignments.portcullis import PortcullisWrapper
 from .rnaseq.mikado import Mikado
 from .rnaseq.assemblies.workflow import AssemblyWrapper
+import os
 
 
 class AnnotationWorklow(EIWorfkflow):
@@ -23,6 +24,7 @@ class AnnotationWorklow(EIWorfkflow):
         self.merge([self.short_wrapper, self.long_wrapper, self.portcullis])
         self.assemblies = AssemblyWrapper(self.short_wrapper)
         self.merge([self.assemblies])
-        print(*[_.rulename for _ in self.assemblies.nodes])
-        self.mikado = Mikado(assemblies=self.assemblies, long_alignments=self.long_wrapper, portcullis=self.portcullis)
-        self.merge([self.mikado])
+        # self.mikado = Mikado(assemblies=self.assemblies, long_alignments=self.long_wrapper, portcullis=self.portcullis)
+        # self.merge([self.mikado])
+        flag = os.path.join(self.configuration["outdir"], "all.done")
+        self.add_final_flag(flag)

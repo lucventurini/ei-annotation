@@ -22,7 +22,6 @@ class ShortAlignmentsWrapper(EIWrapper):
         self.configuration = prepare_wrapper.configuration
         self.__prepare_flag = prepare_wrapper
         instances = []
-        print(self.samples)
         flags = []
         for wrapper in self.wrappers.values():
             instance = wrapper(self.configuration, self.__prepare_flag)
@@ -30,11 +29,8 @@ class ShortAlignmentsWrapper(EIWrapper):
             if len(instance.bams) > 0:
                 instances.append(instance)
                 flags.append(instance.exit)
-                print("Exit", instance.exit.rulename, instance.output, instance.exit.input)
                 self.merge([instance])
                 self.__bams.extend(instance.bams)
-            else:
-                print(instance.__class__)
 
         final_flag = AlnFlag(flags, outdir=self.outdir, prepare_wrapper=prepare_wrapper)
         self.add_node(final_flag)  # We have to add the node, otherwise the workflow will be empty

@@ -478,6 +478,49 @@ class EIWorfkflow:
     def edges(self):
         return self.graph.edges
 
+    def __find_exits(self):
+        """A workflow can have more than one final point. This method will identify and collect them all."""
+
+        nodes = [_ for _ in self if not self.adj[_]]
+        if len(nodes) == 0 and len(self) > 0:
+            raise ValueError("Unexpected: no end nodes in a non-empty graph!")
+        return nodes
+
+    def add_final_flag(self, flag):
+        """This method will find all the end nodes of the pipeline and connect them to the final flag."""
+        finals = {"inputs": []}
+
+        nodes = self.__find_exits()
+        for node in nodes:
+            for key, item in node.output.items():
+                if isinstance(item, list):
+                    finals["inputs"].extend(item)
+                else:
+                    finals["inputs"].append(item)
+
+        # Remove redundancies
+        finals["inputs"] = list(set(finals["inputs"]))
+        flag = FinalFlag(finals, flag)
+        self.add_edges_from([(node, flag) for node in nodes])
+
+
+class FinalFlag(AtomicOperation):
+
+    def __init__(self, inputs, flag):
+
+        super().__init__()
+        self.input = inputs
+        self.output["flag"] = flag
+        self.touch = True
+
+    @property
+    def rulename(self):
+        return "all"
+
+    @property
+    def loader(self):
+        return []
+
 
 class EIWrapper(EIWorfkflow):
 

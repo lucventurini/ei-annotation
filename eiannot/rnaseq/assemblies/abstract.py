@@ -177,9 +177,7 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def runs(self):
-        print(self.toolname, self.configuration["programs"].get(self.toolname, dict()).get("runs", []))
         return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
-
 
     def add_flag_to_inputs(self):
         for rule in self:
