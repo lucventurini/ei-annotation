@@ -41,9 +41,6 @@ class TrinityGGWrapper(ShortAssemblerWrapper):
                 mappers.append(mapper)
                 self.add_to_gf(mapper)
 
-            flag = TrinityFlag(self.outdir, mappers)
-            self.add_edges_from([mapper, flag] for mapper in mappers)
-
     @property
     def toolname(self):
         return "trinity"
@@ -62,6 +59,7 @@ class TrinityGG(ShortAssembler):
 
     def __init__(self, bam, run):
         super().__init__(bam, run)
+        self.align_run = bam.align_run
         self.input["reference"] = self.genome
 
         self.output = {"transcripts": os.path.join(self.outdir, "Trinity.fasta")}
@@ -148,6 +146,14 @@ class TrinityGG(ShortAssembler):
             return "--left={} --right={}".format(self.sample.read1, self.sample.read2)
         else:
             return "--single={} ".format(self.sample.read1)
+
+    @property
+    def suffix(self):
+        return ".fa"
+
+    @property
+    def toolname(self):
+        return "trinity"
 
 
 class TrinityGmap(ShortAssembler):

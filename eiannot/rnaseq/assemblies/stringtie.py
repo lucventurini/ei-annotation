@@ -1,4 +1,4 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
 from ...abstract import AtomicOperation, EIWrapper, ShortSample
 import os
 import itertools
@@ -15,10 +15,12 @@ class StringtieWrapper(ShortAssemblerWrapper):
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
                 stringtie = Stringtie(bam, run)
                 stringties.append(stringtie)
-                self.add_to_gf(stringtie)
-            flag = StringtieFlag(stringties, self.outdir)
-            self.add_node(flag)
-            self.add_edges_from([(stringtie, flag) for stringtie in stringties])
+                stat = AsmStats(stringtie)
+                self.add_edge(stringtie, stat)
+                self.add_to_gf(stat)
+            # flag = StringtieFlag(stringties, self.outdir)
+            # self.add_node(flag)
+            # self.add_edges_from([(stringtie, flag) for stringtie in stringties])
             return
 
     @property

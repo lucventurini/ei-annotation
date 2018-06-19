@@ -21,19 +21,18 @@ class AssemblyWrapper(EIWrapper):
 
         super().__init__(configuration=short_alignments.configuration)
 
-        stats = []
         self.__gfs = []
         for wrapper in self.wrappers.values():
             instance = wrapper(short_alignments)
             instance.add_flag_to_inputs()
             self.merge([instance])
             self.__add_to_gfs(instance)
-            stats.extend([AsmStats(rule) for rule in instance.gfs])
-            self.add_edges_from([(instance.exit, stat) for stat in stats])
 
-        final_flag = AsmFlag(stats, outdir=self.outdir)
+        print(self.gfs)
+        final_flag = AsmFlag(self.gfs, outdir=self.outdir)
         self.add_node(final_flag)
-        self.add_edges_from([(stat, final_flag) for stat in stats])
+        self.add_edges_from([(gf, final_flag) for gf in self.gfs])
+        print(self.exit.input, self.output["flag"])
 
     @property
     def gfs(self):

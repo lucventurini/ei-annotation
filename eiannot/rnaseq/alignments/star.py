@@ -256,7 +256,7 @@ class StarBam2Gtf(LongAligner):
 
     @property
     def suffix(self):
-        return ".gtf"
+        return "gtf"
 
     @property
     def toolname(self):

@@ -73,9 +73,11 @@ class LongAlignmentsWrapper(EIWrapper):
             self.__gf_rules.extend(instance.gfs)
             flags.append(instance.exit)
 
+        print(*[flag.rulename for flag in flags])
         flag = LongAlignersFlag(flags, outdir=self.outdir)
         self.add_node(flag)
         self.add_edges_from([(f_flag, flag) for f_flag in flags])
+        print(flag.input)
         self.add_flag_to_inputs()
 
     @property
@@ -101,17 +103,15 @@ class LongAlignersFlag(AtomicOperation):
         super().__init__()
         self.touch = True
         if stats_runs:
-            try:
-                outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["flag"]))
-            except KeyError:
-                raise KeyError((stats_runs[0].input, stats_runs[0].output))
+            outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["flag"]))
+            self.input["flags"] = [stat.output["flag"] for stat in stats_runs]
         else:
             assert outdir is not None
         self.output["flag"] = os.path.join(outdir, "long_reads.done")
 
     @property
     def rulename(self):
-        return "aln_all"
+        return "long_aln_all"
 
     @property
     def loader(self):

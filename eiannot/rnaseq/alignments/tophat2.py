@@ -10,14 +10,14 @@ class TopHat2Index(IndexBuilder):
 
         super().__init__(configuration, outdir)
 
-        self.output = {"index": os.path.join(self._outdir, "{}_index.done".format(self.toolname))}
-        self.log = os.path.join(self._outdir, "{}.index.log".format(self.toolname))
+        self.output = {"index": os.path.join(self.outdir, "{}_index.done".format(self.toolname))}
+        self.log = os.path.join(self.outdir, "{}.index.log".format(self.toolname))
         self.touch = True
         self.message = "Indexing genome with {}".format(self.toolname)
 
     @property
     def out_prefix(self):
-        return os.path.abspath(os.path.join(self._outdir[0], self.species))
+        return os.path.abspath(os.path.join(self.outdir[0], self.species))
 
     @property
     def toolname(self):
@@ -41,19 +41,22 @@ class TopHat2Index(IndexBuilder):
         if not os.path.exists(align_dir):
             os.makedirs(align_dir)
         extra = self.__configuration["programs"][self.toolname]["index"]
-        cmd = "{load}"
-        cmd += "bowtie2-build {input[genome]} {extra} > {log} 2>&1"
+        cmd = "{load} "
+        index = self.index
+        cmd += "bowtie2-build {extra} {input[genome]} {index} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def index(self):
+        return os.path.join(self.outdir, self.species)
 
 
 class TopHat2Aligner(ShortAligner):
 
-    def __init__(self, index, sample, run, configuration, outdir, ref_transcriptome=None):
+    def __init__(self, index, sample, run):
 
-        super(TopHat2Aligner, self).__init__(configuration=configuration,
-                                            sample=sample, run=run,
-                                            outdir=outdir, index=index, ref_transcriptome=ref_transcriptome)
+        super(TopHat2Aligner, self).__init__(indexer=index, sample=sample, run=run)
         self.output = {"bam": os.path.join(self.bamdir, "accepted_hits.bam"),
                        "link": self.link}
 
@@ -123,6 +126,14 @@ class TopHat2Flag(AtomicOperation):
         self.output["flag"] = os.path.join(outdir, "tophat2.done")
         self.touch = True
 
+    @property
+    def loader(self):
+        return []
+
+    @property
+    def rulename(self):
+        return "tophat2_all"
+
 
 class TopHat2Wrapper(ShortWrapper):
 
@@ -144,10 +155,8 @@ class TopHat2Wrapper(ShortWrapper):
             # Optionally build the reference splice catalogue
             star_runs = []
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                hisat_run = TopHat2Aligner(configuration=configuration,
-                                           index=indexer.output["index"],
+                hisat_run = TopHat2Aligner(index=indexer,
                                            sample=sample,
-                                           outdir=self.outdir,
                                            run=run)
                 star_runs.append(hisat_run)
             self.add_edges_from([(indexer, run) for run in star_runs])

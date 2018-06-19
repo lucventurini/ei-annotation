@@ -17,6 +17,12 @@ programs:
   tophat2:
     load: ''
     runs: ['']
+  gsnap:
+    load: ''
+    runs: ['']
+#  star:
+#    load: ''
+#    runs: ['']
   samtools:
     load: ''
   portcullis:
@@ -28,9 +34,12 @@ programs:
   star_long:
     runs: ['']
     load: ''
-  trinity:
-    runs: ['']
-    load: ''
+#  trinity:
+#    runs: ['']
+#    load: ''
+#  class2:
+#    runs: ['']
+#    load: ''
 outdir: "Eiannot"
 homology:
   prot_db: ["uniprot_sprot_plants.fasta"]

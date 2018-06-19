@@ -164,9 +164,9 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         pass
 
     def add_to_gf(self, rule):
-        if not isinstance(rule, ShortAssembler):
+        if not isinstance(rule, AsmStats):
             raise TypeError
-        if "link" not in rule.output:
+        if "gf" not in rule.input:
             raise KeyError("Link not found for rule {}".format(rule.rulename))
         self.__gf_rules.add(rule)
 
@@ -208,7 +208,10 @@ class AsmStats(AtomicOperation):
 
         super().__init__()
         self.configuration = asm_run.configuration
-        self.input["gf"] = asm_run.output["link"]
+        try:
+            self.input["gf"] = asm_run.output["link"]
+        except KeyError:
+            raise KeyError((asm_run.rulename, asm_run.output))
         self.output["stats"] = self.input["gf"] + ".stats"
         self.message = "Computing assembly stats for: {input[gf]}"
         self.log = self.output["stats"] + ".log"
@@ -241,6 +244,7 @@ class AsmFlag(AtomicOperation):
         super().__init__()
         self.touch = True
         if stats_runs:
+            self.input["stats"] = [rule.output["stats"] for rule in stats_runs]
             outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
         else:
             assert outdir is not None

@@ -379,8 +379,7 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
     def finalise(self):
         if self.__finalised is True:
             return
-        if self.__finalised:
-            return
+
         new_gfs = set()
 
         for gf in self.gfs:
