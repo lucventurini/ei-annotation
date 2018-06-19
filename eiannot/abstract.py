@@ -12,6 +12,7 @@ class Sample(metaclass=abc.ABCMeta):
     def __init__(self, label, read_dir):
         self.__label = label
         self.__read_dir = read_dir
+        self.__strandedness = None
         if not os.path.exists(self.read_dir):
             os.makedirs(self.read_dir)
 
@@ -25,6 +26,16 @@ class Sample(metaclass=abc.ABCMeta):
     @property
     def label(self):
         return self.__label
+
+    @property
+    def stranded(self):
+        return self.strandedness is not None and self.strandedness != "fr-unstranded"
+
+    @property
+    def strandedness(self):
+        """Returns the exact strandedness of the sample."""
+        # We will check the exact type of the
+        return self.__strandedness
 
 
 class LongSample(Sample):
@@ -98,16 +109,6 @@ class ShortSample(Sample):
     @property
     def paired(self):
         return self.read2 is not None
-
-    @property
-    def stranded(self):
-        return self.strandedness is not None and self.strandedness != "fr-unstranded"
-
-    @property
-    def strandedness(self):
-        """Returns the exact strandedness of the sample."""
-        # We will check the exact type of the
-        return self.__strandedness
 
     @property
     def suffix(self):

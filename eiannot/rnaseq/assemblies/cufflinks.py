@@ -1,5 +1,4 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper
-from ...abstract import AtomicOperation, EIWrapper, ShortSample
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
 import os
 import itertools
 
@@ -12,32 +11,24 @@ class CufflinksWrapper(ShortAssemblerWrapper):
         if len(self.bams) > 0 and len(self.runs) > 0:
             cuffs = []
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
-                cufflinks = Cufflinks(bam, run, self.configuration, self.outdir)
+                cufflinks = Cufflinks(bam, run)
                 cuffs.append(cufflinks)
-                self.add_to_gf(cuffs)
-            flag = CufflinksFlag(cuffs, self.outdir)
-            self.add_edges_from([(cuff, flag) for cuff in cuffs])
-            return
+                stat = AsmStats(cufflinks)
+                self.add_edge(cufflinks, stat)
+                self.add_to_gf(stat)
+                # self.add_to_gf(cuffs)
+
 
     @property
     def toolname(self):
         return "cufflinks"
 
 
-class CufflinksFlag(AtomicOperation):
-
-    def __init__(self, cufflinks, outdir):
-        super().__init__()
-        self.input = {"gtfs": [cuff.output["link"] for cuff in cufflinks]}
-        self.touch = True
-        self.output = {"flag": os.path.join(outdir, "cufflinks.done")}
-
-
 class Cufflinks(ShortAssembler):
 
-    def __init__(self, bam, run, configuration, outdir):
+    def __init__(self, bam, run):
 
-        super().__init__(bam, run, configuration, outdir)
+        super().__init__(bam, run)
         # Cufflinks has a set name for the output
         self.output["gf"] = os.path.join(self.gfdir, "transcripts.gtf")
 
@@ -52,6 +43,7 @@ class Cufflinks(ShortAssembler):
     @property
     def cmd(self):
         load = self.load
+        strand = self.strand
         cmd = "{load}"
         extra = self.extra
         threads = self.threads
@@ -84,3 +76,7 @@ class Cufflinks(ShortAssembler):
             return '--library-type={}'.format(self.sample)
         else:
             return ""
+
+    @property
+    def input_reads(self):
+        raise NotImplementedError()

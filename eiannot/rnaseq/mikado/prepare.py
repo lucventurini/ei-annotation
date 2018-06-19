@@ -76,7 +76,7 @@ class MikadoConfig(AtomicOperation):
                 for gf in itertools.chain(self.assemblies.gfs, self.long_aln_wrapper.gfs):
                     # Write out the location of the file, and all other details
                     try:
-                        line = [gf.input["link"], gf.label, gf.sample.stranded]
+                        line = [gf.input["gf"], gf.label, gf.sample.stranded]
                     except KeyError:
                         raise KeyError((gf.rulename, gf.output))
                     print(*line, file=file_list, sep="\t")

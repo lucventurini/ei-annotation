@@ -14,9 +14,6 @@ programs:
   hisat2:
     load: ''
     runs: ['']
-  tophat2:
-    load: ''
-    runs: ['']
   gsnap:
     load: ''
     runs: ['']
@@ -34,6 +31,12 @@ programs:
   star_long:
     runs: ['']
     load: ''
+  cufflinks:
+    runs: ['']
+    load: ''
+#  scallop:
+#    runs: ['']
+#    load: ''
 #  trinity:
 #    runs: ['']
 #    load: ''

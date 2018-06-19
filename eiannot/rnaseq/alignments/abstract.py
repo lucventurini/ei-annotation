@@ -68,6 +68,7 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
             sample=self.sample.label,
             run=self.run
         )
+        self.output["link"] = self.link
 
     @property
     def indexer(self):
@@ -126,14 +127,7 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def ref_transcriptome(self):
-        return self.__ref_transcriptome
-
-    @ref_transcriptome.setter
-    def ref_transcriptome(self, ref):
-        if not os.path.exists(os.path.abspath(ref)):
-            raise ValueError
-        self.__ref_transcriptome = ref
-        self.input["ref_transcriptome"] = ref
+        return self.configuration.get("reference", dict()).get("transcriptome", "")
 
     @property
     def index(self):
@@ -159,9 +153,7 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def link_src(self):
-        return os.path.join("..", self.toolname,
-                            "{sample}-{run}".format(sample=self.sample.label, run=self.run),
-                            os.path.basename(self.output["bam"]))
+        return os.path.relpath(self.output["bam"], start=os.path.dirname(self.output["link"]))
 
     @property
     def rulename(self):
@@ -260,7 +252,7 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def link(self):
-        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}.{suffix}".format(
+        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}{suffix}".format(
             toolname=self.toolname, sample=self.sample.label, run=self.run, suffix=self.suffix)
                             )
 
@@ -315,7 +307,10 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
         if not isinstance(rule, ShortAligner):
             raise TypeError
         if "link" not in rule.output:
-            raise KeyError("Link not found for rule {}".format(rule.rulename))
+            raise KeyError("Link not found for rule {}; output: {}; input: {}".format(
+                rule.rulename,
+                rule.output,
+                rule.input))
         self.__bam_rules.add(rule)
 
     @property
@@ -475,3 +470,11 @@ class LongAlignerStats(AtomicOperation):
         cmd = "{load} mikado util stats {input[link]} {output[stats]} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def sample(self):
+        return self.__aligner.sample
+
+    @property
+    def label(self):
+        return self.__aligner.sample.label

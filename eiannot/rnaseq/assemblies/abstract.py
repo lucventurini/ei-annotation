@@ -197,10 +197,6 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         assert all("bam" in bam.input for bam in bams), [bam.output for bam in bams]
         self.__bams = bams
 
-    @property
-    def outdir(self):
-        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "2-assemblies"))
-
 
 class AsmStats(AtomicOperation):
 
@@ -212,6 +208,7 @@ class AsmStats(AtomicOperation):
             self.input["gf"] = asm_run.output["link"]
         except KeyError:
             raise KeyError((asm_run.rulename, asm_run.output))
+        self.sample = asm_run.sample
         self.output["stats"] = self.input["gf"] + ".stats"
         self.message = "Computing assembly stats for: {input[gf]}"
         self.log = self.output["stats"] + ".log"
@@ -235,6 +232,10 @@ class AsmStats(AtomicOperation):
     @property
     def threads(self):
         return 1
+
+    @property
+    def label(self):
+        return self.sample.label
 
 
 class AsmFlag(AtomicOperation):

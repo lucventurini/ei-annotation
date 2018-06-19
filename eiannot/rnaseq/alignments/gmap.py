@@ -84,7 +84,7 @@ class GmapIndex(IndexBuilder):
 
         load = self.load
         input = self.input
-        outdir = os.path.dirname(os.path.dirname(self.output["index"]))
+        outdir = os.path.dirname(self.output["index"])
         species = self.species
         log = self.log
         extra = self.extra
@@ -100,11 +100,11 @@ class GmapIndex(IndexBuilder):
 
     @property
     def indexdir(self):
-        return os.path.abspath(os.path.dirname(os.path.dirname(self.output["index"])))
+        return os.path.abspath(os.path.dirname(self.output["index"]))
 
     @property
     def dbname(self):
-        return os.path.basename(os.path.dirname(self.output["index"]))
+        return self.species
 
     @property
     def index(self):
@@ -157,10 +157,11 @@ class GsnapAligner(ShortAligner):
         extra = self.extra
         bamdir = self.bamdir
         log = self.log
-        cmd += "--localsplicedist={max_intron} --nthreads={threads} --format=sam --npaths=20"
+        compression = self.compression
+        cmd += " {compression} --localsplicedist={max_intron} --nthreads={threads} --format=sam --npaths=20 "
         infiles = self.input_reads
-        cmd += "{infiles} 2> {log}"
-        cmd += "| samtools view -b -@ {threads} - > {output[bam]}"
+        cmd += " {infiles} 2> {log}"
+        cmd += " | samtools view -b -@ {threads} - > {output[bam]}"
         cwd = os.getcwd()
         link_src = os.path.relpath(output["bam"], start=os.path.dirname(self.output["link"]))
         cmd += " && cd {cwd} && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
@@ -184,6 +185,15 @@ class GsnapAligner(ShortAligner):
         """GSNAP does not accept specifying the strand of reads, so this property returns an empty string."""
         return ""
 
+    @property
+    def compression(self):
+        if self.sample.suffix == ".gz":
+            return " --gunzip "
+        elif self.sample.suffix == ".bz2":
+            return "--bunzip2"
+        else:
+            return ""
+
 
 class GmapLongReads(LongAligner):
 
@@ -194,7 +204,7 @@ class GmapLongReads(LongAligner):
 
         self.output = {
             "link": self.link,
-            "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "star-{sample}-{run}.{suffix}").format(
+            "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "star-{sample}-{run}{suffix}").format(
                 sample=self.sample.label, run=self.run, suffix=self.suffix)
         }
 
@@ -228,9 +238,9 @@ class GmapLongReads(LongAligner):
         dbname = self.indexer.dbname
         cmd = "{load} gmap --dir={index} --db {dbname} --min-intronlength={min_intron} {max_intron}"
         input, output, log = self.input, self.output, self.log
-        cmd += "--format=3 {input[read1]} > {output[gf]} 2> {log} "
-        link_src = os.path.relpath(self.link, start=os.path.dirname(self.output["gf"]))
-        cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        cmd += " --format=3 {input[read1]} > {output[gf]} 2> {log} "
+        link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
+        cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
 
         cmd = cmd.format(**locals())
         return cmd

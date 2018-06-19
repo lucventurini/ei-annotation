@@ -22,9 +22,10 @@ class AssemblyWrapper(EIWrapper):
         super().__init__(configuration=short_alignments.configuration)
 
         self.__gfs = []
-        for wrapper in self.wrappers.values():
+        for tool, wrapper in self.wrappers.items():
             instance = wrapper(short_alignments)
             instance.add_flag_to_inputs()
+            print(tool, instance.gfs)
             self.merge([instance])
             self.__add_to_gfs(instance)
 

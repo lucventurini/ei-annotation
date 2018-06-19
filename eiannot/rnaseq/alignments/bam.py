@@ -100,7 +100,7 @@ class BamStats(AtomicOperation):
         self.message = "Using samtools to collect stats for: {input[bam]}".format(input=self.input)
         load = self.load
         self.cmd = "{load} samtools stats {input[bam]} > {output[stats]}"
-        self.cmd += " && plot-bamstats -p {plot_dir} {output[stats]}"
+        self.cmd += " && (plot-bamstats -p {plot_dir} {output[stats]} || touch {output[stats]})"
         self.cmd = self.cmd.format(**locals())
 
     @property

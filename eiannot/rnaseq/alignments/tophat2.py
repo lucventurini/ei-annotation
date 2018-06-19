@@ -32,6 +32,7 @@ class TopHat2Index(IndexBuilder):
         """TopHat2 only builds in single core fashion."""
         return 1
 
+    @property
     def cmd(self):
         load = self.load
         threads = 1
@@ -40,7 +41,7 @@ class TopHat2Index(IndexBuilder):
         align_dir = os.path.abspath(os.path.dirname(self.output["index"]))
         if not os.path.exists(align_dir):
             os.makedirs(align_dir)
-        extra = self.__configuration["programs"][self.toolname]["index"]
+        extra = self.extra
         cmd = "{load} "
         index = self.index
         cmd += "bowtie2-build {extra} {input[genome]} {index} > {log} 2>&1"
@@ -87,6 +88,7 @@ class TopHat2Aligner(ShortAligner):
         threads = self.threads
         output = self.output
         index = self.index
+        log = self.log
         cmd += "{strand} {extra} {index} {infiles} > {log}"
         cmd += "| samtools view -b -@ {threads} - > {output[bam]}"
         link_src = self.link_src
@@ -112,11 +114,6 @@ class TopHat2Aligner(ShortAligner):
 
 
 class TopHat2Flag(AtomicOperation):
-
-    # rule hisat_all:
-    # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
-    # 	output: ALIGN_DIR+"/hisat.done"
-    # 	shell: "touch {output}"
 
     def __init__(self, outdir, runs=[]):
 
@@ -153,15 +150,14 @@ class TopHat2Wrapper(ShortWrapper):
             indexer = self.indexer(configuration, self.outdir)
             self.add_node(indexer)
             # Optionally build the reference splice catalogue
-            star_runs = []
+            top_runs = []
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                hisat_run = TopHat2Aligner(index=indexer,
+                tophat2_run = TopHat2Aligner(index=indexer,
                                            sample=sample,
                                            run=run)
-                star_runs.append(hisat_run)
-            self.add_edges_from([(indexer, run) for run in star_runs])
-            flag = TopHat2Flag(self.outdir, [run.output["link"] for run in star_runs])
-            self.add_edges_from([(run, flag) for run in star_runs])
+                top_runs.append(tophat2_run)
+                self.add_to_bams(tophat2_run)
+            self.add_edges_from([(indexer, run) for run in top_runs])
         self.finalise()
 
     @property

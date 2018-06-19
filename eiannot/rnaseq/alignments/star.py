@@ -22,23 +22,27 @@ class StarIndex(IndexBuilder):
     def loader(self):
         return ["star"]
 
+    @property
     def cmd(self):
         load = self.load
         threads = self.threads
         input = self.input
-        log = self.log
         align_dir = os.path.abspath(os.path.dirname(self.output["index"]))
         if not os.path.exists(align_dir):
             os.makedirs(align_dir)
         if "ref_transcriptome" in self.input:
-            trans = "--sjdbGTFfile {input[ref_transcriptome]}"
+            ref_transcriptome = os.path.relpath(self.input["ref_transcriptome"],
+                                                start=align_dir)
+            trans = "--sjdbGTFfile {ref_transcriptome}"
         else:
             trans = ""
-        extra = self.__configuration["programs"]["star"]["index"]
-        cmd = "{load}"
-        cmd += "cd {align_dir} && "
-        cmd += "STAR --runThreadN {threads} --runMode GenomeGenerate --genomeDir . {trans}"
-        cmd += "--genomeFastaFiles {input[genome]} {extra} > {log} 2>&1"
+        genome = os.path.relpath(self.input["genome"],
+                                 start=align_dir)
+        log = os.path.relpath(self.log, start=align_dir)
+        extra = self.extra
+        cmd = "{load} cd {align_dir} && "
+        cmd += "STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir . {trans}"
+        cmd += "--genomeFastaFiles {genome} -- {extra} --outStd Log > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -53,6 +57,7 @@ class StarAligner(ShortAligner):
 
         super(StarAligner, self).__init__(indexer=indexer,
                                           sample=sample, run=run)
+        self.output["bam"] = os.path.join(self.bamdir, "Aligned.out.bam")
 
     @property
     def compression_option(self):
@@ -78,28 +83,30 @@ class StarAligner(ShortAligner):
     def cmd(self):
 
         load = self.load
-        index = os.path.dirname(self.input["index"])
         outdir = self.bamdir
+        index = os.path.relpath(os.path.dirname(self.input["index"]), start=outdir)
         threads = self.threads
         cmd = "{load}"
-        cmd += "cd {outdir} &&"
-        cmd += "STAR --runThreadN {threads} --runMode alignReads --genomeDir {index}"
+        cmd += " mkdir -p {outdir} && cd {outdir} &&"
+        cmd += " STAR --runThreadN {threads} --genomeDir {index} "
         rfc = self.compression_option
         infiles = self.input_reads
         cmd += "{rfc} --runMode alignReads {infiles}"
-        cmd += "--outSAMtype BAM Unsorted --outSAMattributes NH HI AS nM XS NM MD"
-        cmd += "--outSAMstrandField intronMotif"
+        cmd += " --outSAMtype BAM Unsorted --outSAMattributes NH HI AS nM XS NM MD"
+        cmd += " --outSAMstrandField intronMotif"
         min_intron, max_intron = self.min_intron, self.max_intron
-        cmd += "--alignIntronMin {min_intron} --alignIntronMax {max_intron} --alignMatesGapMax {max_intron}"
+        cmd += " --alignIntronMin {min_intron} --alignIntronMax {max_intron} --alignMatesGapMax {max_intron}"
         if self.ref_transcriptome:
             ref_transcriptome = self.ref_transcriptome
-            cmd += "--sjdbGTFfile {ref_transcriptome}"
+            cmd += " --sjdbGTFfile {ref_transcriptome}"
         extra = self.extra
-        bamdir = self.bamdir
-        log = self.log
-        cwd = os.getcwd()  # TODO: this is probably *not* what we need
-        cmd += "--outFileNamePrefix {bamdir} {extra} > {log} 2>&1"
-        cmd += " && cd {cwd} && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        # bamdir = self.bamdir
+        log = os.path.relpath(self.log, start=outdir)
+        link_src = self.link_src
+        cmd += "  {extra} > {log} 2>&1"
+        final_dir = os.path.dirname(os.path.abspath(self.configuration["outdir"]))
+        cmd += " && cd {final_dir} && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        output = self.output
         cmd = cmd.format(**locals())
         return cmd
 
@@ -116,21 +123,21 @@ class StarAligner(ShortAligner):
         """STAR does not accept specifying the strand of reads, so this property returns an empty string."""
         return ""
 
-
-class StarFlag(AtomicOperation):
-
-    # rule hisat_all:
-    # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
-    # 	output: ALIGN_DIR+"/hisat.done"
-    # 	shell: "touch {output}"
-
-    def __init__(self, outdir, runs=[]):
-
-        super().__init__()
-        for number, run in enumerate(runs):
-            self.input["run{}".format(number)] = run
-        self.output["flag"] = os.path.join(outdir, "star.done")
-        self.touch = True
+#
+# class StarFlag(AtomicOperation):
+#
+#     # rule hisat_all:
+#     # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
+#     # 	output: ALIGN_DIR+"/hisat.done"
+#     # 	shell: "touch {output}"
+#
+#     def __init__(self, outdir, runs=[]):
+#
+#         super().__init__()
+#         for number, run in enumerate(runs):
+#             self.input["run{}".format(number)] = run
+#         self.output["flag"] = os.path.join(outdir, "star.done")
+#         self.touch = True
 
 
 class StarWrapper(ShortWrapper):
@@ -157,8 +164,6 @@ class StarWrapper(ShortWrapper):
                 star_runs.append(star_run)
                 self.add_to_bams(star_run)
             self.add_edges_from([(indexer, run) for run in star_runs])
-            flag = StarFlag(self.outdir, [run.output["link"] for run in star_runs])
-            self.add_edges_from([(run, flag) for run in star_runs])
 
     @property
     def toolname(self):
@@ -256,7 +261,7 @@ class StarBam2Gtf(LongAligner):
 
     @property
     def suffix(self):
-        return "gtf"
+        return ".gtf"
 
     @property
     def toolname(self):
