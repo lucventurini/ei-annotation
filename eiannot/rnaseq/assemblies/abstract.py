@@ -3,6 +3,7 @@ from ...abstract import ShortSample, LongSample, AtomicOperation, Sample, EIWrap
 from ..alignments.bam import BamStats
 import os
 import re
+import networkx as nx
 
 
 class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
@@ -143,9 +144,11 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
     def label(self):
         alrun = re.sub("--", "-", re.sub(self.sample.label, '', self.alrun))
         alrun = re.sub(".sorted", "", alrun)
-        return "{sample}-{run}-{alrun}".format(sample=self.sample.label,
-                                               run=self.run,
-                                               alrun=alrun)
+        return "{sample}-{toolname}-{run}-{alrun}".format(
+            sample=self.sample.label,
+            run=self.run,
+            toolname=self.toolname,
+            alrun=alrun)
 
 
 class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
@@ -179,10 +182,6 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
     def runs(self):
         return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
 
-    def add_flag_to_inputs(self):
-        for rule in self:
-            rule.input["aln_flag"] = self.aln_flag.output["flag"]
-
     @property
     def outdir(self):
         return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "2-assemblies"))
@@ -212,6 +211,7 @@ class AsmStats(AtomicOperation):
         self.output["stats"] = self.input["gf"] + ".stats"
         self.message = "Computing assembly stats for: {input[gf]}"
         self.log = self.output["stats"] + ".log"
+        self.__asm_run = asm_run
 
     @property
     def rulename(self):
@@ -235,7 +235,7 @@ class AsmStats(AtomicOperation):
 
     @property
     def label(self):
-        return self.sample.label
+        return self.__asm_run.label
 
 
 class AsmFlag(AtomicOperation):

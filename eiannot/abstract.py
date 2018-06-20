@@ -40,7 +40,7 @@ class Sample(metaclass=abc.ABCMeta):
 
 class LongSample(Sample):
 
-    def __init__(self, readfile, label, read_dir):
+    def __init__(self, readfile, label, read_dir, strandedness):
 
         super().__init__(label=label, read_dir=read_dir)
         suffix = readfile.split(".")[-1]
@@ -56,6 +56,7 @@ class LongSample(Sample):
         if not os.path.islink(rout):
             os.symlink(os.path.abspath(readfile), rout)
         self.__readfile = rout
+        self.__strandedness = strandedness
 
     @property
     def readfile(self):
@@ -69,6 +70,10 @@ class LongSample(Sample):
     def read2(self):
         """This will always return None; long-read samples only have one set of reads."""
         return None
+
+    @property
+    def strandedness(self):
+        return self.__strandedness
 
 
 class ShortSample(Sample):
@@ -97,6 +102,10 @@ class ShortSample(Sample):
             if not os.path.islink(r2out):
                 os.symlink(os.path.abspath(read2), r2out)
             self.__read2 = r2out
+
+    @property
+    def strandedness(self):
+        return self.__strandedness
 
     @property
     def read1(self):
@@ -196,6 +205,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     def touch(self, touch):
         if touch not in (True, False):
             raise ValueError("Invalid touch: {}".format(touch))
+
         self.__touch = touch
 
     @property
@@ -400,15 +410,53 @@ class EIWorfkflow:
         if isinstance(in_edge, EIWrapper):
             self.merge([in_edge])
             in_edge = in_edge.exit
+        if in_edge == out_edge:  # Silently avoid linking with oneself
+            return
         elif not isinstance(in_edge, AtomicOperation):
             raise TypeError("Input edge must be an Atomic operation, not {}!".format(type(in_edge)))
         if isinstance(out_edge, EIWrapper):
-            self.add_edges_from([(in_edge, entry) for entry in out_edge.entries])
             self.merge([out_edge])
+            self.add_edges_from([(in_edge, entry) for entry in out_edge.entries])
             return
         elif not isinstance(out_edge, AtomicOperation):
             raise TypeError("Outgoing node must be an Atomic operation, not {}".format(type(out_edge)))
+        self.validate_operation(in_edge)
+        self.validate_operation(out_edge)
+
         self.__graph.add_edge(in_edge, out_edge)
+
+    @staticmethod
+    def validate_operation(operation: AtomicOperation):
+
+        assert isinstance(operation, AtomicOperation)
+        inputs = []
+        for value in operation.input.values():
+            if isinstance(value, list):
+                inputs.extend(value)
+            else:
+                inputs.append(value)
+        outputs = []
+        for value in operation.output.values():
+            if isinstance(value, list):
+                outputs.extend(value)
+            else:
+                outputs.append(value)
+        from collections import Counter
+        count_inps = Counter(inputs)
+        count_outs = Counter(outputs)
+        if count_inps.most_common()[0][1] > 1:
+            raise ValueError("Rule {operation.rulename} has repeated inputs: {count_inps}".format(**locals()))
+        elif count_outs.most_common()[0][1] > 1:
+            raise ValueError("Rule {operation.rulename} has repeated outputs: {count_outs}".format(**locals()))
+
+        common = set.intersection(set(inputs), set(outputs))
+        if common:
+            raise ValueError(
+                "Rule {operation.rulename} has inputs and outputs in common, \
+                which causes a cyclic dependency: {common}.\n{operation.input}\n{operation.output}".format(
+                    **locals()
+                ))
+        return True
 
     def add_edges_from(self, tasks):
 
@@ -552,3 +600,15 @@ class EIWrapper(EIWorfkflow):
         entry points into a wrapper."""
         in_edges, out_edges = zip(*self.graph.in_edges)
         return set.difference(set(in_edges), set(out_edges))
+
+    def add_flag_to_inputs(self, flag, flag_name, key):
+        assert isinstance(flag, (AtomicOperation, EIWrapper))
+
+        self.add_edges_from([(flag, entry) for entry in self.entries])
+        if isinstance(flag, EIWrapper):
+            flag = flag.exit
+        assert key in flag.output
+        preds = nx.ancestors(self.graph, flag)
+        for edge in self.edges:
+            if edge[0] == flag and edge[1] not in preds:
+                edge[1].input[flag_name] = flag.output[key]

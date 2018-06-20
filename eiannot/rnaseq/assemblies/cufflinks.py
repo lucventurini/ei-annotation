@@ -73,7 +73,7 @@ class Cufflinks(ShortAssembler):
     @property
     def strand(self):
         if self.sample.strandedness:
-            return '--library-type={}'.format(self.sample)
+            return '--library-type={}'.format(self.sample.strandedness)
         else:
             return ""
 

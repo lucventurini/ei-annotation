@@ -1,5 +1,5 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper
-from ...abstract import AtomicOperation, EIWrapper, ShortSample
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
+from ...abstract import AtomicOperation
 import os
 import itertools
 import subprocess
@@ -8,11 +8,11 @@ import functools
 
 @functools.lru_cache(maxsize=8, typed=True)
 def get_class_location(load):
-    cmd = "{load} && which class_run.py".format(load=load)
+    cmd = "{load} which class_run.py".format(load=load)
     loc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE).stdout.read().decode()
     if not loc:
         raise OSError("CLASS2 not found!")
-    return loc
+    return loc.rstrip()
 
 
 class Class2Wrapper(ShortAssemblerWrapper):
@@ -22,14 +22,12 @@ class Class2Wrapper(ShortAssemblerWrapper):
         super().__init__(aln_wrapper)
         outdir = ''  # TODO: implement!
         if len(self.runs) > 0 and len(self.bams) > 0:
-            scallops = []
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
-                scallop = Class2(bam, run)
-                scallops.append(scallop)
-                self.add_to_gf(scallop)
+                class2 = Class2(bam, run)
+                stat = AsmStats(class2)
+                self.add_edge(class2, stat)
+                self.add_to_gf(stat)
                 continue
-            flag = Class2Flag(scallops, outdir)
-            self.add_edges_from([(scallop, flag) for scallop in scallops])
 
     @property
     def toolname(self):
@@ -47,9 +45,9 @@ class Class2Flag(AtomicOperation):
 
 class Class2(ShortAssembler):
 
-    def __init__(self, bam, run, configuration, outdir):
+    def __init__(self, bam, run):
 
-        super().__init__(bam, run, configuration, outdir)
+        super().__init__(bam, run)
 
     @property
     def toolname(self):
@@ -57,7 +55,7 @@ class Class2(ShortAssembler):
 
     @property
     def loader(self):
-        return ["class2"]
+        return ["class2", "mikado"]
 
     @property
     def strand(self):
@@ -72,6 +70,10 @@ class Class2(ShortAssembler):
         load = self.load
         cmd = "{load} "
         extra = self.extra
+        if self.extra:
+            extra = "-c \"{}\"".format(self.extra)
+        else:
+            extra = ""
         threads = self.threads
         outdir = self.gfdir
         program = self.program
@@ -80,7 +82,7 @@ class Class2(ShortAssembler):
         output = self.output
         log = self.log
         gtf = os.path.join(self.gfdir, "transcripts.gtf")
-        cmd += "{program} --clean --force -c \"{extra}\" -p {threads} {input[bam]} > {output[gf]} 2> {log} &&"
+        cmd += "{program} --clean --force {extra} -p {threads} {input[bam]} > {output[gf]} 2> {log} &&"
         cmd += " ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
@@ -88,3 +90,7 @@ class Class2(ShortAssembler):
     @property
     def suffix(self):
         return "gtf"
+
+    @property
+    def input_reads(self):
+        return ""

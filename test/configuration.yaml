@@ -17,9 +17,9 @@ programs:
   gsnap:
     load: ''
     runs: ['']
-  star:
-    load: ''
-    runs: ['']
+#  star:
+#    load: ''
+#    runs: ['']
   samtools:
     load: ''
   portcullis:
@@ -40,9 +40,9 @@ programs:
 #  trinity:
 #    runs: ['']
 #    load: ''
-#  class2:
-#    runs: ['']
-#    load: ''
+  class2:
+    runs: ['']
+    load: ''
 outdir: "Eiannot"
 homology:
   prot_db: ["uniprot_sprot_plants.fasta"]

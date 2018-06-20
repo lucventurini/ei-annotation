@@ -35,10 +35,10 @@ def parse_samplesheet(samplesheet, configuration):
             else:
                 is_long = False
             if is_long:
-                sample = LongSample(read1, label, outdir)
+                sample = LongSample(read1, label, outdir, strandedness)
                 tag = "long_reads"
             else:
-                sample = ShortSample(read1, read2, label, outdir, strandedness)
+                sample = ShortSample(read1, read2, label, outdir, strandedness=strandedness)
                 tag = "short_reads"
             if label in configuration[tag]:  # Double label!
                 raise KeyError(

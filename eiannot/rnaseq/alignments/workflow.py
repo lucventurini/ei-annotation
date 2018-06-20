@@ -26,7 +26,7 @@ class ShortAlignmentsWrapper(EIWrapper):
         for tool, wrapper in self.wrappers.items():
             instance = wrapper(self.configuration, self.__prepare_flag)
             instance.finalise()
-            print(tool, instance.bams)
+            # print(tool, instance.bams)
             if len(instance.bams) > 0:
                 instances.append(instance)
                 flags.append(instance.exit)
@@ -74,12 +74,12 @@ class LongAlignmentsWrapper(EIWrapper):
             self.__gf_rules.extend(instance.gfs)
             flags.append(instance.exit)
 
-        print(*[flag.rulename for flag in flags])
+        # print(*[flag.rulename for flag in flags])
         flag = LongAlignersFlag(flags, outdir=self.outdir)
         self.add_node(flag)
         self.add_edges_from([(f_flag, flag) for f_flag in flags])
-        print(flag.input)
-        self.add_flag_to_inputs()
+        # print(flag.input)
+        self.add_flag_to_inputs(prepare_wrapper, "prep_flag", "fai")
 
     @property
     def outdir(self):
@@ -89,13 +89,6 @@ class LongAlignmentsWrapper(EIWrapper):
     def gfs(self):
         return self.__gf_rules
 
-    def add_flag_to_inputs(self):
-        for rule in self.nodes:
-            if rule == self.__prepare_flag.exit:
-                continue
-            rule.input["prep_flag"] = self.__prepare_flag.output["fai"]
-            self.add_edge(self.__prepare_flag.exit, rule)
-
 
 class LongAlignersFlag(AtomicOperation):
 
@@ -104,7 +97,7 @@ class LongAlignersFlag(AtomicOperation):
         super().__init__()
         self.touch = True
         if stats_runs:
-            outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["flag"]))
+            outdir = os.path.dirname(stats_runs[0].output["flag"])
             self.input["flags"] = [stat.output["flag"] for stat in stats_runs]
         else:
             assert outdir is not None
@@ -127,7 +120,7 @@ class ShortAlignersFlag(AtomicOperation):
         self.touch = True
         if flags:
             self.input = {"flags": [flag.output["flag"] for flag in flags]}
-            outdir = os.path.dirname(os.path.dirname(flags[0].output["flag"]))
+            outdir = os.path.dirname(flags[0].output["flag"])
         else:
             assert outdir is not None
             assert prepare_wrapper is not None
@@ -136,7 +129,7 @@ class ShortAlignersFlag(AtomicOperation):
 
     @property
     def rulename(self):
-        return "aln_all"
+        return "short_aln_all"
 
     @property
     def loader(self):

@@ -1,4 +1,4 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
 from ...abstract import AtomicOperation, EIWrapper, ShortSample
 import os
 import itertools
@@ -13,32 +13,43 @@ class ScallopWrapper(ShortAssemblerWrapper):
         if len(self.runs) > 0 and len(self.bams) > 0:
             scallops = []
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
-                scallop = Scallop(bam, run, self.configuration)
-                scallops.append(scallop)
-                self.add_to_gf(scallop)
+                scallop = Scallop(bam, run)
+                stat = AsmStats(scallop)
+                self.add_edge(aln_wrapper, scallop)
+                self.add_edge(scallop, stat)
+                self.add_to_gf(stat)
+                scallops.append(stat)
                 continue
-            flag = ScallopFlag(scallops, self.outdir)
-            self.add_edges_from([(scallop, flag) for scallop in scallops])
+            # flag = ScallopFlag(scallops, self.outdir)
+            # self.add_edges_from([(scallop, flag) for scallop in scallops])
 
     @property
     def toolname(self):
         return "scallop"
 
-
-class ScallopFlag(AtomicOperation):
-
-    def __init__(self, scallops, outdir):
-        super().__init__()
-        self.input = {"gtfs": [scallop.output["link"] for scallop in scallops]}
-        self.touch = True
-        self.output = {"flag": os.path.join(outdir, "scallop.done")}
+#
+# class ScallopFlag(AtomicOperation):
+#
+#     def __init__(self, scallops, outdir):
+#         super().__init__()
+#         self.input = {"gtfs": [scallop.output["link"] for scallop in scallops]}
+#         self.touch = True
+#         self.output = {"flag": os.path.join(outdir, "scallop.done")}
+#
+#     @property
+#     def rulename(self):
+#         return "scallop_all"
+#
+#     @property
+#     def loader(self):
+#         return []
 
 
 class Scallop(ShortAssembler):
 
-    def __init__(self, bam, run, configuration):
+    def __init__(self, bam, run):
 
-        super().__init__(bam, run, configuration)
+        super().__init__(bam, run)
 
     @property
     def toolname(self):
@@ -86,5 +97,5 @@ class Scallop(ShortAssembler):
         return "gtf"
 
     @property
-    def toolname(self):
-        return "scallop"
+    def input_reads(self):
+        return ""

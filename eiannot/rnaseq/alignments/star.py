@@ -62,9 +62,9 @@ class StarAligner(ShortAligner):
     @property
     def compression_option(self):
         if self.sample.suffix == ".gz":
-            return "--readFilesCommand zcat"
+            return "--readFilesCommand 'gzip -dc'"
         elif self.sample.suffix in (".bz", ".bz2"):
-            return "--readFilesCommand bzcat"
+            return "--readFilesCommand 'bzip2 -dc'"
         else:
             return ""
 

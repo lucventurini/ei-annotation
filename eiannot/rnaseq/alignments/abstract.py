@@ -264,6 +264,11 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
     def extra(self):
         return self.configuration["programs"][self.toolname]["runs"][self.run]
 
+    @property
+    def label(self):
+        return "{toolname}-{sample}-{run}".format(
+            toolname=self.toolname, sample=self.sample.label, run=self.run)
+
 
 class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
@@ -477,4 +482,4 @@ class LongAlignerStats(AtomicOperation):
 
     @property
     def label(self):
-        return self.__aligner.sample.label
+        return self.__aligner.label
