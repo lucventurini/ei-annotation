@@ -24,8 +24,8 @@ Generate GFF from Exonerate protein2genome GFF output file
 ## Required options:
   --in=<exonerage_protein2genome.output>  -- Exonerate output file 
                                              See NOTE below to see how exonerate must have ran
-  --fasta_count=n <INT>                   -- Input fasta sequence count to exonerate
-                                             Basically the count of fasta sequences you have given into exonerate
+  --fasta=n                               -- Input fasta sequence to exonerate
+                                             Basically the fasta sequences you have given into exonerate
 
 ## Optional:
   --minIdentity=n <INT>                   -- alignments with identity shorter than this are discarded
@@ -44,7 +44,7 @@ Contact: Gemy.Kaithakottil\@tgac.ac.uk
          gemygk\@gmail.com
 ";
 my $exfile;
-my $fasta_count="";
+my $fasta="";
 my $minIdentity = 0;
 my $minCoverage = 0;
 my $help;
@@ -55,7 +55,7 @@ my $help;
 
 GetOptions(
            'in=s'=>\$exfile,
-           'fasta_count:i'=>\$fasta_count,
+           'fasta:s'=>\$fasta_count,
            'minIdentity:i'=>\$minIdentity,
            'minCoverage:i'=>\$minCoverage,
            "h|help" => \$help
@@ -66,7 +66,7 @@ GetOptions(
 if ($help) {
     die $usage;
 }
-unless ($exfile && $fasta_count ) {die "\n## ERROR:Need input file --in & --fasta_count options\n$usage\n"};
+unless ($exfile && $fasta ) {die "\n## ERROR:Need input file --in & --fasta options\n$usage\n"};
 my %transList=();
 my $nextRecord=0;
 my $count=1;
@@ -273,6 +273,13 @@ while (<XNT>) {
 	}
 }
 close(XNT);
+
+# Get the count of FASTA sequences
+if (not -e "$fasta.fai") {
+    `samtools faidx $fasta`
+}
+
+my $fasta_count = `cat $fasta.fai | wc -l`;
 
 # Print the number of transcripts and alignments
 my $input_transcripts = scalar (keys %full_trans);

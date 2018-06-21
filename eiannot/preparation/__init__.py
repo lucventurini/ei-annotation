@@ -108,6 +108,32 @@ class SanitizeProteinBlastDB(AtomicOperation):
         return "sanitize_protein_db"
 
 
+class FaidxProtein(AtomicOperation):
+
+
+    def __init__(self, sanitised: SanitizeProteinBlastDB):
+
+        super().__init__()
+        self.configuration = sanitised.configuration
+        self.input = sanitised.output
+        self.output["fai"] = sanitised.output["db"] + ".fai"
+
+    @property
+    def loader(self):
+        return ["samtools"]
+
+    @property
+    def rulename(self):
+        return "faidx_proteins"
+
+    @property
+    def cmd(self):
+        load = self.load
+        input = self.input
+
+        return "{load} samtools faidx {input[db]}".format(**locals())
+
+
 class PrepareWrapper(EIWrapper):
 
     def __init__(self, configuration, genome):

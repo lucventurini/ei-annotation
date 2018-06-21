@@ -299,15 +299,16 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         rulename = re.sub("\.", "_", re.sub("-", "_", self.rulename))
         string = ["rule {}:".format(rulename)]
         # Inputs now are always dictionaries
-        string.append("  input:")
-        for key, value in self.input.items():
-            if isinstance(value, bytes):
-                value = value.decode()
-            if isinstance(value, list):
-                string.append("    {key}={value},".format(**locals()))
-            else:
-                string.append("    {key}=\"{value}\",".format(**locals()))
-        string[-1] = string[-1].rstrip(",")  # Remove trailing comma
+        if self.input:
+            string.append("  input:")
+            for key, value in self.input.items():
+                if isinstance(value, bytes):
+                    value = value.decode()
+                if isinstance(value, list):
+                    string.append("    {key}={value},".format(**locals()))
+                else:
+                    string.append("    {key}=\"{value}\",".format(**locals()))
+            string[-1] = string[-1].rstrip(",")  # Remove trailing comma
         string.append("  output:")
         for key, value in self.output.items():
             if self.touch is True:
@@ -362,6 +363,18 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     @property
     def genome(self):
         return os.path.join(self.configuration["outdir"], "inputs", "reference", "genome.fa")
+
+    @property
+    def masked_genome(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "masker", "genome.masked.fa")
+
+    @property
+    def min_intron(self):
+        return max(self.configuration["reference"]["min_intron"], 20)
+
+    @property
+    def max_intron(self):
+        return self.configuration["reference"]["max_intron"]
 
 
 class EIWorfkflow:

@@ -144,14 +144,6 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
         pass
 
     @property
-    def min_intron(self):
-        return max(self.configuration["reference"]["min_intron"], 20)
-
-    @property
-    def max_intron(self):
-        return self.configuration["reference"]["max_intron"]
-
-    @property
     def link_src(self):
         return os.path.relpath(self.output["bam"], start=os.path.dirname(self.output["link"]))
 
@@ -237,14 +229,6 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
             if sample not in self.configuration["long_reads"]:
                 raise KeyError("Sample {sample} not found in the configuration!".format(**locals()))
             self.__sample = self.configuration["long_reads"][sample]
-
-    @property
-    def min_intron(self):
-        return max(self.configuration["reference"]["min_intron"], 20)
-
-    @property
-    def max_intron(self):
-        return self.configuration["reference"]["max_intron"]
 
     @property
     def indexer(self):

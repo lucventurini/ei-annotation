@@ -17,9 +17,9 @@ programs:
   gsnap:
     load: ''
     runs: ['']
-#  star:
-#    load: ''
-#    runs: ['']
+  star:
+    load: ''
+    runs: ['']
   samtools:
     load: ''
   portcullis:

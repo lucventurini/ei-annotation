@@ -14,6 +14,7 @@ if USE_CYTHON:
     extensions = cythonize(extensions)
 
 setup(
-    ext_modules = extensions,
+    name='eiannot',
+    ext_modules=extensions,
     entry_points={"console_scripts": ["eiannot = eiannot.cli:main"]}
 )

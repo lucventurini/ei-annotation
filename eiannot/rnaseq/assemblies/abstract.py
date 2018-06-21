@@ -112,14 +112,6 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
         pass
 
     @property
-    def min_intron(self):
-        return max(self.configuration["reference"]["min_intron"], 20)
-
-    @property
-    def max_intron(self):
-        return self.configuration["reference"]["max_intron"]
-
-    @property
     @abc.abstractmethod
     def suffix(self):
         pass
