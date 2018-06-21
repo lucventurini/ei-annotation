@@ -1,10 +1,13 @@
 from .abstract import EIWorfkflow, FinalFlag
-from .preparation import PrepareWrapper
+from .preparation import PrepareWrapper, FaidxProtein, SanitizeProteinBlastDB
+from .repeats.workflow import RepeatMasking
 from .preparation.prepare import parse_samplesheet
 from .rnaseq.alignments.workflow import ShortAlignmentsWrapper, LongAlignmentsWrapper
 from .rnaseq.alignments.portcullis import PortcullisWrapper
 from .rnaseq.mikado import Mikado
 from .rnaseq.assemblies.workflow import AssemblyWrapper
+from .proteins.workflow import ExonerateProteinWrapper
+
 import os
 
 
@@ -26,5 +29,9 @@ class AnnotationWorklow(EIWorfkflow):
         self.merge([self.assemblies])
         self.mikado = Mikado(assemblies=self.assemblies, long_alignments=self.long_wrapper, portcullis=self.portcullis)
         self.merge([self.mikado])
+        self.repeats = RepeatMasking(self.prepare)
+        self.protein_alignments = ExonerateProteinWrapper(self.repeats)
+        self.merge([self.repeats, self.protein_alignments])
+
         flag = os.path.join(self.configuration["outdir"], "all.done")
         self.add_final_flag(flag)

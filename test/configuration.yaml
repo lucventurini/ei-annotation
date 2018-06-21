@@ -51,6 +51,9 @@ homology:
   chunks: 2
   evalue: 0.000001
   max_target_seqs: 10
+  protein_chunks: 3
+  identity: 40
+  coverage: 70
 mikado:
   modes: ['permissive']
   pick:

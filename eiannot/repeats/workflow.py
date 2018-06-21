@@ -1,5 +1,5 @@
 from ..abstract import EIWrapper, AtomicOperation
-from ..preparation import SanitizeGenome, SanitizeProteinBlastDB
+from ..preparation import PrepareWrapper, SanitizeProteinBlastDB, FaidxProtein
 from .modeler import ModelerWorkflow
 import os
 # from .modeler import
@@ -7,14 +7,17 @@ import os
 
 class RepeatMasking(EIWrapper):
 
-    def __init__(self, sanitised: SanitizeGenome, sanitised_proteins: SanitizeProteinBlastDB):
+    def __init__(self, sanitised: PrepareWrapper):
 
         super().__init__()
         self.configuration = sanitised.configuration
+
         if self.execute is True:
+            proteins = SanitizeProteinBlastDB(self.configuration)
+
             if self.model is True:
-                modeler = ModelerWorkflow(sanitised, sanitised_proteins)
-                self.add_edges_from([(sanitised, modeler), (sanitised_proteins, modeler)])
+                modeler = ModelerWorkflow(sanitised, proteins)
+                self.add_edges_from([(sanitised, modeler), (proteins, modeler)])
             else:
                 modeler = None
             if self.retrieve_known is True:
@@ -30,7 +33,6 @@ class RepeatMasking(EIWrapper):
             linker = Linker(sanitised)
             self.add_node(linker)
         assert self.exit
-        assert "masked" in self.output
 
     @property
     def model(self):
@@ -48,10 +50,11 @@ class RepeatMasking(EIWrapper):
 
 class Linker(AtomicOperation):
 
-    def __init__(self, sanitised: SanitizeGenome):
+    def __init__(self, sanitised: PrepareWrapper):
 
         super().__init__()
         self.input = sanitised.output
+        self.input["genome"] = self.genome
         self.output["masked"] = self.masked_genome
 
     @property
@@ -114,9 +117,9 @@ class RetrieveLibraries(AtomicOperation):
 class LibraryCreator(AtomicOperation):
 
     def __init__(self,
-                 sanitiser: SanitizeGenome,
-                 retriever: [RetrieveLibraries|None],
-                 modeler: [ModelerWorkflow|None]
+                 sanitiser: PrepareWrapper,
+                 retriever: RetrieveLibraries,
+                 modeler: ModelerWorkflow
                  ):
         if retriever is None and modeler is None:
             raise ValueError("No input libraries!")
@@ -126,7 +129,7 @@ class LibraryCreator(AtomicOperation):
         if retriever is not None:
             self.input["retrieved"] = retriever.output["libraries"]
         if modeler is not None:
-            self.input["modeled"] = modeler.output["libraries"]
+            self.input["modeled"] = modeler.output["families"]
         self.output = {"libraries": os.path.join(self.outdir, "rm_library.fa")}
 
     @property
@@ -153,14 +156,14 @@ class LibraryCreator(AtomicOperation):
 class Masker(AtomicOperation):
 
     def __init__(self,
-                 sanitised: SanitizeGenome,
+                 sanitised: PrepareWrapper,
                  library_creator: [None]  # Modeller
                  ):
         super().__init__()
         self.configuration = sanitised.configuration
         self.input["rm_library"] = library_creator.output["libraries"]
         self.input["genome"] = os.path.abspath(self.genome)
-        self.output["genome"] = os.path.join(self.outdir, "genome.masked.fa")
+        self.output["masked"] = self.masked_genome
 
     @property
     def rulename(self):

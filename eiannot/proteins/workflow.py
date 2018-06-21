@@ -7,18 +7,24 @@ import os
 class ExonerateProteinWrapper(EIWrapper):
 
     def __init__(self,
-                 sanitised: SanitizeProteinBlastDB,
                  masker: RepeatMasking):
 
         super().__init__()
-        self.configuration = sanitised.configuration
+        self.configuration = masker.configuration
+        sanitised = SanitizeProteinBlastDB(self.configuration)
+
         if sanitised.protein_dbs:
+            faidx = FaidxProtein(sanitised)
+            self.add_edge(sanitised, faidx)
             chunk_proteins = ChunkProteins(sanitised)
             chunks = [Exonerate(chunk_proteins, chunk, masker) for chunk in range(1, chunk_proteins.chunks + 1)]
             self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
             self.add_edges_from([(masker, chunk) for chunk in chunks])
             collapsed = CollapseExonerate(chunks)
             self.add_edges_from([(chunk, collapsed) for chunk in chunks])
+            convert = ConvertExonerate(collapsed, faidx)
+            self.add_edge(faidx, convert)
+            self.add_edge(collapsed, convert)
 
 
 class ChunkProteins(AtomicOperation):
@@ -30,7 +36,7 @@ class ChunkProteins(AtomicOperation):
         self.input = sanitised.output  # input[db] is our file
         self.output["flag"] = os.path.join(os.path.dirname(self.outdir), "chunking.done")
         self.output["chunks"] = [os.path.join(self.outdir, "chunk_{}.fasta".format(
-            str(chunk).zfill(3) for chunk in range(1, self.chunks + 1)))]
+            str(chunk).zfill(3))) for chunk in range(1, self.chunks + 1)]
         self.log = os.path.join(os.path.dirname(self.outdir), "logs", "chunking.log")
 
     @property
@@ -75,6 +81,7 @@ class Exonerate(AtomicOperation):
                  ):
         super().__init__()
         self._chunks = chunks
+        self.configuration = chunks.configuration
         self.__chunk = None
         self.chunk = chunk
         self.input["flag"] = chunks.output["flag"]
@@ -91,7 +98,7 @@ class Exonerate(AtomicOperation):
 
         assert isinstance(chunk, int)
         fasta = os.path.join(self._chunks.outdir, "chunk_{}.fasta".format(str(chunk).zfill(3)))
-        assert fasta in self._chunks.output["chunks"]
+        assert fasta in self._chunks.output["chunks"], (fasta, self._chunks.output["chunks"])
         self.input["fasta"] = fasta
         self.__chunk = chunk
 
@@ -115,7 +122,7 @@ class Exonerate(AtomicOperation):
         cmd += " --maxintron {max_intron} --percent 30 --score 50 --geneseed 50 --showalignment no "
         cmd += " --query {input[fasta]} --target {input[genome]} "
         input, output, log = self.input, self.output, self.log
-        cmd += " -ryo '>%qi\tlength=%ql\talnlen=%qal\tscore=%s\tpercentage=%pi\nTarget>%ti\tlength=%tl\talnlen=%tal\n' "
+        cmd += " -ryo '>%qi\\tlength=%ql\\talnlen=%qal\\tscore=%s\\tpercentage=%pi\\nTarget>%ti\\tlength=%tl\\talnlen=%tal\\n' "
         cmd += " > {output[txt]} 2> {log}"
         cmd = cmd.format(**locals())
         return cmd

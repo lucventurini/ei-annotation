@@ -1,12 +1,12 @@
 from ..abstract import EIWrapper, AtomicOperation
-from ..preparation import SanitizeGenome, SanitizeProteinBlastDB
+from ..preparation import PrepareWrapper, SanitizeProteinBlastDB
 import os
 import glob
 
 
 class ModelerWorkflow(EIWrapper):
 
-    def __init__(self, sanitiser: SanitizeGenome,
+    def __init__(self, sanitiser: PrepareWrapper,
                  sanitised_proteins: SanitizeProteinBlastDB):
 
         super().__init__()
@@ -27,11 +27,12 @@ class ModelerWorkflow(EIWrapper):
 
 class BuildModelerDB(AtomicOperation):
 
-    def __init__(self, sanitiser: SanitizeGenome):
+    def __init__(self, sanitiser: PrepareWrapper):
 
         super().__init__()
         self.configuration = sanitiser.configuration
         self.input = sanitiser.output
+        self.input["genome"] = self.genome
         self.output = {"db": "{db}.nog".format(db=self.dbname)}
         self.log = os.path.join(os.path.dirname(self.outdir), "logs", "build.log")
 
@@ -75,11 +76,10 @@ class RepeatModeler(AtomicOperation):
 
     def __init__(self, builder: BuildModelerDB):
         super().__init__()
+        self.configuration = builder.configuration
         self.input = builder.output
         self.output["families"] = os.path.join(self.outdir, "consensi.fa.classified")
-        self.configuration = builder.configuration
         self.log = os.path.join(os.path.dirname(self.outdir), "logs", "modeler.log")
-
 
     @property
     def dbname(self):
@@ -108,8 +108,8 @@ class RepeatModeler(AtomicOperation):
         logdir = os.path.dirname(self.log)
         outfile = os.path.basename(self.output["families"])
         # Remove failed runs
-        for el in glob.glob(os.path.join(self.outdir, "RM*")):
-            os.remove(el)
+        # for el in glob.glob(os.path.join(self.outdir, "RM*")):
+        #     os.remove(el)
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && cd {outdir} && "
         cmd += "(RepeatModeler -engine ncbi -pa {threads} -database {dbname} 2> {log} > {log} && "
