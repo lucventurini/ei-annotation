@@ -15,6 +15,7 @@ if USE_CYTHON:
 
 setup(
     name='eiannot',
+    version="0.0.1",
     ext_modules=extensions,
     entry_points={"console_scripts": ["eiannot = eiannot.cli:main"]}
 )
