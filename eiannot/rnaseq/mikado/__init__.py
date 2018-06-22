@@ -1,4 +1,4 @@
-from ...abstract import AtomicOperation, EIWrapper, ShortSample, LongSample
+from ...abstract import AtomicOperation, EIWrapper
 import os
 import networkx as nx
 # import abc
@@ -11,6 +11,9 @@ from .homology import MikadoHomologyWrapper
 from ...preparation import FaidxGenome
 
 
+__modes__ = ("permissive", "stringent", "nosplit", "split", "lenient")
+
+
 class Mikado(EIWrapper):
 
     def __init__(self,
@@ -19,6 +22,7 @@ class Mikado(EIWrapper):
                  portcullis: PortcullisWrapper):
 
         super().__init__()
+        self.__indexer, self.__picker, self.__stats = None, None, None
         self.configuration = assemblies.configuration
         self.assemblies = assemblies
         self.long_alignments = long_alignments
@@ -57,20 +61,21 @@ class Mikado(EIWrapper):
         self.add_edges_from([_, self.serialiser] for _ in [self.faidx_genome, self.preparer,
                                                            self.homologies, self.orfs] if _ is not None)
 
-        mikados = []
-        for mode in self.modes:
-            picker = MikadoPick(self.serialiser, mode)
-            self.add_edge(self.serialiser, picker)
-            stats = MikadoStats(picker)
-            self.add_edge(picker, stats)
-            mikados.append(stats)
-        collection = MikadoCollectStats(mikados)
-        self.add_edges_from([mikado, collection] for mikado in mikados)
+        self.picker = MikadoPick(self.serialiser)
+        self.add_edge(self.serialiser, self.picker)
+        self.indexer = IndexMikado(self.picker)
+        self.add_edge(self.picker, self.indexer)
+        stats = MikadoStats(self.indexer)
+        self.add_edge(self.indexer, stats)
         try:
             _ = self.exit.rulename
         except ValueError:
             nodes = [_.rulename for _ in self if not self.adj[_]]
             raise ValueError([(_, [n.rulename for n in nx.ancestors(self.graph, _)]) for _ in nodes])
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado")
 
     @property
     def gfs(self):
@@ -81,11 +86,6 @@ class Mikado(EIWrapper):
         return self.portcullis.junctions
 
     @property
-    def modes(self):
-        # TODO: verify this is correct
-        return self.configuration["mikado"]["modes"]
-
-    @property
     def orf_caller(self):
         if self.configuration.get("orfs", dict()).get("execute", True):
             if self.configuration.get("mikado", dict()).get("use_prodigal", True):
@@ -94,6 +94,39 @@ class Mikado(EIWrapper):
                 return "Transdecoder"
         else:
             return None
+
+    @property
+    def indexer(self):
+        return self.__indexer
+        
+    @indexer.setter
+    def indexer(self, indexer):
+        
+        if not isinstance(indexer, IndexMikado):
+            raise TypeError(type(indexer))
+        self.__indexer = indexer
+
+    @property
+    def picker(self):
+        return self.__picker
+
+    @picker.setter
+    def picker(self, picker):
+
+        if not isinstance(picker, MikadoPick):
+            raise TypeError(type(picker))
+        self.__picker = picker
+
+    @property
+    def stats(self):
+        return self.__stats
+
+    @stats.setter
+    def stats(self, stats):
+
+        if not isinstance(stats, MikadoPick):
+            raise TypeError(type(stats))
+        self.__stats = stats
 
 
 class MikadoSerialise(AtomicOperation):
@@ -178,17 +211,17 @@ class MikadoSerialise(AtomicOperation):
 
 class MikadoPick(AtomicOperation):
 
-    def __init__(self, serialise: MikadoSerialise, mode):
+    def __init__(self, serialise: MikadoSerialise):
 
         super().__init__()
         self.configuration = serialise.configuration
         self.input = serialise.output
         self.input["gtf"] = serialise.input["gtf"]
         self.input["cfg"] = serialise.input["cfg"]
-        self.__mode = mode
-        self.outdir = os.path.join(serialise.outdir, "pick", self.mode)
+        self.__serialise_dir = serialise.outdir
         self.output = {"loci": os.path.join(
-            self.outdir, "mikado-{mode}.loci.gff3").format(**locals())}
+            self.loci_dir, "mikado-{mode}.loci.gff3").format(**locals()),
+                       "link": os.path.join(self.outdir, "mikado.loci.gff3")}
         self.log = os.path.join(self.outdir, "mikado-{mode}.pick.err").format(
             **locals()
         )
@@ -196,7 +229,12 @@ class MikadoPick(AtomicOperation):
 
     @property
     def mode(self):
-        return self.__mode
+        return self.configuration["mikado"]["pick"]["mode"]
+
+    @mode.setter
+    def mode(self, mode):
+        assert mode in __modes__
+        self.__mode = mode
 
     @property
     def loader(self):
@@ -219,36 +257,69 @@ class MikadoPick(AtomicOperation):
         loci_out = os.path.basename(self.output["loci"])
         outdir = self.outdir
         log = self.log
-        cmd += "-od {outdir} --loci_out {loci_out}  -lv INFO -db {input[db]} {input[gtf]} > {log} 2>&1"
+        cmd += "-od {outdir} --loci_out {loci_out}  -lv INFO -db {input[db]} {input[gtf]} > {log} 2>&1 "
+        cmd += " && cd {link_dir} && ln -s {link_src} {output[link]}"
         cmd = cmd.format(**locals())
 
         return cmd
 
     @property
     def loci_dir(self):
-        return os.path.dirname(self.output["loci"])
+        return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado", "pick")
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado", "output")
+
+
+class IndexMikado(AtomicOperation):
+
+    def __init__(self, mikado: MikadoPick):
+        super().__init__()
+        self.input = mikado.output
+        self.output = {"midx": self.input["link"] + ".midx"}
+        self.log = os.path.join(os.path.dirname(self.input["link"]), "index_loci.log")
+
+    @property
+    def rulename(self):
+        return "index_mikado_loci"
+
+    @property
+    def loader(self):
+        return ["mikado"]
+
+    @property
+    def cmd(self):
+        load = self.load
+        input, log = self.input, self.log
+
+        cmd = "{load} mikado compare -r {input[loci]} -l {log} --index"
+
+        cmd = cmd.format(**locals())
+        return cmd
+
+    @property
+    def outdir(self):
+
+        return os.path.dirname(self.input["loci"])
 
 
 class MikadoStats(AtomicOperation):
 
-    def __init__(self, pick: MikadoPick):
+    def __init__(self, index: IndexMikado):
 
         super().__init__()
-        self.input = pick.output
-        self.outdir = pick.outdir
-        self.configuration = pick.configuration
-        self.__mode = pick.mode
-        self.output = {"stats": os.path.join(self.loci_dir, "mikado-{mode}.loci.stats".format(mode=pick.mode))}
-        self.message = "Calculating statistics for Mikado run in mode: {mode}".format(mode=self.mode)
+        self.input = index.output
+        self.input.update(index.input)
+        self.outdir = index.outdir
+        self.configuration = index.configuration
+        self.output = {"stats": os.path.splitext(self.input["link"])[0] + ".stats"}
+        self.message = "Calculating statistics for Mikado run"
         self.log = self.output["stats"] + ".log"
 
     @property
-    def mode(self):
-        return self.__mode
-
-    @property
     def rulename(self):
-        return "mikado_stats_{mode}".format(mode=self.mode)
+        return "mikado_stats"
 
     @property
     def loader(self):
@@ -256,47 +327,47 @@ class MikadoStats(AtomicOperation):
 
     @property
     def loci_dir(self):
-        return os.path.dirname(self.input["loci"])
+        return os.path.dirname(self.input["link"])
 
     @property
     def cmd(self):
 
         load = self.load
         input, output, log = self.input, self.output, self.log
-        cmd = "{load} mikado util stats {input[loci]} {output[stats]} > {log} 2>&1"
+        cmd = "{load} mikado util stats {input[link]} {output[stats]} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 
 
-class MikadoCollectStats(AtomicOperation):
-
-    def __init__(self, stats: [MikadoStats]):
-
-        assert len(stats) > 0 and all(isinstance(stat, MikadoStats) for stat in stats)
-        super().__init__()
-        self.input["stats"] = [stat.output["stats"] for stat in stats]
-        self.configuration = stats[0].configuration
-        assert "programs" in self.configuration, (stats[0].rulename, self.configuration)
-        self.outdir = os.path.dirname(os.path.dirname(stats[0].outdir))
-        self.output = {"stats": os.path.join(self.outdir, "pick", "comparison.stats")}
-        self.message = "Collecting statistics for Mikado in: {output[stats]}".format(output=self.output)
-
-    @property
-    def loader(self):
-        return ["mikado"]
-
-    @property
-    def rulename(self):
-        return "mikado_collect_stats"
-
-    @property
-    def threads(self):
-        return 1
-
-    @property
-    def cmd(self):
-        inputs = " ".join(self.input["stats"])
-        output = self.output
-        load = self.load
-        cmd = "{load} asm_collect.py {inputs} > {output[stats]}".format(**locals())
-        return cmd
+# class MikadoCollectStats(AtomicOperation):
+#
+#     def __init__(self, stats: [MikadoStats]):
+#
+#         assert len(stats) > 0 and all(isinstance(stat, MikadoStats) for stat in stats)
+#         super().__init__()
+#         self.input["stats"] = [stat.output["stats"] for stat in stats]
+#         self.configuration = stats[0].configuration
+#         assert "programs" in self.configuration, (stats[0].rulename, self.configuration)
+#         self.outdir = os.path.dirname(os.path.dirname(stats[0].outdir))
+#         self.output = {"stats": os.path.join(self.outdir, "pick", "comparison.stats")}
+#         self.message = "Collecting statistics for Mikado in: {output[stats]}".format(output=self.output)
+#
+#     @property
+#     def loader(self):
+#         return ["mikado"]
+#
+#     @property
+#     def rulename(self):
+#         return "mikado_collect_stats"
+#
+#     @property
+#     def threads(self):
+#         return 1
+#
+#     @property
+#     def cmd(self):
+#         inputs = " ".join(self.input["stats"])
+#         output = self.output
+#         load = self.load
+#         cmd = "{load} asm_collect.py {inputs} > {output[stats]}".format(**locals())
+#         return cmd

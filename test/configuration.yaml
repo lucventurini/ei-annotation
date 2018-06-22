@@ -55,6 +55,6 @@ homology:
   identity: 40
   coverage: 70
 mikado:
-  modes: ['permissive']
   pick:
+    mode: 'permissive'
     scoring_file: "athaliana_scoring.yaml"

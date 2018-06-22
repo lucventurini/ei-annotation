@@ -325,6 +325,13 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             string.append("  log: \"{}\"".format(self.log))
         if self.threads > 1:
             string.append("  threads: {}".format(self.threads))
+
+        # Add resources
+        if self.resources:
+            string.append("  resources:")
+            for resource in self.resources:
+                string.append('    {key}={value}'.format(key=resource, value=self.resources[resource]))
+
         if self.cmd:
             string.append("  shell: \"{}\"".format(self.cmd))
 
@@ -358,7 +365,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     def species(self):
         """This property returns the name of the organism to be used."""
         # TODO: check consistency of name
-        return self.configuration.get("name", "Daijin")
+        return self.configuration.get("name", "eiannot")
 
     @property
     def genome(self):
@@ -375,6 +382,74 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     @property
     def max_intron(self):
         return self.configuration["reference"]["max_intron"]
+
+    @property
+    def resources(self):
+
+        """This property will define the resources to be used for each rule."""
+
+        default = self.configuration["resources"]["default"]
+
+        if self.step and self.step in self.configuration["resources"]:
+            default.update(self.configuration["resources"][self.__step])
+
+        return default
+
+    @property
+    def step(self):
+        """This property is used to retrieve the resource definition from the dictionary"""
+        return None
+
+
+class Linker(AtomicOperation):
+
+    """Basic class to link an input into an output, when no operation is needed
+    but still the pipeline needs two different files."""
+
+    def __init__(self, input_file, output_file, key_in, key_out, rulename):
+        super().__init__()
+        self.__key_in = None
+        self.key_in = key_in
+        self.__key_out = None
+        self.key_out = key_out
+        self.input[self.key_in] = input_file
+        self.output[self.key_out] = output_file
+        self.__rulename = rulename
+
+    @property
+    def key_in(self):
+        return self.__key_in
+
+    @key_in.setter
+    def key_in(self, key):
+        assert isinstance(key, str)
+        self.__key_in = key
+
+    @property
+    def key_out(self):
+        return self.__key_out
+
+    @key_out.setter
+    def key_out(self, key):
+        assert isinstance(key, str)
+        self.__key_out = key
+
+    @property
+    def cmd(self):
+        outdir = os.path.dirname(self.output[self.key_out])
+        input, output = self.input[self.key_in], self.output[self.key_out]
+        link_src = os.path.relpath(input, start=outdir)
+        link_name = os.path.basename(output)
+
+        return "mkdir -p {outdir} && cd {outdir} && ln -s {link_src} {link_name}".format(**locals())
+
+    @property
+    def rulename(self):
+        return self.__rulename
+
+    @property
+    def loader(self):
+        return []
 
 
 class EIWorfkflow:
@@ -490,6 +565,16 @@ class EIWorfkflow:
             snake += str(task)
 
         return snake
+
+    @property
+    def resources(self):
+
+        resources = []
+        for rule in self.nodes:
+            if rule.resources:
+                resources.append(rule.resources)
+
+        return "\n".join(resources)
 
     def __len__(self):
         return len(self.graph)
@@ -611,7 +696,15 @@ class EIWrapper(EIWorfkflow):
     def entries(self):
         """This property returns the roots of the workflow. Contrary to exits, there can be multiple
         entry points into a wrapper."""
-        in_edges, out_edges = zip(*self.graph.in_edges)
+
+        # Code snippet example:
+        # g.add_edges_from([(0,1), (0,2), (2,3), (1,3)])
+        # >>> list(zip(*g.edges))
+        # [(0, 0, 1, 2), (1, 2, 3, 3)]
+        # >>> set.difference(*[set(_) for _ in list(zip(*g.in_edges))])
+        # {0}  # CVD
+
+        in_edges, out_edges = zip(*self.graph.edges)
         return set.difference(set(in_edges), set(out_edges))
 
     def add_flag_to_inputs(self, flag, flag_name, key):

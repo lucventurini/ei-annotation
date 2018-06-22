@@ -1,4 +1,4 @@
-from ..abstract import EIWrapper, AtomicOperation
+from ..abstract import EIWrapper, AtomicOperation, Linker
 from ..preparation import PrepareWrapper, SanitizeProteinBlastDB, FaidxProtein
 from .modeler import ModelerWorkflow
 import os
@@ -30,7 +30,8 @@ class RepeatMasking(EIWrapper):
             masker = Masker(sanitised, library_creator)
             self.add_edge(library_creator, masker)
         else:
-            linker = Linker(sanitised)
+            linker = Linker(sanitised.exit.genome, sanitised.exit.masked_genome,
+                            "genome", "masked", "link_genome_to_masked")
             self.add_node(linker)
         assert self.exit
 
@@ -46,25 +47,6 @@ class RepeatMasking(EIWrapper):
     @property
     def execute(self):
         return self.model or self.retrieve_known
-
-
-class Linker(AtomicOperation):
-
-    def __init__(self, sanitised: PrepareWrapper):
-
-        super().__init__()
-        self.input = sanitised.output
-        self.input["genome"] = self.genome
-        self.output["masked"] = self.masked_genome
-
-    @property
-    def cmd(self):
-        outdir = os.path.dirname(self.output["masked"])
-        input, output = self.input, self.output
-        link_src = os.path.relpath(input["genome"], start=outdir)
-        masked = os.path.basename(self.output["masked"])
-
-        return "mkdir -p {outdir} && cd {outdir} && ln -s {link_src} {masked}".format(**locals())
 
 
 class RetrieveLibraries(AtomicOperation):
