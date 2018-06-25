@@ -4,7 +4,7 @@ from .repeats.workflow import RepeatMasking
 from .preparation.prepare import parse_samplesheet
 from .rnaseq.alignments.workflow import ShortAlignmentsWrapper, LongAlignmentsWrapper
 from .rnaseq.alignments.portcullis import PortcullisWrapper
-from .rnaseq.mikado import Mikado
+from .rnaseq.mikado.workflow import Mikado
 from .rnaseq.assemblies.workflow import AssemblyWrapper
 from .proteins.workflow import ExonerateProteinWrapper
 

@@ -35,6 +35,7 @@ class PortcullisWrapper(EIWrapper):
         super().__init__(configuration=short_alignments.configuration)
 
         filters = []
+        juncs = []
         if self.execute and short_alignments.bams:
             preps = []
             filters = []
@@ -52,6 +53,7 @@ class PortcullisWrapper(EIWrapper):
 
                 junc = PortcullisJunc(prep)
                 self.add_edge(prep, junc)
+                juncs.append(junc)
 
                 filt = PortcullisFilter(junc, portcullis_prep_ref=refprep)
                 self.add_edge(junc, filt)
@@ -60,8 +62,11 @@ class PortcullisWrapper(EIWrapper):
                 filters.append(filt)
         self.merger = PortcullisMerge(self.configuration, filters, self.outdir)
         self.add_edges_from([(filt, self.merger) for filt in filters])
+        self.failed_merger = PortcullisMergeFailed(juncs, self.merger)
+        self.add_edge(self.merger, self.failed_merger)
         self.flag = PortcullisFlag(merger=self.merger)
         self.add_edge(self.merger, self.flag)
+        self.add_edge(self.failed_merger, self.flag)
 
     @property
     def junctions(self):
@@ -357,9 +362,46 @@ class PortcullisMerge(AtomicOperation):
             prefix = "--prefix=portcullis_merged"
             log = self.log
             cmd = "{load}"
-            cmd += "junctools set {prefix} --output={output[tab]} --operator=mean union {tabs} > {log} 2>&1"
-            cmd += " || touch {output[tab]} && "
+            cmd += "(junctools set {prefix} --output={output[tab]} --operator=mean union {tabs} > {log} 2>&1"
+            cmd += " || touch {output[tab]}) && "
             cmd += "junctools convert -if portcullis -of ebed -o {output[bed]}  {output[tab]}"
+        cmd = cmd.format(**locals())
+        return cmd
+
+
+class PortcullisMergeFailed(AtomicOperation):
+
+    def __init__(self, juncs: [PortcullisJunc], merged: PortcullisMerge):
+
+        super().__init__()
+        self.configuration = merged.configuration
+        self.input["merged"] = merged.output["tab"]
+        self.input["juncs"] = [junc.output["tab"] for junc in juncs]
+        self.outdir = merged.outdir
+        self.output["tab"] = os.path.join(self.outdir, "portcullis.failed.tab"),
+        self.output["bed"] = os.path.join(self.outdir, "portcullis.failed.bed")
+        self.output["all"] = os.path.join(self.outdir, "portcullis.all.bed")
+        self.temps = ["all"]
+
+    @property
+    def loader(self):
+        return ["portcullis"]
+
+    @property
+    def rulename(self):
+        return "portcullis_extract_failed"
+
+    @property
+    def cmd(self):
+
+        load = self.load
+        output = self.output
+        tab_inputs = " ".join(self.input["juncs"])
+        prefix = "--prefix=portcullis_failed"
+
+        cmd = "{load} junctools set union --output {output[all]} {tab_input} && "
+        cmd += " junctools set subtract {prefix} --output={output[tab]} {output[all]} {input[merged]} && "
+        cmd += " junctools convert -if portcullis -of ebed -o {output[bed]} {output[tab]}"
         cmd = cmd.format(**locals())
         return cmd
 

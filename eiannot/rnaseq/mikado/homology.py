@@ -5,7 +5,7 @@ from .prepare import MikadoPrepare
 from ...preparation import DiamondIndex, BlastxIndex, SanitizeProteinBlastDB
 
 
-class SplitMikadoFasta(AtomicOperation):
+class SplitMikadoPrepareFasta(AtomicOperation):
 
     def __init__(self, prepare: MikadoPrepare):
         super().__init__()
@@ -13,7 +13,7 @@ class SplitMikadoFasta(AtomicOperation):
         self.input = prepare.output
         self.outdir = prepare.outdir
         self.output["split_flag"] = os.path.join(self.outdir, 'homology', 'split.done')
-        self.output["split"] =["{outprefix}_{chunk}.fasta".format(
+        self.output["split"] = ["{outprefix}_{chunk}.fasta".format(
             outprefix=self.outprefix, chunk=str(_).zfill(3)) for _ in range(1, self.chunks + 1)]
 
     @property
@@ -30,7 +30,7 @@ class SplitMikadoFasta(AtomicOperation):
 
     @property
     def rulename(self):
-        return "mikado_split_fa"
+        return "mikado_prepare_split_fa"
 
     @property
     def log(self):
@@ -60,7 +60,7 @@ class MikadoHomology(AtomicOperation, metaclass=abc.ABCMeta):
 
     def __init__(self,
                  chunk_id,
-                 split: SplitMikadoFasta,
+                 split: SplitMikadoPrepareFasta,
                  index: AtomicOperation): # We are going to create a Diamond/Blastx index somewhere else
 
         if "db" not in index.output:
@@ -113,7 +113,7 @@ class MikadoDiamond(MikadoHomology):
 
     def __init__(self,
                  chunk_id: int,
-                 split: SplitMikadoFasta,
+                 split: SplitMikadoPrepareFasta,
                  diamond_index: DiamondIndex):
 
         super().__init__(chunk_id, split, diamond_index)
@@ -143,7 +143,7 @@ class MikadoBlastx(MikadoHomology):
 
     def __init__(self,
                  chunk_id: int,
-                 split: SplitMikadoFasta,
+                 split: SplitMikadoPrepareFasta,
                  blast_index: BlastxIndex):
         super().__init__(chunk_id, split, blast_index)
 
@@ -202,7 +202,7 @@ class MikadoHomologyWrapper(EIWrapper):
         self.configuration = preparer.configuration
         self.sanitizer = SanitizeProteinBlastDB(self.configuration)
         if self.execute is True:
-            split = SplitMikadoFasta(preparer)
+            split = SplitMikadoPrepareFasta(preparer)
             if self.program == "blastx":
                 indexer, executer = BlastxIndex, MikadoBlastx
             elif self.program == "diamond":

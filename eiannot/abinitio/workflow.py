@@ -1,4 +1,5 @@
 from ..abstract import EIWrapper, AtomicOperation, Linker
+from .fln import FlnWrapper
 
 
 class AugustusWorkflow(EIWrapper):

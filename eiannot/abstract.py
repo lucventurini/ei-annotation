@@ -155,6 +155,8 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         self.__params = dict()
         self.__threads = None
         self.__configuration = dict()
+        self.__temps = []
+        self.__touchers = []
 
     def __hash__(self):
         """The hash will only consider the rule name. In a SnakeMake graph,
@@ -223,6 +225,32 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     @property
     def input(self):
         return self.__inputs
+
+    @property
+    def temps(self):
+
+        return self.__temps
+
+    @temps.setter
+    def temps(self, temps):
+        if not isinstance(temps, (tuple, set, list)):
+            raise TypeError
+        if not all(_ in self.output for _ in temps):
+            raise KeyError
+        self.__temps = temps
+
+    @property
+    def touchers(self):
+
+        return self.__touchers
+
+    @touchers.setter
+    def touchers(self, touchers):
+        if not isinstance(touchers, (tuple, set, list)):
+            raise TypeError
+        if not all(_ in self.output for _ in touchers):
+            raise KeyError
+        self.__touchers = touchers
 
     @input.setter
     def input(self, inputs):
@@ -311,11 +339,13 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             string[-1] = string[-1].rstrip(",")  # Remove trailing comma
         string.append("  output:")
         for key, value in self.output.items():
-            if self.touch is True:
+            if self.touch is True or key in self.touchers:
                 assert len(self.output) == 1, (self.rulename, self.input, self.output)
                 string.append("    {key}=touch(\"{value}\")".format(**locals()))
             elif isinstance(value, list):
                 string.append("    {key}={value},".format(**locals()))
+            elif key in self.temps:
+                string.append("    {key}=temp({value})".format(**locals()))
             else:
                 string.append("    {key}=\"{value}\",".format(**locals()))
         string[-1] = string[-1].rstrip(",")
