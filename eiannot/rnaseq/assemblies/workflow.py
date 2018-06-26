@@ -6,6 +6,7 @@ from .trinity_gg import TrinityGGWrapper
 from .scallop import ScallopWrapper
 from ...abstract import EIWrapper, EIWorfkflow
 from ..alignments.workflow import ShortAlignmentsWrapper
+from .strawberry import StrawberryWrapper
 import os
 
 
@@ -15,7 +16,8 @@ class AssemblyWrapper(EIWrapper):
                 "scallop": ScallopWrapper,
                 "trinity": TrinityGGWrapper,
                 "class2": Class2Wrapper,
-                "stringtie": StringtieWrapper}
+                "stringtie": StringtieWrapper,
+                "strawberry": StrawberryWrapper}
 
     def __init__(self, short_alignments: ShortAlignmentsWrapper):
 
