@@ -345,7 +345,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             elif isinstance(value, list):
                 string.append("    {key}={value},".format(**locals()))
             elif key in self.temps:
-                string.append("    {key}=temp({value})".format(**locals()))
+                string.append("    {key}=temp(\"{value}\")".format(**locals()))
             else:
                 string.append("    {key}=\"{value}\",".format(**locals()))
         string[-1] = string[-1].rstrip(",")
@@ -418,10 +418,12 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
         """This property will define the resources to be used for each rule."""
 
-        default = self.configuration["resources"]["default"]
-
-        if self.step and self.step in self.configuration["resources"]:
-            default.update(self.configuration["resources"][self.__step])
+        # TODO: implement!
+        # default = self.configuration["resources"]["default"]
+        #
+        # if self.step and self.step in self.configuration["resources"]:
+        #     default.update(self.configuration["resources"][self.__step])
+        default = dict()
 
         return default
 
@@ -562,7 +564,12 @@ class EIWorfkflow:
         from collections import Counter
         count_inps = Counter(inputs)
         count_outs = Counter(outputs)
-        if count_inps.most_common()[0][1] > 1:
+        try:
+            most_common_input = count_inps.most_common()[0]
+        except IndexError:
+            most_common_input = None
+            # raise IndexError("Rule {operation.rulename} has no inputs! {operation.input}".format(**locals()))
+        if most_common_input and most_common_input[1] > 1:
             raise ValueError("Rule {operation.rulename} has repeated inputs: {count_inps}".format(**locals()))
         elif count_outs.most_common()[0][1] > 1:
             raise ValueError("Rule {operation.rulename} has repeated outputs: {count_outs}".format(**locals()))

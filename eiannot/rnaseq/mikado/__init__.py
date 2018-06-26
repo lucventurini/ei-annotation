@@ -104,6 +104,7 @@ class MikadoPick(AtomicOperation):
         self.input["gtf"] = serialise.input["gtf"]
         self.input["cfg"] = serialise.input["cfg"]
         self.__serialise_dir = serialise.outdir
+        mode = self.mode
         self.output = {"loci": os.path.join(
             self.loci_dir, "mikado-{mode}.loci.gff3").format(**locals()),
                        "link": os.path.join(self.outdir, "mikado.loci.gff3")}
@@ -137,13 +138,16 @@ class MikadoPick(AtomicOperation):
         mode = self.mode
         threads = self.threads
         cmd += "mikado pick --source Mikado_{mode} --mode={mode} --procs={threads} "
-        input = self.input
+        input, output = self.input, self.output
         cmd += "--start-method=spawn --json-conf={input[cfg]} "
         loci_out = os.path.basename(self.output["loci"])
         outdir = self.outdir
         log = self.log
+        link_dir = os.path.dirname(self.output["link"])
+        link_src = os.path.relpath(self.output["loci"],
+                                   start=os.path.dirname(self.output["link"]))
         cmd += "-od {outdir} --loci_out {loci_out}  -lv INFO -db {input[db]} {input[gtf]} > {log} 2>&1 "
-        cmd += " && cd {link_dir} && ln -s {link_src} {output[link]}"
+        cmd += " && mkdir -p {link_dir} && cd {link_dir} && ln -s {link_src} {output[link]}"
         cmd = cmd.format(**locals())
 
         return cmd
@@ -164,6 +168,7 @@ class IndexMikado(AtomicOperation):
         self.input = mikado.output
         self.output = {"midx": self.input["link"] + ".midx"}
         self.log = os.path.join(os.path.dirname(self.input["link"]), "index_loci.log")
+        self.configuration = mikado.configuration
 
     @property
     def rulename(self):

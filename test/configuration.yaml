@@ -34,6 +34,9 @@ programs:
   cufflinks:
     runs: ['']
     load: ''
+  strawberry:
+    runs: ['']
+    load: ''
 #  scallop:
 #    runs: ['']
 #    load: ''
@@ -58,3 +61,7 @@ mikado:
   pick:
     mode: 'permissive'
     scoring_file: "athaliana_scoring.yaml"
+repeats:
+  execute: true
+  model: false
+  species: "arabidopsis thaliana"

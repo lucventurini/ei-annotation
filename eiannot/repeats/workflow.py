@@ -144,7 +144,7 @@ class Masker(AtomicOperation):
         super().__init__()
         self.configuration = sanitised.configuration
         self.input["rm_library"] = library_creator.output["libraries"]
-        self.input["genome"] = os.path.abspath(self.genome)
+        self.input["genome"] = self.genome
         self.output["masked"] = self.masked_genome
 
     @property

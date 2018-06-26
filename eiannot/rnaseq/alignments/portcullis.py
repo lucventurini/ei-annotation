@@ -74,6 +74,10 @@ class PortcullisWrapper(EIWrapper):
         return self.merger.output["bed"]
 
     @property
+    def junctions_task(self):
+        return self.merger
+
+    @property
     def toolname(self):
         return 'portcullis'
 
@@ -84,6 +88,14 @@ class PortcullisWrapper(EIWrapper):
     @property
     def execute(self):
         return self.configuration["programs"].get("portcullis", dict()).get("execute", True)
+
+    @property
+    def failed_junctions(self):
+        return self.failed_merger.output["bed"]
+
+    @property
+    def failed_junctions_task(self):
+        return self.failed_merger
 
 
 class PortcullisPrep(AtomicOperation):
@@ -329,7 +341,8 @@ class PortcullisMerge(AtomicOperation):
         self.input = {"beds": [filter.output["bed_link"] for filter in filters],
                       "tabs": [filter.output["tab_link"] for filter in filters]}
         self.output = {"bed": os.path.join(self.outdir, "output", "portcullis.merged.bed"),
-                       "tab": os.path.join(self.outdir, "output", "portcullis.merged.tab")}
+                       "tab": os.path.join(self.outdir, "output", "portcullis.merged.tab"),
+                       "gff3": os.path.join(self.outdir, "output", "portcullis.merged.gff3"),}
 
         self.message = "Taking the union of portcullis results"
         self.log = os.path.join(self.outdir, "logs", "portcullis.merge.log")
@@ -364,7 +377,8 @@ class PortcullisMerge(AtomicOperation):
             cmd = "{load}"
             cmd += "(junctools set {prefix} --output={output[tab]} --operator=mean union {tabs} > {log} 2>&1"
             cmd += " || touch {output[tab]}) && "
-            cmd += "junctools convert -if portcullis -of ebed -o {output[bed]}  {output[tab]}"
+            cmd += "junctools convert -if portcullis -of ebed -o {output[bed]}  {output[tab]} && "
+            cmd += "junctools convert -if portcullis -of igff -o {output[gff3]}  {output[tab]}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -380,6 +394,7 @@ class PortcullisMergeFailed(AtomicOperation):
         self.outdir = merged.outdir
         self.output["tab"] = os.path.join(self.outdir, "portcullis.failed.tab"),
         self.output["bed"] = os.path.join(self.outdir, "portcullis.failed.bed")
+        self.output["gff3"] = os.path.join(self.outdir, "portcullis.failed.gff3")
         self.output["all"] = os.path.join(self.outdir, "portcullis.all.bed")
         self.temps = ["all"]
 
@@ -395,13 +410,14 @@ class PortcullisMergeFailed(AtomicOperation):
     def cmd(self):
 
         load = self.load
-        output = self.output
+        input, output = self.input, self.output
         tab_inputs = " ".join(self.input["juncs"])
         prefix = "--prefix=portcullis_failed"
 
-        cmd = "{load} junctools set union --output {output[all]} {tab_input} && "
+        cmd = "{load} junctools set union --output {output[all]} {tab_inputs} && "
         cmd += " junctools set subtract {prefix} --output={output[tab]} {output[all]} {input[merged]} && "
-        cmd += " junctools convert -if portcullis -of ebed -o {output[bed]} {output[tab]}"
+        cmd += " junctools convert -if portcullis -of ebed -o {output[bed]} {output[tab]} && "
+        cmd += "junctools convert -if portcullis -of igff -o {output[gff3]}  {output[tab]}"
         cmd = cmd.format(**locals())
         return cmd
 
