@@ -16,7 +16,7 @@ programs:
     runs: ['']
   gsnap:
     load: ''
-    runs: ['']
+    runs: []
   star:
     load: ''
     runs: ['']
@@ -29,7 +29,7 @@ programs:
     runs: ['']
     load: ''
   star_long:
-    runs: ['']
+    runs: []
     load: ''
   cufflinks:
     runs: ['']
@@ -65,3 +65,4 @@ repeats:
   execute: true
   model: false
   species: "arabidopsis thaliana"
+threads: 20

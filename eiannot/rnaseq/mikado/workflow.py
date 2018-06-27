@@ -3,6 +3,11 @@ from . import MikadoConfig, MikadoPrepare, MikadoHomologyWrapper, MikadoPick
 from .orfs import Prodigal, TransdecoderLongOrf, TransdecoderPred
 from . import FaidxGenome, MikadoSerialise
 from . import IndexMikado, MikadoStats
+import os
+import networkx as nx
+
+
+# TODO: we have to execute Mikado probably TWICE, once on only long reads, once on long and short reads.
 
 
 class Mikado(EIWrapper):

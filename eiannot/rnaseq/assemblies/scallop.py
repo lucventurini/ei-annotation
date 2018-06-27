@@ -67,7 +67,7 @@ class Scallop(ShortAssembler):
     def strand(self):
         if self.sample.strandedness in ("f", "fr-secondstrand"):
             return "--library_type second"
-        elif self.sample.strandedness in ("r", "fr-secondstrand"):
+        elif self.sample.strandedness in ("r", "fr-firststrand"):
             return "--library_type first"
         elif self.sample.strandedness == "fr-unstranded" or self.sample.strandedness is None:
             return "--library_type unstranded"

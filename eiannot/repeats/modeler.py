@@ -125,13 +125,23 @@ class PolishRepeats(AtomicOperation):
         super().__init__()
         self.configuration = modeler.configuration
         self.input = modeler.output
+        self.input["proteins"] = self.proteins
 
     @property
     def loader(self):
-        return []
+        return ["repeatmasker"]
 
     @property
     def rulename(self):
         return "polish_modeler_repeats"
+
+    @property
+    def cmd(self):
+
+        cmd = "{load}"
+
+        cmd = "RepeatMasker -lib {proteins} "
+
+        return cmd
 
 

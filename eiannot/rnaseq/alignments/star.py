@@ -41,7 +41,7 @@ class StarIndex(IndexBuilder):
         log = os.path.relpath(self.log, start=align_dir)
         extra = self.extra
         cmd = "{load} cd {align_dir} && "
-        cmd += "STAR --runThreadN {threads} --runMode genomeGenerate --genomeDir . {trans}"
+        cmd += "STAR --runThreadN={threads} --runMode genomeGenerate --genomeDir . {trans}"
         cmd += "--genomeFastaFiles {genome} -- {extra} --outStd Log > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
@@ -88,7 +88,7 @@ class StarAligner(ShortAligner):
         threads = self.threads
         cmd = "{load}"
         cmd += " mkdir -p {outdir} && cd {outdir} &&"
-        cmd += " STAR --runThreadN {threads} --genomeDir {index} "
+        cmd += " STAR --runThreadN={threads} --genomeDir {index} "
         rfc = self.compression_option
         infiles = self.input_reads
         cmd += "{rfc} --runMode alignReads {infiles}"
@@ -204,7 +204,8 @@ class StarLong(LongAligner):
         outdir = os.path.dirname(self.output["bam"])
         extra = self.extra
 
-        cmd = "{load} STARlong --runThreadN {threads} --runMode alignReads --outSAMattributes NH HI NM MD "
+        cmd = "{load} "
+        cmd += "STARlong --runThreadN={threads} --runMode alignReads --outSAMattributes NH HI NM MD "
         cmd += " --readNameSeparator space --outFilterMultimapScoreRange 1 --outFilterMismatchNmax 2000 "
         cmd += " --scoreGapNoncan -20 --scoreGapGCAG -4 --scoreGapATAC -8 --scoreDelOpen -1 --scoreDelBase -1 "
         cmd += "--scoreInsOpen -1 --scoreInsBase -1 --alignEndsType Local --seedSearchStartLmax 50 "

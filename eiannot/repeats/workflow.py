@@ -55,7 +55,7 @@ class RetrieveLibraries(AtomicOperation):
 
         super().__init__()
         self.configuration = configuration
-        self.input = {}
+        self.input = {"mock": "."}
         self.output = {"libraries": os.path.join(self.outdir, "retrieved.fa")}
         self.log = os.path.join(self.outdir, "logs", "extract_libraries.log")
 
@@ -145,7 +145,9 @@ class Masker(AtomicOperation):
         self.configuration = sanitised.configuration
         self.input["rm_library"] = library_creator.output["libraries"]
         self.input["genome"] = self.genome
-        self.output["masked"] = self.masked_genome
+        self.output["link"] = self.masked_genome
+        self.output["masked"] = os.path.join(self.maskdir, "genome.fa.masked")
+        self.log = os.path.join(self.maskdir, "repeat_masker.log")
 
     @property
     def rulename(self):
@@ -161,10 +163,17 @@ class Masker(AtomicOperation):
         load = self.load
         outdir = self.outdir
         input, threads = self.input, self.threads
+        rm_library = os.path.basename(self.input["rm_library"])
+        log = os.path.basename(self.log)
+        outdir = os.path.abspath(self.outdir)
+        maskdir = self.maskdir
+        link_src = os.path.relpath(self.output["masked"], start=outdir)
+        link_dest = os.path.basename(self.output["link"])
+        genome = os.path.relpath(os.path.abspath(self.genome), start=maskdir)
 
-        cmd = "{load} mkdir -p {outdir} && cd {outdir} && "
-        cmd += "RepeatMasker -xsmall -dir . -lib {input[rm_library]} -pa {threads} {input[genome]} && "
-        cmd += " ln -s genome.fa.masked genome.masked.fa"
+        cmd = "{load} mkdir -p {outdir} && mkdir -p {maskdir} && cd {maskdir} && "
+        cmd += "RepeatMasker -xsmall -dir . -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
+        cmd += "rm -rf RM_* && cd {outdir} && ln -s {link_src} {link_dest} && touch -h {link_dest}"
 
         cmd = cmd.format(**locals())
 
@@ -172,4 +181,8 @@ class Masker(AtomicOperation):
 
     @property
     def outdir(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "output")
+
+    @property
+    def maskdir(self):
         return os.path.join(self.configuration["outdir"], "repeats", "masker")

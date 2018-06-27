@@ -63,7 +63,7 @@ class ChunkProteins(AtomicOperation):
         logdir = os.path.dirname(self.log)
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
         cmd += " split_fasta.py -m {chunks} {input[db]} {outdir}/chunk 2> {log} > {log}"
-        cmd += " && touch -h {output[flag]}"
+        cmd += " && touch {output[flag]}"
         cmd = cmd.format(**locals())
         return cmd
 

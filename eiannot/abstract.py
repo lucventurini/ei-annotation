@@ -50,9 +50,9 @@ class LongSample(Sample):
             suffix = ".fq"
         else:
             suffix = ".{}".format(suffix)
+
         rout = os.path.join(self.read_dir,
                             "{label}.long{suffix}".format(**locals()))
-
         if not os.path.islink(rout):
             os.symlink(os.path.abspath(readfile), rout)
         self.__readfile = rout
@@ -167,6 +167,8 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
         """In order to make sure that we add a rule only once,
         we are going to compare the hashes, ie, the rule names."""
+
+        # TODO: this must be changed!
 
         return hash(self) == hash(other)
 
@@ -327,16 +329,18 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         rulename = re.sub("\.", "_", re.sub("-", "_", self.rulename))
         string = ["rule {}:".format(rulename)]
         # Inputs now are always dictionaries
-        if self.input:
-            string.append("  input:")
-            for key, value in self.input.items():
-                if isinstance(value, bytes):
-                    value = value.decode()
-                if isinstance(value, list):
-                    string.append("    {key}={value},".format(**locals()))
-                else:
-                    string.append("    {key}=\"{value}\",".format(**locals()))
-            string[-1] = string[-1].rstrip(",")  # Remove trailing comma
+        if not self.input:
+            raise ValueError("Snakemake rules must have defined inputs and outputs.")
+
+        string.append("  input:")
+        for key, value in self.input.items():
+            if isinstance(value, bytes):
+                value = value.decode()
+            if isinstance(value, list):
+                string.append("    {key}={value},".format(**locals()))
+            else:
+                string.append("    {key}=\"{value}\",".format(**locals()))
+        string[-1] = string[-1].rstrip(",")  # Remove trailing comma
         string.append("  output:")
         for key, value in self.output.items():
             if self.touch is True or key in self.touchers:
@@ -353,8 +357,10 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             string.append("  message: \"{}\" """.format(self.message))
         if self.log:
             string.append("  log: \"{}\"".format(self.log))
-        if self.threads > 1:
+        if isinstance(self.threads, int):
             string.append("  threads: {}".format(self.threads))
+        else:
+            string.append("  threads: threads")
 
         # Add resources
         if self.resources:
@@ -381,15 +387,16 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     def threads(self):
         # Single location. We can change this whenever we desire.
         if self.__threads is None:
-            return self.configuration.get("threads", 1)
+            return "{threads}"
         else:
             return self.__threads
 
     @threads.setter
     def threads(self, threads):
-        if not isinstance(threads, int) or threads < 1:
+        if threads is not None and (not isinstance(threads, int) or threads < 1):
             raise ValueError
-        self.__threads = threads
+        else:
+            self.__threads = threads
 
     @property
     def species(self):
@@ -403,7 +410,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
     @property
     def masked_genome(self):
-        return os.path.join(self.configuration["outdir"], "repeats", "masker", "genome.masked.fa")
+        return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa")
 
     @property
     def min_intron(self):
@@ -500,6 +507,7 @@ class EIWorfkflow:
     def check_graph(self):
         """This method will check that the graph is valid, before printing."""
 
+        # TODO: implement
         pass
 
     def add_node(self, node: AtomicOperation):
@@ -687,6 +695,10 @@ class EIWorfkflow:
         flag = FinalFlag(finals, flag)
         self.add_edges_from([(node, flag) for node in nodes])
 
+    @property
+    def threads(self):
+        return self.configuration.get("threads", 1)
+
 
 class FinalFlag(AtomicOperation):
 
@@ -704,6 +716,10 @@ class FinalFlag(AtomicOperation):
     @property
     def loader(self):
         return []
+
+    @property
+    def threads(self):
+        return 1
 
 
 class EIWrapper(EIWorfkflow):

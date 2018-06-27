@@ -25,6 +25,8 @@ def main():
     workflow = AnnotationWorklow(args.configuration, args.genome, args.samplesheet)
 
     with open(args.out, 'wt') as out:
+        print("threads={threads}".format(threads=workflow.threads), file=out, end="\n\n")
+
         print(workflow, file=out)
     return
 

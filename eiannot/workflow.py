@@ -16,8 +16,8 @@ class AnnotationWorklow(EIWorfkflow):
     def __init__(self, configuration, genome, samplesheet):
 
         # First thing: prepare the reads. This is *outside* the snakemake.
-        configuration = parse_samplesheet(samplesheet, configuration)
-        super().__init__(configuration)
+        self.configuration = parse_samplesheet(samplesheet, configuration)
+        super().__init__(self.configuration)
         self.prepare = PrepareWrapper(self.configuration, genome)
         self.merge([self.prepare])
         # Second thing: prepare the genome

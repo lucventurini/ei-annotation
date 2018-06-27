@@ -193,6 +193,10 @@ class IndexMikado(AtomicOperation):
 
         return os.path.dirname(self.input["loci"])
 
+    @property
+    def threads(self):
+        return 1
+
 
 class MikadoStats(AtomicOperation):
 
@@ -228,36 +232,6 @@ class MikadoStats(AtomicOperation):
         cmd = cmd.format(**locals())
         return cmd
 
-
-# class MikadoCollectStats(AtomicOperation):
-#
-#     def __init__(self, stats: [MikadoStats]):
-#
-#         assert len(stats) > 0 and all(isinstance(stat, MikadoStats) for stat in stats)
-#         super().__init__()
-#         self.input["stats"] = [stat.output["stats"] for stat in stats]
-#         self.configuration = stats[0].configuration
-#         assert "programs" in self.configuration, (stats[0].rulename, self.configuration)
-#         self.outdir = os.path.dirname(os.path.dirname(stats[0].outdir))
-#         self.output = {"stats": os.path.join(self.outdir, "pick", "comparison.stats")}
-#         self.message = "Collecting statistics for Mikado in: {output[stats]}".format(output=self.output)
-#
-#     @property
-#     def loader(self):
-#         return ["mikado"]
-#
-#     @property
-#     def rulename(self):
-#         return "mikado_collect_stats"
-#
-#     @property
-#     def threads(self):
-#         return 1
-#
-#     @property
-#     def cmd(self):
-#         inputs = " ".join(self.input["stats"])
-#         output = self.output
-#         load = self.load
-#         cmd = "{load} asm_collect.py {inputs} > {output[stats]}".format(**locals())
-#         return cmd
+    @property
+    def threads(self):
+        return 1
