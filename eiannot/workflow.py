@@ -22,16 +22,16 @@ class AnnotationWorklow(EIWorfkflow):
         self.merge([self.prepare])
         # Second thing: prepare the genome
         self.short_wrapper = ShortAlignmentsWrapper(self.prepare)
-        self.long_wrapper = LongAlignmentsWrapper(self.prepare)
+
         self.portcullis = PortcullisWrapper(self.short_wrapper)
-        self.merge([self.short_wrapper, self.long_wrapper, self.portcullis])
         self.assemblies = AssemblyWrapper(self.short_wrapper)
-        self.merge([self.assemblies])
+        self.merge([self.short_wrapper, self.portcullis, self.assemblies])
+
+        self.long_wrapper = LongAlignmentsWrapper(self.prepare)
         self.mikado = Mikado(assemblies=self.assemblies, long_alignments=self.long_wrapper, portcullis=self.portcullis)
         self.merge([self.mikado])
         self.repeats = RepeatMasking(self.prepare)
         self.protein_alignments = ExonerateProteinWrapper(self.repeats)
         self.merge([self.repeats, self.protein_alignments])
-
         flag = os.path.join(self.configuration["outdir"], "all.done")
         self.add_final_flag(flag)

@@ -1,5 +1,6 @@
 from ..abstract import EIWrapper, AtomicOperation
 from ..preparation import SanitizeProteinBlastDB, FaidxProtein
+from ..rnaseq.alignments.portcullis import PortcullisWrapper
 from ..repeats.workflow import RepeatMasking
 import os
 
@@ -88,6 +89,7 @@ class Exonerate(AtomicOperation):
         self.input["genome"] = masked.output["masked"]
         assert self.input["fasta"] in chunks.output["chunks"]
         self.output["txt"] = os.path.join(self.outdir, "{chunk}.exonerate.txt").format(chunk=self.chunk)
+        self.log = os.path.join(self.logdir, "exonerate.{}.log".format(self.chunk))
 
     @property
     def chunk(self):
@@ -111,18 +113,25 @@ class Exonerate(AtomicOperation):
         return ['exonerate']
 
     @property
+    def threads(self):
+        return 4  # TODO: Ask Gemy about this
+
+    @property
     def cmd(self):
 
         load = self.load
-        cmd = "{load}"
+        cmd = "{load} mkdir -p {logdir} && mkdir -p {outdir} && "
+        logdir = self.logdir
+        outdir = self.outdir
         fasta = self.input["fasta"]
-        cmd += " exonerate --model protein2genome --showtargetgff yes --showvulgar yes "
+        threads = self.threads
+        cmd += " exonerate --model protein2genome -c {threads} --showtargetgff yes --showvulgar yes "
         min_intron, max_intron = self.min_intron, self.max_intron
         cmd += " --softmaskquery yes --softmasktarget yes --bestn 10  --minintron {min_intron} "
         cmd += " --maxintron {max_intron} --percent 30 --score 50 --geneseed 50 --showalignment no "
         cmd += " --query {input[fasta]} --target {input[genome]} "
         input, output, log = self.input, self.output, self.log
-        cmd += " -ryo '>%qi\\tlength=%ql\\talnlen=%qal\\tscore=%s\\tpercentage=%pi\\nTarget>%ti\\tlength=%tl\\talnlen=%tal\\n' "
+        cmd += " --ryo '>%qi\\\\tlength=%ql\\\\talnlen=%qal\\\\tscore=%s\\\\tpercentage=%pi\\\\nTarget>%ti\\\\tlength=%tl\\\\talnlen=%tal\\\\n' "
         cmd += " > {output[txt]} 2> {log}"
         cmd = cmd.format(**locals())
         return cmd
@@ -130,6 +139,10 @@ class Exonerate(AtomicOperation):
     @property
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "proteins", "alignments")
+
+    @property
+    def logdir(self):
+        return os.path.join(self.configuration["outdir"], "proteins", "logs")
 
 
 class CollapseExonerate(AtomicOperation):
@@ -202,3 +215,28 @@ class ConvertExonerate(AtomicOperation):
     @property
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "proteins", "alignments")
+
+
+class FilterExonerate(AtomicOperation):
+
+    def __init__(self, converter: ConvertExonerate, portcullis: PortcullisWrapper):
+
+        super().__init__()
+        self.configuration = converter.configuration
+        self.input = converter.output
+        self.input.update()  # TODO: add portcullis here
+
+    @property
+    def rulename(self):
+        return "filter_exonerate_alignments"
+
+    @property
+    def loader(self):
+        return ["mikado"]  # TODO: this will need to be updated with the proper details
+
+    @property
+    def cmd(self):
+
+        return ""
+
+

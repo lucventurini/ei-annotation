@@ -60,13 +60,11 @@ class PortcullisWrapper(EIWrapper):
                 if refprep is not None:
                     self.add_edge(refprep, filt)
                 filters.append(filt)
-        self.merger = PortcullisMerge(self.configuration, filters, self.outdir)
-        self.add_edges_from([(filt, self.merger) for filt in filters])
-        self.failed_merger = PortcullisMergeFailed(juncs, self.merger)
-        self.add_edge(self.merger, self.failed_merger)
-        self.flag = PortcullisFlag(merger=self.merger)
-        self.add_edge(self.merger, self.flag)
-        self.add_edge(self.failed_merger, self.flag)
+            self.merger = PortcullisMerge(self.configuration, filters, self.outdir)
+            self.add_edges_from([(filt, self.merger) for filt in filters])
+            # self.failed_merger = PortcullisMergeFailed(juncs, self.merger)
+            # self.add_edge(self.merger, self.failed_merger)
+        self.add_final_flag(os.path.join(self.outdir, "portcullis.done"), rulename="portcullis_flag")
 
     @property
     def junctions(self):
@@ -89,13 +87,13 @@ class PortcullisWrapper(EIWrapper):
     def execute(self):
         return self.configuration["programs"].get("portcullis", dict()).get("execute", True)
 
-    @property
-    def failed_junctions(self):
-        return self.failed_merger.output["bed"]
-
-    @property
-    def failed_junctions_task(self):
-        return self.failed_merger
+    # @property
+    # def failed_junctions(self):
+    #     return self.failed_merger.output["bed"]
+    #
+    # @property
+    # def failed_junctions_task(self):
+    #     return self.failed_merger
 
 
 class PortcullisPrep(AtomicOperation):
@@ -383,60 +381,41 @@ class PortcullisMerge(AtomicOperation):
         return cmd
 
 
-class PortcullisMergeFailed(AtomicOperation):
-
-    def __init__(self, juncs: [PortcullisJunc], merged: PortcullisMerge):
-
-        super().__init__()
-        self.configuration = merged.configuration
-        self.input["merged"] = merged.output["tab"]
-        self.input["juncs"] = [junc.output["tab"] for junc in juncs]
-        self.outdir = merged.outdir
-        self.output["tab"] = os.path.join(self.outdir, "portcullis.failed.tab"),
-        self.output["bed"] = os.path.join(self.outdir, "portcullis.failed.bed")
-        self.output["gff3"] = os.path.join(self.outdir, "portcullis.failed.gff3")
-        self.output["all"] = os.path.join(self.outdir, "portcullis.all.bed")
-        self.temps = ["all"]
-
-    @property
-    def loader(self):
-        return ["portcullis"]
-
-    @property
-    def rulename(self):
-        return "portcullis_extract_failed"
-
-    @property
-    def cmd(self):
-
-        load = self.load
-        input, output = self.input, self.output
-        tab_inputs = " ".join(self.input["juncs"])
-        prefix = "--prefix=portcullis_failed"
-
-        cmd = "{load} junctools set union --output {output[all]} {tab_inputs} && "
-        cmd += " junctools set subtract {prefix} --output={output[tab]} {output[all]} {input[merged]} && "
-        cmd += " junctools convert -if portcullis -of ebed -o {output[bed]} {output[tab]} && "
-        cmd += "junctools convert -if portcullis -of igff -o {output[gff3]}  {output[tab]}"
-        cmd = cmd.format(**locals())
-        return cmd
-
-
-class PortcullisFlag(AtomicOperation):
-
-    def __init__(self, merger: PortcullisMerge):
-
-        super().__init__()
-        self.configuration = merger.configuration
-        self.input = merger.output
-        self.message = "Flagging portcullis as complete"
-        self.output = {"flag": os.path.join(os.path.dirname(self.input["bed"]), "portcullis.done")}
-        self.touch = True
-
-    @property
-    def loader(self):
-        return []
-
-    @property
-    def rulename(self):
-        return "portcullis_flag"
+# class PortcullisMergeFailed(AtomicOperation):
+#
+#     def __init__(self, juncs: [PortcullisJunc], merged: PortcullisMerge):
+#
+#         super().__init__()
+#         self.configuration = merged.configuration
+#         self.input["merged"] = merged.output["tab"]
+#         self.input["juncs"] = [junc.output["tab"] for junc in juncs]
+#         self.outdir = merged.outdir
+#         self.output["tab"] = os.path.join(self.outdir, "portcullis.failed.tab"),
+#         self.output["bed"] = os.path.join(self.outdir, "portcullis.failed.bed")
+#         self.output["gff3"] = os.path.join(self.outdir, "portcullis.failed.gff3")
+#         self.output["all"] = os.path.join(self.outdir, "portcullis.all.bed")
+#         self.temps = ["all"]
+#
+#     @property
+#     def loader(self):
+#         return ["portcullis"]
+#
+#     @property
+#     def rulename(self):
+#         return "portcullis_extract_failed"
+#
+#     @property
+#     def cmd(self):
+#
+#         load = self.load
+#         input, output = self.input, self.output
+#         tab_inputs = " ".join(self.input["juncs"])
+#         prefix = "--prefix=portcullis_failed"
+#
+#         cmd = "{load} junctools set union --output {output[all]} {tab_inputs} && "
+#         cmd += " junctools set subtract {prefix} --output={output[tab]} {output[all]} {input[merged]} && "
+#         cmd += " junctools convert -if portcullis -of ebed -o {output[bed]} {output[tab]} && "
+#         cmd += "junctools convert -if portcullis -of igff -o {output[gff3]}  {output[tab]}"
+#         cmd = cmd.format(**locals())
+#         return cmd
+#

@@ -1,13 +1,11 @@
-from ..abstract import EIWrapper, AtomicOperation
-from ..preparation import PrepareWrapper, SanitizeProteinBlastDB
+from ..abstract import EIWrapper, AtomicOperation, Linker
+from ..preparation import PrepareWrapper
 import os
-import glob
 
 
 class ModelerWorkflow(EIWrapper):
 
-    def __init__(self, sanitiser: PrepareWrapper,
-                 sanitised_proteins: SanitizeProteinBlastDB):
+    def __init__(self, sanitiser: PrepareWrapper):
 
         super().__init__()
         self.configuration = sanitiser.configuration
@@ -16,13 +14,27 @@ class ModelerWorkflow(EIWrapper):
             modeler = RepeatModeler(builder)
             # polisher = PolishRepeats(modeler)
             self.add_edges_from([(sanitiser, builder), (builder, modeler)])
-            # TODO: how are we going to polish this?
-            # self.add_edges_from([(modeler, polisher)])
+            if self.polishing_models is not None:
+                polisher = PolishRepeats(modeler)
+            else:
+                polisher = Linker(modeler.output["families"],
+                                  os.path.join(self.outdir, PolishRepeats.outfile),
+                                  "families", "families", "link_unpolished_repeats")
+            self.add_edges_from([(modeler, polisher)])
             assert self.exit
 
     @property
     def model_repeats(self):
         return self.configuration.get("repeats", dict()).get("model", True)
+
+    @property
+    def polishing_models(self):
+        return self.configuration.get("repeats", dict()).get("polishing_models", None)
+
+    @property
+    def outdir(self):
+
+        return os.path.join(self.configuration["outdir"], "repeats", "output")
 
 
 class BuildModelerDB(AtomicOperation):
@@ -74,11 +86,13 @@ class BuildModelerDB(AtomicOperation):
 
 class RepeatModeler(AtomicOperation):
 
+    outfile = "consensi.fa.classified"
+
     def __init__(self, builder: BuildModelerDB):
         super().__init__()
         self.configuration = builder.configuration
         self.input = builder.output
-        self.output["families"] = os.path.join(self.outdir, "consensi.fa.classified")
+        self.output["families"] = os.path.join(self.outdir, self.outfile)
         self.log = os.path.join(os.path.dirname(self.outdir), "logs", "modeler.log")
 
     @property
@@ -113,19 +127,30 @@ class RepeatModeler(AtomicOperation):
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && cd {outdir} && "
         cmd += "(RepeatModeler -engine ncbi -pa {threads} -database {dbname} 2> {log} > {log} && "
-        cmd += " ln -s RM*/{outfile} . ) || touch {outfile})"
+        cmd += " cp RM*/{outfile} . && rm -rf RM*) || touch {outfile})"
         cmd = cmd.format(**locals())
         return cmd
 
 
 class PolishRepeats(AtomicOperation):
 
+    masked_file = RepeatModeler.outfile + ".masked"
+    outfile = "modelled_repeats.fa"
+
     def __init__(self, modeler: RepeatModeler):
 
         super().__init__()
         self.configuration = modeler.configuration
         self.input = modeler.output
-        self.input["proteins"] = self.proteins
+        self.output["families"] = os.path.join(modeler.outdir, self.masked_file)
+        self.masked_dir = os.path.dirname(modeler.output["families"])
+        self.output["link"] = os.path.join(self.outdir, self.outfile)
+        self.input["polishing_models"] = self.polishing_models
+        self.log = os.path.join(self.masked_dir, "polish.log")
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "output")
 
     @property
     def loader(self):
@@ -138,10 +163,27 @@ class PolishRepeats(AtomicOperation):
     @property
     def cmd(self):
 
+        load = self.load
+        proteins = os.path.abspath(self.polishing_models)
         cmd = "{load}"
+        maskdir = self.masked_dir
+        outdir = os.path.relpath(self.outdir, start=self.masked_dir)
+        rm_library = os.path.abspath(self.input["polishing_models"])
+        link_src = os.path.relpath(self.output["families"], start=self.masked_dir)
+        threads = self.threads
+        families = self.input["families"]
+        link_dest = self.outfile
 
-        cmd = "RepeatMasker -lib {proteins} "
+        cmd = "{load} mkdir -p {maskdir} && cd {maskdir} && "
+        cmd += "RepeatMasker  -s –no_is –nolow -x -dir . -lib {rm_library} "
+        cmd += "-pa {threads} {families} 2> {log} > {log} && "
+        cmd += "rm -rf RM_* && mkdir -p {outdir}  && cd {outdir} && "
+        cmd += " ln -s {link_src} {link_dest} && touch -h {link_dest}"
+
+        cmd = cmd.format(**locals())
 
         return cmd
 
-
+    @property
+    def polishing_models(self):
+        return self.configuration.get("repeats", dict()).get("polishing_models", None)

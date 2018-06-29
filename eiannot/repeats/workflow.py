@@ -46,7 +46,8 @@ class RepeatMasking(EIWrapper):
 
     @property
     def execute(self):
-        return self.model or self.retrieve_known
+
+        return (self.model or self.retrieve_known) and self.configuration.get("repeats", dict()).get("execute", False)
 
 
 class RetrieveLibraries(AtomicOperation):
@@ -172,7 +173,7 @@ class Masker(AtomicOperation):
         genome = os.path.relpath(os.path.abspath(self.genome), start=maskdir)
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {maskdir} && cd {maskdir} && "
-        cmd += "RepeatMasker -xsmall -dir . -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
+        cmd += "RepeatMasker -nolow -xsmall -dir . -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
         cmd += "rm -rf RM_* && cd {outdir} && ln -s {link_src} {link_dest} && touch -h {link_dest}"
 
         cmd = cmd.format(**locals())

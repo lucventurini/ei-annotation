@@ -1,10 +1,10 @@
 reference:
   min_intron: 20
   max_intron: 10000
-proteins:
-  chunks: 10
-  files:
-    uniprot: uniprot_sprot_plants.fasta
+# proteins:
+#  chunks: 10
+#  files:
+#    uniprot: uniprot_sprot_plants.fasta
 programs:
   mikado:
     load: ''
@@ -13,20 +13,20 @@ programs:
     runs: ['']
   hisat2:
     load: ''
-    runs: ['']
+    runs: []  # ['']
   gsnap:
     load: ''
     runs: []
   star:
     load: ''
-    runs: ['']
+    runs: []  # ['']
   samtools:
     load: ''
   portcullis:
     execute: true
     load: ''
   gmap_long:
-    runs: ['']
+    runs: [] # ['']
     load: ''
   star_long:
     runs: []
@@ -48,7 +48,7 @@ programs:
     load: ''
 outdir: "Eiannot"
 homology:
-  prot_db: ["uniprot_sprot_plants.fasta"]
+  prot_db: ["subset.sprot.fasta"]
   execute: true
   program: 'diamond'
   chunks: 2
@@ -62,7 +62,8 @@ mikado:
     mode: 'permissive'
     scoring_file: "athaliana_scoring.yaml"
 repeats:
-  execute: true
+  execute: false
   model: false
   species: "arabidopsis thaliana"
+  # safe_proteins: []
 threads: 20

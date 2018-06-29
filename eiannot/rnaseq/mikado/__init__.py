@@ -9,21 +9,43 @@ from .prepare import MikadoPrepare, MikadoConfig
 from .orfs import Prodigal, TransdecoderLongOrf, TransdecoderPred, OrfCaller
 from .homology import MikadoHomologyWrapper
 from ...preparation import FaidxGenome
+import abc
 
 
 __modes__ = ("permissive", "stringent", "nosplit", "split", "lenient")
 
 
-class MikadoSerialise(AtomicOperation):
+class MikadoOp(AtomicOperation, metaclass=abc.ABCMeta):
+
+    def __init__(self, is_long=False):
+
+        super().__init__()
+        self.__is_long = is_long
+
+    @property
+    def is_long(self):
+        assert isinstance(self.__is_long, bool)
+        return self.__is_long
+
+    @property
+    def mikado_dir(self):
+        if self.is_long is False:
+            return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado")
+        else:
+            return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado-long-reads")
+
+
+class MikadoSerialise(MikadoOp):
 
     def __init__(self,
                  prepare: MikadoPrepare,
                  homology: MikadoHomologyWrapper,
                  orfs: OrfCaller,
                  faidx: FaidxGenome,
-                 portcullis: PortcullisWrapper):
+                 portcullis: PortcullisWrapper,
+                 is_long=False):
 
-        super().__init__()
+        super().__init__(is_long=is_long)
         self.input = prepare.output
         self.input.update(orfs.output)
         self.input.update(homology.output)

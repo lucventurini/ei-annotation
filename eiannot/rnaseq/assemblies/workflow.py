@@ -32,10 +32,7 @@ class AssemblyWrapper(EIWrapper):
                 self.__add_to_gfs(instance)
 
         # print(self.gfs)
-        final_flag = AsmFlag(self.gfs, outdir=self.outdir)
-        self.add_node(final_flag)
-        self.add_edges_from([(gf, final_flag) for gf in self.gfs])
-        # print(self.exit.input, self.output["flag"])
+        self.add_final_flag(os.path.join(self.outdir, "all.done"), rulename="asm_all")
 
     @property
     def gfs(self):

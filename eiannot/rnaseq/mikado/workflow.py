@@ -14,54 +14,61 @@ class Mikado(EIWrapper):
     def __init__(self,
                  assemblies: AssemblyWrapper,
                  long_alignments: LongAlignmentsWrapper,
-                 portcullis: PortcullisWrapper):
+                 portcullis: PortcullisWrapper,
+                 only_long=False):
 
         super().__init__()
         self.__indexer, self.__picker, self.__stats = None, None, None
-        self.configuration = assemblies.configuration
         self.assemblies = assemblies
         self.long_alignments = long_alignments
         self.portcullis = portcullis
 
-        self.configurer = MikadoConfig(portcullis_wrapper=self.portcullis,
-                                       assemblies=self.assemblies,
-                                       long_aln_wrapper=long_alignments)
-        self.add_edges_from([step, self.configurer] for step in
-                            [self.assemblies, self.long_alignments, self.portcullis])
+        self.configuration = assemblies.configuration
 
-        self.preparer = MikadoPrepare(self.configurer)
-        self.add_edge(self.configurer, self.preparer)
-        if self.orf_caller == "Prodigal":
-            self.orfs = Prodigal(self.preparer)
-            self.add_edge(self.preparer, self.orfs)
-        elif self.orf_caller == "Transdecoder":
-            longorf = TransdecoderLongOrf(self.preparer)
-            self.add_edge(self.preparer, longorf)
-            self.orfs = TransdecoderPred(self.preparer, longorf)
-            self.add_edge(longorf, self.orfs)
-        else:
-            self.orfs = None
-        self.homologies = MikadoHomologyWrapper(self.preparer)
-        if self.homologies.execute is False:
-            self.homologies = None
-        else:
-            self.add_edge(self.preparer, self.homologies)
+        if self.assemblies.gfs or self.long_alignments.gfs:
 
-        self.faidx_genome = FaidxGenome(None, self.configuration)
-        self.serialiser = MikadoSerialise(prepare=self.preparer,
-                                          homology=self.homologies,
-                                          orfs=self.orfs,
-                                          faidx=self.faidx_genome,
-                                          portcullis=self.portcullis)
-        self.add_edges_from([_, self.serialiser] for _ in [self.faidx_genome, self.preparer,
-                                                           self.homologies, self.orfs] if _ is not None)
+            self.configurer = MikadoConfig(portcullis_wrapper=self.portcullis,
+                                           assemblies=self.assemblies,
+                                           long_aln_wrapper=long_alignments)
+            self.add_edges_from([step, self.configurer] for step in
+                                [self.assemblies, self.long_alignments, self.portcullis])
 
-        self.picker = MikadoPick(self.serialiser)
-        self.add_edge(self.serialiser, self.picker)
-        self.indexer = IndexMikado(self.picker)
-        self.add_edge(self.picker, self.indexer)
-        stats = MikadoStats(self.indexer)
-        self.add_edge(self.indexer, stats)
+            self.preparer = MikadoPrepare(self.configurer)
+            self.add_edge(self.configurer, self.preparer)
+            if self.orf_caller == "Prodigal":
+                self.orfs = Prodigal(self.preparer)
+                self.add_edge(self.preparer, self.orfs)
+            elif self.orf_caller == "Transdecoder":
+                longorf = TransdecoderLongOrf(self.preparer)
+                self.add_edge(self.preparer, longorf)
+                self.orfs = TransdecoderPred(self.preparer, longorf)
+                self.add_edge(longorf, self.orfs)
+            else:
+                self.orfs = None
+            self.homologies = MikadoHomologyWrapper(self.preparer)
+            if self.homologies.execute is False:
+                self.homologies = None
+            else:
+                self.add_edge(self.preparer, self.homologies)
+
+            self.faidx_genome = FaidxGenome(None, self.configuration)
+            self.serialiser = MikadoSerialise(prepare=self.preparer,
+                                              homology=self.homologies,
+                                              orfs=self.orfs,
+                                              faidx=self.faidx_genome,
+                                              portcullis=self.portcullis)
+            self.add_edges_from([_, self.serialiser] for _ in [self.faidx_genome, self.preparer,
+                                                               self.homologies, self.orfs] if _ is not None)
+
+            self.picker = MikadoPick(self.serialiser)
+            self.add_edge(self.serialiser, self.picker)
+            self.indexer = IndexMikado(self.picker)
+            self.add_edge(self.picker, self.indexer)
+            stats = MikadoStats(self.indexer)
+            self.add_edge(self.indexer, stats)
+
+        self.add_final_flag(os.path.join(self.outdir, "mikado.done"), "mikado_done")
+
         try:
             _ = self.exit.rulename
         except ValueError:

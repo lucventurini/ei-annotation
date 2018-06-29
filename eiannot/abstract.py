@@ -37,6 +37,11 @@ class Sample(metaclass=abc.ABCMeta):
         # We will check the exact type of the
         return self.__strandedness
 
+    @property
+    @abc.abstractmethod
+    def type(self):
+        pass
+
 
 class LongSample(Sample):
 
@@ -74,6 +79,10 @@ class LongSample(Sample):
     @property
     def strandedness(self):
         return self.__strandedness
+
+    @property
+    def type(self):
+        return "long"
 
 
 class ShortSample(Sample):
@@ -132,6 +141,10 @@ class ShortSample(Sample):
         elif self.suffix == ".bz2":
             return "bzcat"
 
+    @property
+    def type(self):
+        return "short"
+
 
 class AtomicOperation(metaclass=abc.ABCMeta):
 
@@ -170,7 +183,9 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
         # TODO: this must be changed!
 
-        return hash(self) == hash(other)
+        return (hash(self) == hash(other) and
+                self.input == other.input and self.output == other.output and
+                str(self) == str(other))
 
     @property
     @abc.abstractmethod
@@ -330,7 +345,9 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         string = ["rule {}:".format(rulename)]
         # Inputs now are always dictionaries
         if not self.input:
-            raise ValueError("Snakemake rules must have defined inputs and outputs.")
+            raise ValueError("Snakemake rules must have defined inputs and outputs. Offending rule: {}".format(
+                self.rulename
+            ))
 
         string.append("  input:")
         for key, value in self.input.items():
@@ -678,7 +695,7 @@ class EIWorfkflow:
             raise ValueError("Unexpected: no end nodes in a non-empty graph!")
         return nodes
 
-    def add_final_flag(self, flag):
+    def add_final_flag(self, flag, rulename=None):
         """This method will find all the end nodes of the pipeline and connect them to the final flag."""
         finals = {"inputs": []}
 
@@ -692,8 +709,10 @@ class EIWorfkflow:
 
         # Remove redundancies
         finals["inputs"] = list(set(finals["inputs"]))
-        flag = FinalFlag(finals, flag)
+        flag = FinalFlag(finals, flag, rulename=rulename)
+        self.add_node(flag)
         self.add_edges_from([(node, flag) for node in nodes])
+        # assert flag in self.nodes
 
     @property
     def threads(self):
@@ -702,16 +721,20 @@ class EIWorfkflow:
 
 class FinalFlag(AtomicOperation):
 
-    def __init__(self, inputs, flag):
+    def __init__(self, inputs, flag, rulename=None):
 
         super().__init__()
-        self.input = inputs
+        if not inputs:
+            self.input["mock"] = "."
+        else:
+            self.input = inputs
         self.output["flag"] = flag
         self.touch = True
+        self.__rulename = rulename
 
     @property
     def rulename(self):
-        return "all"
+        return self.__rulename or "all"
 
     @property
     def loader(self):

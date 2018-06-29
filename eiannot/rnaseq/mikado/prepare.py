@@ -14,7 +14,12 @@ class MikadoConfig(AtomicOperation):
                  assemblies: AssemblyWrapper,
                  long_aln_wrapper: LongAlignmentsWrapper):
         super().__init__()
-        self.configuration = portcullis_wrapper.configuration
+        if portcullis_wrapper:
+            self.configuration = portcullis_wrapper.configuration
+        elif long_aln_wrapper:
+            self.configuration = long_aln_wrapper.configuration
+        elif assemblies:
+            self.configuration = assemblies.configuration
         self.portcullis = portcullis_wrapper
         self.assemblies = assemblies
         self.long_aln_wrapper = long_aln_wrapper
@@ -73,12 +78,18 @@ class MikadoConfig(AtomicOperation):
 
         if not os.path.exists(self.input["asm_list"]):
             with open(self.input["asm_list"], mode="wt") as file_list:
+
+
+
+
                 for gf in itertools.chain(self.assemblies.gfs, self.long_aln_wrapper.gfs):
                     # Write out the location of the file, and all other details
                     try:
                         line = [gf.input["gf"], gf.label, gf.sample.stranded]
                     except KeyError:
                         raise KeyError((gf.rulename, gf.output))
+                    lines.append(line)
+
                     print(*line, file=file_list, sep="\t")
 
     @property
