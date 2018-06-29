@@ -2,6 +2,7 @@
 from setuptools import setup
 from distutils.extension import Extension
 import os
+from glob import glob
 
 USE_CYTHON = True
 
@@ -17,5 +18,6 @@ setup(
     name='eiannot',
     version="0.0.1",
     ext_modules=extensions,
+    scripts=glob(os.path.join("eiannot", "util", "*py")) + glob(os.path.join("eiannot", "util", "*pl")),
     entry_points={"console_scripts": ["eiannot = eiannot.cli:main"]}
 )

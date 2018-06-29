@@ -45,6 +45,7 @@ Contact: Gemy.Kaithakottil\@tgac.ac.uk
 ";
 my $exfile;
 my $fasta="";
+my $fasta_count = 0;
 my $minIdentity = 0;
 my $minCoverage = 0;
 my $help;
@@ -55,7 +56,7 @@ my $help;
 
 GetOptions(
            'in=s'=>\$exfile,
-           'fasta:s'=>\$fasta_count,
+           'fasta:s'=>\$fasta,
            'minIdentity:i'=>\$minIdentity,
            'minCoverage:i'=>\$minCoverage,
            "h|help" => \$help
@@ -279,7 +280,7 @@ if (not -e "$fasta.fai") {
     `samtools faidx $fasta`
 }
 
-my $fasta_count = `cat $fasta.fai | wc -l`;
+$fasta_count = `cat $fasta.fai | wc -l`;
 
 # Print the number of transcripts and alignments
 my $input_transcripts = scalar (keys %full_trans);
