@@ -1,8 +1,13 @@
-from . import EIWrapper, AssemblyWrapper, LongAlignmentsWrapper, PortcullisWrapper
-from . import MikadoConfig, MikadoPrepare, MikadoHomologyWrapper, MikadoPick
+from ...abstract import EIWrapper
+from ..assemblies.workflow import AssemblyWrapper
+from ..alignments.workflow import LongAlignmentsWrapper
+from ..alignments.portcullis import PortcullisWrapper
+from .prepare import MikadoConfig, MikadoPrepare
+from .serialise import MikadoSerialise
+from .homology import MikadoHomologyWrapper
+from .pick import MikadoPick, IndexMikado, MikadoStats
 from .orfs import Prodigal, TransdecoderLongOrf, TransdecoderPred
-from . import FaidxGenome, MikadoSerialise
-from . import IndexMikado, MikadoStats
+from ...preparation import FaidxGenome
 import os
 import networkx as nx
 
@@ -24,12 +29,17 @@ class Mikado(EIWrapper):
         self.portcullis = portcullis
 
         self.configuration = assemblies.configuration
+        if only_long is True:
+            execute = (self.long_alignments.gfs)
+        else:
+            execute = (self.assemblies.gfs or self.long_alignments.gfs)
 
-        if self.assemblies.gfs or self.long_alignments.gfs:
+        if execute:
 
             self.configurer = MikadoConfig(portcullis_wrapper=self.portcullis,
                                            assemblies=self.assemblies,
-                                           long_aln_wrapper=long_alignments)
+                                           long_aln_wrapper=long_alignments,
+                                           is_long=only_long)
             self.add_edges_from([step, self.configurer] for step in
                                 [self.assemblies, self.long_alignments, self.portcullis])
 
@@ -67,7 +77,11 @@ class Mikado(EIWrapper):
             stats = MikadoStats(self.indexer)
             self.add_edge(self.indexer, stats)
 
-        self.add_final_flag(os.path.join(self.outdir, "mikado.done"), "mikado_done")
+        if only_long:
+            rulename = "mikado_done_long"
+        else:
+            rulename = "mikado_done"
+        self.add_final_flag(os.path.join(self.outdir, "mikado.done"), rulename)
 
         try:
             _ = self.exit.rulename
@@ -77,7 +91,7 @@ class Mikado(EIWrapper):
 
     @property
     def outdir(self):
-        return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado")
+        return self.configurer.mikado_dir
 
     @property
     def gfs(self):

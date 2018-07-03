@@ -1,9 +1,12 @@
 reference:
   min_intron: 20
   max_intron: 10000
-# proteins:
-#  chunks: 10
-#  files:
+proteins:
+  chunks: 2
+  files: ['subset.sprot.fasta']
+  min_intron: 20
+  max_intron_ends: 500
+  max_intron_middle: 1000
 #    uniprot: uniprot_sprot_plants.fasta
 programs:
   mikado:
@@ -13,7 +16,7 @@ programs:
     runs: ['']
   hisat2:
     load: ''
-    runs: []  # ['']
+    runs: ['']
   gsnap:
     load: ''
     runs: []
@@ -26,7 +29,7 @@ programs:
     execute: true
     load: ''
   gmap_long:
-    runs: [] # ['']
+    runs: ['']
     load: ''
   star_long:
     runs: []
@@ -35,7 +38,7 @@ programs:
     runs: ['']
     load: ''
   strawberry:
-    runs: ['']
+    runs: []  # ['']
     load: ''
 #  scallop:
 #    runs: ['']

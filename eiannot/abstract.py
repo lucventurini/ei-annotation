@@ -492,10 +492,13 @@ class Linker(AtomicOperation):
 
     @property
     def cmd(self):
-        outdir = os.path.dirname(self.output[self.key_out])
-        input, output = self.input[self.key_in], self.output[self.key_out]
-        link_src = os.path.relpath(input, start=outdir)
-        link_name = os.path.basename(output)
+        try:
+            outdir = os.path.dirname(self.output[self.key_out])
+            input, output = self.input[self.key_in], self.output[self.key_out]
+            link_src = os.path.relpath(input, start=outdir)
+            link_name = os.path.basename(output)
+        except (TypeError, ValueError, KeyError) as exc:
+            raise type(exc)("Error in rule: {}".format(self.rulename))
 
         return "mkdir -p {outdir} && cd {outdir} && ln -s {link_src} {link_name}".format(**locals())
 
@@ -589,6 +592,10 @@ class EIWorfkflow:
         from collections import Counter
         count_inps = Counter(inputs)
         count_outs = Counter(outputs)
+        if not count_outs:
+            raise ValueError("Rule {} has no outputs: {}".format(
+                operation.rulename, operation.output
+            ))
         try:
             most_common_input = count_inps.most_common()[0]
         except IndexError:

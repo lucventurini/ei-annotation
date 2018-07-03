@@ -1,19 +1,18 @@
-from ...abstract import AtomicOperation, ShortSample, LongSample
 from ..alignments.portcullis import PortcullisWrapper
 from ..assemblies.workflow import AssemblyWrapper
-from ..assemblies.abstract import ShortAssembler
+from . import MikadoOp
 from ..alignments.workflow import LongAlignmentsWrapper  # , LongAligner
 import os
-import itertools
 
 
-class MikadoConfig(AtomicOperation):
+class MikadoConfig(MikadoOp):
 
     def __init__(self,
                  portcullis_wrapper: PortcullisWrapper,
                  assemblies: AssemblyWrapper,
-                 long_aln_wrapper: LongAlignmentsWrapper):
-        super().__init__()
+                 long_aln_wrapper: LongAlignmentsWrapper,
+                 is_long: bool):
+        super().__init__(is_long=is_long)
         if portcullis_wrapper:
             self.configuration = portcullis_wrapper.configuration
         elif long_aln_wrapper:
@@ -35,8 +34,7 @@ class MikadoConfig(AtomicOperation):
 
     @property
     def outdir(self):
-
-        return os.path.join(self.configuration["outdir"], "rnaseq", "5-mikado")
+        return self.mikado_dir
 
     @property
     def threads(self):
@@ -78,18 +76,21 @@ class MikadoConfig(AtomicOperation):
 
         if not os.path.exists(self.input["asm_list"]):
             with open(self.input["asm_list"], mode="wt") as file_list:
-
-
-
-
-                for gf in itertools.chain(self.assemblies.gfs, self.long_aln_wrapper.gfs):
-                    # Write out the location of the file, and all other details
+                if not self.is_long:
+                    for gf in self.assemblies:
+                        try:
+                            line = [gf.input["gf"], gf.label, gf.sample.stranded]
+                        except KeyError:
+                            raise KeyError((gf.rulename, gf.output))
+                        print(*line, file=file_list, sep="\t")
+                    score_add = self.long_bias_score
+                else:
+                    score_add = 0
+                for gf in self.long_aln_wrapper.gfs:
                     try:
-                        line = [gf.input["gf"], gf.label, gf.sample.stranded]
+                        line = [gf.input["gf"], gf.label, gf.sample.stranded, score_add]
                     except KeyError:
                         raise KeyError((gf.rulename, gf.output))
-                    lines.append(line)
-
                     print(*line, file=file_list, sep="\t")
 
     @property
@@ -104,7 +105,11 @@ class MikadoConfig(AtomicOperation):
             return ""
 
     @property
-    def rulename(self):
+    def long_bias_score(self):
+        return self.configuration["mikado"]["pick"].get("long_bias_score", 1)
+
+    @property
+    def _rulename(self):
         return 'mikado_config'
 
     @property
@@ -113,11 +118,10 @@ class MikadoConfig(AtomicOperation):
         return ""
 
 
-class MikadoPrepare(AtomicOperation):
+class MikadoPrepare(MikadoOp):
 
     def __init__(self, config: MikadoConfig):
-        super().__init__()
-        self.outdir = config.outdir
+        super().__init__(is_long=config.is_long)
         self.configuration = config.configuration
         assert 'programs' in config.configuration, config.configuration
         assert 'mikado' in config.configuration["programs"], config.configuration["programs"]
@@ -128,7 +132,7 @@ class MikadoPrepare(AtomicOperation):
         self.log = os.path.join(os.path.dirname(self.output["gtf"]), "mikado_prepare.log")
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "mikado_prepare"
 
     @property
@@ -151,3 +155,7 @@ class MikadoPrepare(AtomicOperation):
     @property
     def config(self):
         return self.input["cfg"]
+
+    @property
+    def outdir(self):
+        return self.mikado_dir

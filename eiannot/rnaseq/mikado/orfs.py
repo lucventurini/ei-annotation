@@ -1,17 +1,18 @@
 import os
+from . import MikadoOp
 from ...abstract import AtomicOperation
 import abc
 from Bio.Data import CodonTable
 from .prepare import MikadoPrepare
 
 
-class OrfCaller(AtomicOperation, metaclass=abc.ABCMeta):
+class OrfCaller(MikadoOp, metaclass=abc.ABCMeta):
 
     def __init__(self, prepare: MikadoPrepare):
 
-        super().__init__()
+        super().__init__(is_long=prepare.is_long)
         self.configuration = prepare.configuration
-        self.outdir = os.path.join(prepare.outdir, "orfs")
+        self.outdir = os.path.join(self.mikado_dir, "orfs")
         self.input = prepare.output
 
     @property
@@ -41,7 +42,7 @@ class Prodigal(OrfCaller):
         return 1
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "mikado_prodigal"
 
     @property
@@ -85,7 +86,7 @@ class TransdecoderLongOrf(OrfCaller):
         return 1
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "mikado_transdecoder_longorfs"
 
     @property
@@ -132,7 +133,7 @@ class TransdecoderPred(OrfCaller):
         self.output = {"orfs": os.path.join(self.outdir, "transcripts.fasta.transdecoder.bed")}
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "mikado_transdecoder_pred"
 
     @property

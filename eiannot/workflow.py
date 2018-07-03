@@ -28,10 +28,20 @@ class AnnotationWorklow(EIWorfkflow):
         self.merge([self.short_wrapper, self.portcullis, self.assemblies])
 
         self.long_wrapper = LongAlignmentsWrapper(self.prepare)
-        self.mikado = Mikado(assemblies=self.assemblies, long_alignments=self.long_wrapper, portcullis=self.portcullis)
+        if self.long_wrapper.gfs:
+            self.mikado_long = Mikado(assemblies=self.assemblies,
+                                      long_alignments=self.long_wrapper,
+                                      portcullis=self.portcullis,
+                                      only_long=True)
+            self.merge([self.mikado_long])
+        self.mikado = Mikado(assemblies=self.assemblies,
+                             long_alignments=self.long_wrapper,
+                             portcullis=self.portcullis,
+                             only_long=False)
         self.merge([self.mikado])
+
         self.repeats = RepeatMasking(self.prepare)
-        self.protein_alignments = ExonerateProteinWrapper(self.repeats)
+        self.protein_alignments = ExonerateProteinWrapper(self.repeats, self.portcullis)
         self.merge([self.repeats, self.protein_alignments])
         flag = os.path.join(self.configuration["outdir"], "all.done")
         self.add_final_flag(flag)

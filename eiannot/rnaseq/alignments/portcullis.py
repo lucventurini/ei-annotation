@@ -60,10 +60,8 @@ class PortcullisWrapper(EIWrapper):
                 if refprep is not None:
                     self.add_edge(refprep, filt)
                 filters.append(filt)
-            self.merger = PortcullisMerge(self.configuration, filters, self.outdir)
-            self.add_edges_from([(filt, self.merger) for filt in filters])
-            # self.failed_merger = PortcullisMergeFailed(juncs, self.merger)
-            # self.add_edge(self.merger, self.failed_merger)
+        self.merger = PortcullisMerge(self.configuration, filters, self.outdir)
+        self.add_edges_from([(filt, self.merger) for filt in filters])
         self.add_final_flag(os.path.join(self.outdir, "portcullis.done"), rulename="portcullis_flag")
 
     @property
@@ -362,12 +360,14 @@ class PortcullisMerge(AtomicOperation):
 
         beds = " ".join(self.input["beds"])
         tabs = " ".join(self.input["tabs"])
-        output = self.output
+        output, input = self.output, self.input
+        log = self.log
 
         if len(self.input["beds"]) == 0:
-            cmd = "touch {output[bed]} && touch {output[tab]}".format(**locals())
+            cmd = "touch {output[bed]} && touch {output[tab]} && touch {output[gff3]}".format(**locals())
         elif len(self.input["beds"]) == 1:
-            cmd = "cat {beds} > {output[bed]} && cat {tabs} > {output[tab]}".format(**locals())
+            cmd = "cat {beds} > {output[bed]} && cat {tabs} > {output[tab]}"
+            cmd += " && junctools convert -if portcullis -of igff -o {output[gff3]} {output[tab]}".format(**locals())
         else:
             load = self.load
             prefix = "--prefix=portcullis_merged"

@@ -1,5 +1,5 @@
 from ..abstract import EIWrapper, AtomicOperation, Linker
-from ..preparation import PrepareWrapper, SanitizeProteinBlastDB, FaidxProtein
+from ..preparation import PrepareWrapper, SanitizeProteinBlastDB, FaidxGenome
 from .modeler import ModelerWorkflow
 import os
 # from .modeler import
@@ -29,10 +29,18 @@ class RepeatMasking(EIWrapper):
             [self.add_edge(_, library_creator) for _ in (retriever, modeler) if _ is not None]
             masker = Masker(sanitised, library_creator)
             self.add_edge(library_creator, masker)
+            faidx = FaidxMaskedGenome(masker)
+            self.add_edge(masker, faidx)
+
         else:
             linker = Linker(sanitised.exit.genome, sanitised.exit.masked_genome,
-                            "genome", "masked", "link_genome_to_masked")
+                            "genome", "genome", "link_genome_to_masked")
             self.add_node(linker)
+            fai_linker = Linker(sanitised.fai.output["fai"], sanitised.exit.masked_genome + ".fai",
+                                "fai", "fai", "link_genome_fai_to_masked")
+            self.add_node(fai_linker)
+            self.add_edge(linker, fai_linker)
+
         assert self.exit
 
     @property
@@ -48,6 +56,14 @@ class RepeatMasking(EIWrapper):
     def execute(self):
 
         return (self.model or self.retrieve_known) and self.configuration.get("repeats", dict()).get("execute", False)
+
+    @property
+    def masked_genome(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa")
+
+    @property
+    def fai(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa.fai")
 
 
 class RetrieveLibraries(AtomicOperation):
@@ -146,7 +162,7 @@ class Masker(AtomicOperation):
         self.configuration = sanitised.configuration
         self.input["rm_library"] = library_creator.output["libraries"]
         self.input["genome"] = self.genome
-        self.output["link"] = self.masked_genome
+        self.output["genome"] = self.masked_genome
         self.output["masked"] = os.path.join(self.maskdir, "genome.fa.masked")
         self.log = os.path.join(self.maskdir, "repeat_masker.log")
 
@@ -169,11 +185,11 @@ class Masker(AtomicOperation):
         outdir = os.path.abspath(self.outdir)
         maskdir = self.maskdir
         link_src = os.path.relpath(self.output["masked"], start=outdir)
-        link_dest = os.path.basename(self.output["link"])
+        link_dest = os.path.basename(self.output["genome"])
         genome = os.path.relpath(os.path.abspath(self.genome), start=maskdir)
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {maskdir} && cd {maskdir} && "
-        cmd += "RepeatMasker -nolow -xsmall -dir . -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
+        cmd += "RepeatMasker -nolow -xsmall -dir -gff . -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
         cmd += "rm -rf RM_* && cd {outdir} && ln -s {link_src} {link_dest} && touch -h {link_dest}"
 
         cmd = cmd.format(**locals())
@@ -187,3 +203,14 @@ class Masker(AtomicOperation):
     @property
     def maskdir(self):
         return os.path.join(self.configuration["outdir"], "repeats", "masker")
+
+
+class FaidxMaskedGenome(FaidxGenome):
+
+    def __init__(self, masker: Masker):
+
+        super().__init__(sanitiser=masker)
+
+    @property
+    def rulename(self):
+        return "faidx_masked_genome"

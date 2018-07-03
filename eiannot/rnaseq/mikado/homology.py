@@ -3,15 +3,16 @@ import abc
 from ...abstract import AtomicOperation, EIWrapper
 from .prepare import MikadoPrepare
 from ...preparation import DiamondIndex, BlastxIndex, SanitizeProteinBlastDB
+from . import MikadoOp
 
 
-class SplitMikadoPrepareFasta(AtomicOperation):
+class SplitMikadoPrepareFasta(MikadoOp):
 
     def __init__(self, prepare: MikadoPrepare):
-        super().__init__()
+        super().__init__(is_long=prepare.is_long)
         self.configuration = prepare.configuration
         self.input = prepare.output
-        self.outdir = prepare.outdir
+        self.outdir = self.mikado_dir
         self.output["split_flag"] = os.path.join(self.outdir, 'homology', 'split.done')
         self.output["split"] = ["{outprefix}_{chunk}.fasta".format(
             outprefix=self.outprefix, chunk=str(_).zfill(3)) for _ in range(1, self.chunks + 1)]
@@ -29,7 +30,7 @@ class SplitMikadoPrepareFasta(AtomicOperation):
         return ["mikado"]
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "mikado_prepare_split_fa"
 
     @property
@@ -38,7 +39,7 @@ class SplitMikadoPrepareFasta(AtomicOperation):
 
     @property
     def outprefix(self):
-        return os.path.join(os.path.dirname(self.output["split_flag"]), "fastas", "chunk")
+        return os.path.join(self.fasta_dir, "chunk")
 
     @property
     def cmd(self):
@@ -55,33 +56,33 @@ class SplitMikadoPrepareFasta(AtomicOperation):
         cmd = cmd.format(**locals())
         return cmd
 
+    @property
+    def fasta_dir(self):
+        return os.path.join(self.mikado_dir, "homology", "fastas")
 
-class MikadoHomology(AtomicOperation, metaclass=abc.ABCMeta):
+
+class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
 
     def __init__(self,
                  chunk_id,
                  split: SplitMikadoPrepareFasta,
-                 index: AtomicOperation): # We are going to create a Diamond/Blastx index somewhere else
+                 index: AtomicOperation):  # We are going to create a Diamond/Blastx index somewhere else
 
         if "db" not in index.output:
             raise KeyError("Missing input from index rule {rule}".format(rule=index.rulename))
 
-        super().__init__()
+        super().__init__(is_long=split.is_long)
         self.configuration = split.configuration
-        self.outdir = split.outdir
         self.input = split.output
         self.input["db"] = index.output["db"]
         self.__chunk_id = chunk_id
         chunk_id = self.chunk_id
         del self.input["split"]
-        self.input["chunk"] = os.path.join(self.outdir,
-                                           "homology",
-                                           "fastas",
+        self.input["chunk"] = os.path.join(self.fasta_dir,
                                            "chunk_{chunk_id}.fasta".format(**locals()))
         self.output = {"xml": os.path.join(self.outdir,
-                                          "homology",
-                                          "xmls",
-                                          "chunk_{chunk_id}.xml.gz".format(**locals()))}
+                                           "xmls",
+                                           "chunk_{chunk_id}.xml.gz".format(**locals()))}
 
     @property
     def chunk_id(self):
@@ -104,9 +105,17 @@ class MikadoHomology(AtomicOperation, metaclass=abc.ABCMeta):
         return os.path.join(logdir, "{name}_{chunk_id}.log".format(chunk_id=self.chunk_id, name=name))
 
     @property
-    def rulename(self):
+    def _rulename(self):
         name = self.loader[0]
         return "mikado_{name}_chunk_{chunk_id}".format(chunk_id=self.chunk_id, name=name)
+
+    @property
+    def outdir(self):
+        return os.path.join(self.mikado_dir, "homology")
+
+    @property
+    def fasta_dir(self):
+        return os.path.join(self.mikado_dir, "homology", "fastas")
 
 
 class MikadoDiamond(MikadoHomology):
@@ -148,10 +157,6 @@ class MikadoBlastx(MikadoHomology):
         super().__init__(chunk_id, split, blast_index)
 
     @property
-    def rulename(self):
-        return "mikado_blast_chunk_{}".format(self.chunk_id)
-
-    @property
     def loader(self):
         return ["blast"]
 
@@ -173,12 +178,12 @@ class MikadoBlastx(MikadoHomology):
         return cmd
 
 
-class MikadoHomologyFlag(AtomicOperation):
+class MikadoHomologyFlag(MikadoOp):
 
     def __init__(self, homologies: [MikadoHomology]):
 
         assert len(homologies) and all(isinstance(homology, MikadoHomology) for homology in homologies)
-        super().__init__()
+        super().__init__(is_long=homologies[0].is_long)
         self.configuration = homologies[0].configuration
         self.outdir = homologies[0].outdir
         self.touch = True
@@ -190,7 +195,7 @@ class MikadoHomologyFlag(AtomicOperation):
         return []
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "homology_all"
 
 

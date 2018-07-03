@@ -143,6 +143,10 @@ class PrepareWrapper(EIWrapper):
         self.faidx = FaidxGenome(self.sanitizer)
         self.add_edge(self.sanitizer, self.faidx)
 
+    @property
+    def fai(self):
+        return self.faidx
+
 
 class DiamondIndex(AtomicOperation):
 

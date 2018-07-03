@@ -8,7 +8,7 @@ import os
 class ExonerateProteinWrapper(EIWrapper):
 
     def __init__(self,
-                 masker: RepeatMasking):
+                 masker: RepeatMasking, portcullis: PortcullisWrapper):
 
         super().__init__()
         self.configuration = masker.configuration
@@ -26,6 +26,12 @@ class ExonerateProteinWrapper(EIWrapper):
             convert = ConvertExonerate(collapsed, faidx)
             self.add_edge(faidx, convert)
             self.add_edge(collapsed, convert)
+            filterer = FilterExonerate(converter=convert, portcullis=portcullis,
+                                       masker=masker)
+            self.add_edge(masker, filterer)
+            self.add_edge(portcullis, filterer)
+            self.add_edge(convert, filterer)
+            assert self.exit
 
 
 class ChunkProteins(AtomicOperation):
@@ -86,7 +92,7 @@ class Exonerate(AtomicOperation):
         self.__chunk = None
         self.chunk = chunk
         self.input["flag"] = chunks.output["flag"]
-        self.input["genome"] = masked.output["masked"]
+        self.input["genome"] = self.masked_genome
         assert self.input["fasta"] in chunks.output["chunks"]
         self.output["txt"] = os.path.join(self.outdir, "{chunk}.exonerate.txt").format(chunk=self.chunk)
         self.log = os.path.join(self.logdir, "exonerate.{}.log".format(self.chunk))
@@ -219,12 +225,16 @@ class ConvertExonerate(AtomicOperation):
 
 class FilterExonerate(AtomicOperation):
 
-    def __init__(self, converter: ConvertExonerate, portcullis: PortcullisWrapper):
+    def __init__(self, converter: ConvertExonerate, portcullis: PortcullisWrapper, masker: RepeatMasking):
 
         super().__init__()
         self.configuration = converter.configuration
         self.input = converter.output
-        self.input.update()  # TODO: add portcullis here
+        self.input["junctions"] = portcullis.junctions
+        self.input["fai"] = masker.fai
+        self.input["genome"] = self.masked_genome
+        self.log = os.path.join(os.path.dirname(self.outdir), "logs", "filter_exonerate.log")
+        self.output["gff3"] = os.path.join(self.outdir, "exonerate.filtered.gff3")
 
     @property
     def rulename(self):
@@ -232,11 +242,37 @@ class FilterExonerate(AtomicOperation):
 
     @property
     def loader(self):
-        return ["mikado"]  # TODO: this will need to be updated with the proper details
+        return ["mikado", "ei-annotation"]  # TODO: this will need to be updated with the proper details
+
+    @property
+    def min_intron(self):
+        return self.configuration["proteins"]["min_intron"]
+
+    @property
+    def max_intron_middle(self):
+        return self.configuration["proteins"]["max_intron_middle"]
+
+    @property
+    def max_intron_ends(self):
+        return self.configuration["proteins"]["max_intron_ends"]
 
     @property
     def cmd(self):
 
-        return ""
+        load = self.load
+        mini = self.min_intron
+        maxe, maxm = self.max_intron_ends, self.max_intron_middle
+        genome = self.masked_genome
+        outdir = self.outdir
+        logdir = os.path.dirname(self.log)
+        input, output, log = self.input, self.output, self.log
+        cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
+        cmd += " filter_exonerate.py -minI {mini} -maxE {maxe} -maxM {maxm} -j {input[junctions]} -g {genome} "
+        cmd += " {input[gff3]} {output[gff3]} 2> {log} > {log}"
 
+        cmd = cmd.format(**locals())
+        return cmd
 
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "proteins", "output")

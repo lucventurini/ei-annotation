@@ -1,6 +1,6 @@
 from ..abstract import AtomicOperation, EIWrapper
 from ..rnaseq.mikado.workflow import Mikado
-from ..rnaseq.alignments.portcullis import PortcullisWrapper, PortcullisMerge, PortcullisMergeFailed
+from ..rnaseq.alignments.portcullis import PortcullisWrapper
 from ..repeats.workflow import RepeatMasking
 from ..proteins.workflow import ExonerateProteinWrapper
 import os
@@ -227,39 +227,45 @@ class ConvertProteins(AtomicOperation):
 
 class ConvertJunctions(AtomicOperation):
 
-    def __init__(self, junctions: (PortcullisMerge, PortcullisMergeFailed)):
+    def __init__(self, junctions: (PortcullisWrapper)):
 
         super().__init__()
         self.configuration = junctions.configuration
-        self.input["gff3"] = junctions.input["gff3"]
-        self.is_pass = (isinstance(junctions, PortcullisMerge))
-        self.output["gff3"] = os.path.join(self.outdir, "portcullis_junctions_{passed}.gff3".format(
-            passed="pass" if self.is_pass else "failed"
-        ))
+        self.input["gff3"] = junctions.junctions_task.input["gff3"]
+        self.output["gold"] = os.path.join(self.outdir, "portcullis_junctions_gold.gff3")
+        self.output["silver"] = os.path.join(self.outdir, "portcullis_junctions_silver.gff3")
 
     @property
     def rulename(self):
-        return "prepare_hints_junction_{passed}".format(passed="pass" if self.is_pass else "failed")
+        return "prepare_hints_portcullis"
 
     @property
     def loader(self):
-        return []
+        return ["eiannot"]
 
     @property
     def priority(self):
         # TODO: most probably this will have to go into the configuration
-        if self.is_pass:
-            return 6
-        else:
-            return 4
+        return [6, 4]
+
+    @property
+    def threshold(self):
+        # TODO: most probably this will have to go into the configuration
+        return 1
 
     @property
     def cmd(self):
 
         input, output, priority = self.input, self.output, self.priority
         outdir = self.outdir
-
-        cmd = "mkdir -p {outdir} && sed 's/grp/group/; s/;$//; s/$/;pri={priority}/' {input[gff3]} > {output[gff3]}"
+        load = self.load
+        outdir = self.outdir
+        priority = " ".join([str(_) for _ in self.priority])
+        threshold = self.threshold
+        maxintron = self.max_intron  # TODO: maybe this should be yet another value in the conf?
+        prefix = os.path.splitext(self.output["gold"])[0]
+        cmd = "{load} mkdir -p {outdir} && filter_portcullis.py -p {priority} -s gold silver -t {threshold}"
+        cmd += " -mi {maxintron} {input[tab]} {prefix}"
         cmd = cmd.format(**locals())
         return cmd
 

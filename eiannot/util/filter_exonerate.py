@@ -76,7 +76,7 @@ def main():
 
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("-j", "--junctions", default=None, type=Bed12Parser)
-    parser.add_argument("-min", "--min-intron-length", dest="minI",
+    parser.add_argument("-minI", "--min-intron-length", dest="minI",
                         type=int, required=True)
     parser.add_argument("-maxM", "--max-intron-length-middle", dest="maxM",
                         type=int, required=True)
