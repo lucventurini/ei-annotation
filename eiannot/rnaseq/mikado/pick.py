@@ -17,7 +17,7 @@ class MikadoPick(MikadoOp):
         self.output = {"loci": os.path.join(
             self.loci_dir, "mikado-{mode}.loci.gff3").format(**locals()),
                        "link": os.path.join(self.outdir, "mikado.loci.gff3")}
-        self.log = os.path.join(self.outdir, "mikado-{mode}.pick.err").format(
+        self.log = os.path.join(self.loci_dir, "mikado-{mode}.pick.err").format(
             **locals()
         )
         self.message = "Running mikado picking stage in mode: {mode}".format(**locals())
@@ -46,17 +46,19 @@ class MikadoPick(MikadoOp):
         cmd = "{load} "
         mode = self.mode
         threads = self.threads
-        cmd += "mikado pick --source Mikado_{mode} --mode={mode} --procs={threads} "
+        cmd += "mkdir -p {loci_dir} && mikado pick --source Mikado_{mode} --mode={mode} --procs={threads} "
         input, output = self.input, self.output
         cmd += "--start-method=spawn --json-conf={input[cfg]} "
         loci_out = os.path.basename(self.output["loci"])
         outdir = self.outdir
+        loci_dir = self.loci_dir
         log = self.log
         link_dir = os.path.dirname(self.output["link"])
         link_src = os.path.relpath(self.output["loci"],
                                    start=os.path.dirname(self.output["link"]))
-        cmd += "-od {outdir} --loci_out {loci_out}  -lv INFO -db {input[db]} {input[gtf]} > {log} 2>&1 "
-        cmd += " && mkdir -p {link_dir} && cd {link_dir} && ln -s {link_src} {output[link]}"
+        link_dest = os.path.basename(self.output["link"])
+        cmd += "-od {loci_dir} --loci_out {loci_out}  -lv INFO -db {input[db]} {input[gtf]} > {log} 2>&1 "
+        cmd += " && mkdir -p {link_dir} && cd {link_dir} && ln -s {link_src} {link_dest}"
         cmd = cmd.format(**locals())
 
         return cmd
@@ -67,7 +69,7 @@ class MikadoPick(MikadoOp):
 
     @property
     def outdir(self):
-        return self.mikado_dir
+        return os.path.join(self.mikado_dir, "output")
 
 
 class IndexMikado(MikadoOp):
@@ -92,7 +94,7 @@ class IndexMikado(MikadoOp):
         load = self.load
         input, log = self.input, self.log
 
-        cmd = "{load} mikado compare -r {input[loci]} -l {log} --index"
+        cmd = "{load} mikado compare -r {input[link]} -l {log} --index"
 
         cmd = cmd.format(**locals())
         return cmd

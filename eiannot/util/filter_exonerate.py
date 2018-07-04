@@ -7,7 +7,7 @@ from Mikado.parsers.bed12 import Bed12Parser
 from Mikado.transcripts import TranscriptChecker, Transcript
 import pyfaidx
 import operator
-from collections import OrderedDict as odict
+from Mikado.exceptions import IncorrectStrandError
 
 
 __doc__ = """Script to filter exonerate GFFs, by doing the following:
@@ -20,11 +20,12 @@ __doc__ = """Script to filter exonerate GFFs, by doing the following:
 """
 
 
-def _is_intron_valid(intron: (int, int), minI: int, maxI: int, verified_introns, canonical_junctions):
+def _is_intron_valid(intron: (int, int), intron_index, minI: int, maxI: int, verified_introns, canonical_junctions):
 
-    is_verified = (intron in verified_introns or intron in canonical_junctions)
+    is_verified = (intron in verified_introns or intron_index in canonical_junctions)
+    is_correct_length = (minI <= intron[1] - intron[0] + 1 <= maxI)
 
-    return is_verified and minI <= intron[1] - intron[0] + 1 <= maxI
+    return is_verified and is_correct_length
 
 
 def evaluate(transcript: Transcript, args, verified_introns: set):
@@ -35,19 +36,25 @@ def evaluate(transcript: Transcript, args, verified_introns: set):
 
     assert isinstance(args.genome, pyfaidx.Fasta)
 
-    transcript = TranscriptChecker(transcript,
-                                   args.genome[transcript.chrom][transcript.start - 1:transcript.end])
-    transcript.finalize()
+    check_transcript = TranscriptChecker(transcript,
+                                         args.genome[transcript.chrom][transcript.start -1 :transcript.end])
+    check_transcript.finalize()
+    try:
+        check_transcript.check_strand()
+    except IncorrectStrandError:
+        # No correct strand found.
+        pass
 
-    t_introns = sorted(transcript.introns, key=operator.itemgetter(0))
+    t_introns = sorted(check_transcript.introns, key=operator.itemgetter(0))
     minI, maxE, maxM = args.minI, args.maxE, args.maxM
 
-    if len(t_introns) == 2:
-        if not _is_intron_valid(t_introns[0], minI, maxM, verified_introns, transcript.canonical_junctions):
+    num = len(check_transcript.canonical_junctions)
+    if len(t_introns) == 1:
+        if not _is_intron_valid(t_introns[0], 0, minI, maxM, verified_introns, check_transcript.canonical_junctions):
             exon_lengths = dict((_[1] - _[0] + 1, _) for _ in transcript.exons)
-            if max(exon_lengths) / transcript.cdna_length >= 0.8:
-                # TODO: flexible fraction maybe?
+            if max(exon_lengths) / transcript.cdna_length >= 0.8:  # TODO: maybe this has to be configurable?
                 exon = exon_lengths[min(exon_lengths)]
+                # Create new transcript object
                 transcript.unfinalize()
                 transcript.remove_exon(exon)
                 transcript.finalize()
@@ -59,15 +66,22 @@ def evaluate(transcript: Transcript, args, verified_introns: set):
     else:
         # Check internal introns. If any of them is wrong, return None
         if (len(t_introns) > 2 and
-                any(not _is_intron_valid(intron, minI, maxM, verified_introns, transcript.canonical_junctions)
-                for intron in t_introns[1:-1])):
+                any(not _is_intron_valid(intron, pos, minI, maxM, verified_introns, check_transcript.canonical_junctions)
+                for pos, intron in enumerate(t_introns[1:-1], 1))):
             return None
-        if not _is_intron_valid(t_introns[0], minI, maxE, verified_introns, transcript.canonical_junctions):
+        is_start_correct = _is_intron_valid(t_introns[0], 0, minI, maxE, verified_introns,
+                                            check_transcript.canonical_junctions)
+        is_end_correct = _is_intron_valid(t_introns[-1], len(t_introns) -1, minI, maxE, verified_introns,
+                                          check_transcript.canonical_junctions)
+
+        if not (is_start_correct and is_end_correct):
             transcript.unfinalize()
-            transcript.remove_exon(transcript.exons[0])
-        if not _is_intron_valid(t_introns[-1], minI, maxE, verified_introns, transcript.canonical_junctions):
+            if not is_start_correct:
+                transcript.remove_exon(transcript.exons[0])
+            if not is_end_correct:
+                transcript.remove_exon(transcript.exons[-1])
             transcript.unfinalize()
-            transcript.remove_exon(transcript.exons[-1])
+
         transcript.finalize()
         return transcript
 
