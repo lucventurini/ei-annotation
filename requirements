@@ -2,3 +2,4 @@ snakemake
 networkx
 eicore
 mikado>=1.2.1
+pandas

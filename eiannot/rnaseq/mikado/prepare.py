@@ -77,7 +77,7 @@ class MikadoConfig(MikadoOp):
         if not os.path.exists(self.input["asm_list"]):
             with open(self.input["asm_list"], mode="wt") as file_list:
                 if not self.is_long:
-                    for gf in self.assemblies:
+                    for gf in self.assemblies.gfs:
                         try:
                             line = [gf.input["gf"], gf.label, gf.sample.stranded]
                         except KeyError:

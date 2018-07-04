@@ -1,13 +1,6 @@
 reference:
   min_intron: 20
   max_intron: 10000
-proteins:
-  chunks: 2
-  files: ['subset.sprot.fasta']
-  min_intron: 20
-  max_intron_ends: 500
-  max_intron_middle: 1000
-#    uniprot: uniprot_sprot_plants.fasta
 programs:
   mikado:
     load: ''
@@ -60,6 +53,9 @@ homology:
   protein_chunks: 3
   identity: 40
   coverage: 70
+  min_intron: 20
+  max_intron_ends: 500
+  max_intron_middle: 1000
 mikado:
   pick:
     mode: 'permissive'

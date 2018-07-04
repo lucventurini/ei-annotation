@@ -217,9 +217,48 @@ class ConvertMikado(AtomicOperation):
 
     pass
 
+
 class ConvertRepeats(AtomicOperation):
 
-    pass
+    def __init__(self, repeats: RepeatMasking):
+
+        super().__init__()
+        if repeats.execute:
+
+            self.input["table"] = repeats.output["table"]
+            self.output["gff3"] = os.path.join(self.outdir, "repeat_hints.gff3")
+            self.log = os.path.join(os.path.dirname(self.outdir), "logs", "extract_repeats.log")
+
+    @property
+    def outdir(self):
+
+        return os.path.join(self.configuration["outdir"], outdir, "output")
+
+    @property
+    def loader(self):
+        return ["repeatmasker", "ei-annotation"]
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def cmd(self):
+        load = self.load
+        cmd = "{load} mkdir -p {logdir} && "
+        logdir, log = self.logdir, self.log
+        input, output = self.input, self.output
+        log = self.log
+        cmd += "prepare_repeat_hints.py {input.table} {output.gff3} > {log} 2> {log}"
+
+        cmd = cmd.format(**locals())
+
+        return
+
+    @property
+    def rulename(self):
+        return "convert_repeat_hints"
+
 
 class ConvertProteins(AtomicOperation):
     pass

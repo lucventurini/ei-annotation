@@ -511,6 +511,26 @@ class Linker(AtomicOperation):
         return []
 
 
+class Toucher(AtomicOperation):
+
+    def __init__(self, output_file, output_name, rulename, input_rule=None):
+
+        super().__init__()
+        self.__rulename = rulename
+        self.output[output_name] = output_file
+        if input_rule:
+            self.input.update(input_rule.output)
+        self.touch = True
+
+    @property
+    def rulename(self):
+        return self.__rulename
+
+    @property
+    def loader(self):
+        return []
+
+
 class EIWorfkflow:
 
     """The workflow is, at its core, a nx.DiGraph.

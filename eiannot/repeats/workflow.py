@@ -1,4 +1,4 @@
-from ..abstract import EIWrapper, AtomicOperation, Linker
+from ..abstract import EIWrapper, AtomicOperation, Linker, Toucher
 from ..preparation import PrepareWrapper, SanitizeProteinBlastDB, FaidxGenome
 from .modeler import ModelerWorkflow
 import os
@@ -42,6 +42,11 @@ class RepeatMasking(EIWrapper):
             self.add_edge(linker, fai_linker)
 
         assert self.exit
+
+    @property
+    def output(self):
+        return
+
 
     @property
     def model(self):
@@ -164,6 +169,8 @@ class Masker(AtomicOperation):
         self.input["genome"] = self.genome
         self.output["genome"] = self.masked_genome
         self.output["masked"] = os.path.join(self.maskdir, "genome.fa.masked")
+        self.output["mask_table"] = os.path.join(self.maskdir, "genome.fa.out")
+        self.output["table"] = os.path.join(self.outdir, "repeats.table")
         self.log = os.path.join(self.maskdir, "repeat_masker.log")
 
     @property
@@ -187,10 +194,13 @@ class Masker(AtomicOperation):
         link_src = os.path.relpath(self.output["masked"], start=outdir)
         link_dest = os.path.basename(self.output["genome"])
         genome = os.path.relpath(os.path.abspath(self.genome), start=maskdir)
+        gff_link_src = os.path.relpath(self.output["mask_table"], start=outdir)
+        gff_link_dest = os.path.basename(self.output["table"])
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {maskdir} && cd {maskdir} && "
         cmd += "RepeatMasker -nolow -xsmall -dir -gff . -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
-        cmd += "rm -rf RM_* && cd {outdir} && ln -s {link_src} {link_dest} && touch -h {link_dest}"
+        cmd += "rm -rf RM_* && cd {outdir} && ln -s {link_src} {link_dest} && touch -h {link_dest} && "
+        cmd += " ln -s {gff_link_src} {gff_link_dest} && touch -h {gff_link_dest}"
 
         cmd = cmd.format(**locals())
 

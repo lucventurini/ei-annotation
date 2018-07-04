@@ -246,15 +246,23 @@ class FilterExonerate(AtomicOperation):
 
     @property
     def min_intron(self):
-        return self.configuration["proteins"]["min_intron"]
+        return self.configuration["homology"]["min_intron"]
 
     @property
     def max_intron_middle(self):
-        return self.configuration["proteins"]["max_intron_middle"]
+        return self.configuration["homology"]["max_intron_middle"]
 
     @property
     def max_intron_ends(self):
-        return self.configuration["proteins"]["max_intron_ends"]
+        return self.configuration["homology"]["max_intron_ends"]
+
+    @property
+    def identity(self):
+        return self.configuration["homology"]["identity"]
+
+    @property
+    def coverage(self):
+        return self.configuration["homology"]["coverage"]
 
     @property
     def cmd(self):
@@ -265,10 +273,11 @@ class FilterExonerate(AtomicOperation):
         genome = self.masked_genome
         outdir = self.outdir
         logdir = os.path.dirname(self.log)
+        min_coverage, min_identity = self.coverage, self.identity
         input, output, log = self.input, self.output, self.log
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
         cmd += " filter_exonerate.py -minI {mini} -maxE {maxe} -maxM {maxm} -j {input[junctions]} -g {genome} "
-        cmd += " {input[gff3]} {output[gff3]} 2> {log} > {log}"
+        cmd += " -minid {min_identity} -mincov {min_coverage} {input[gff3]} {output[gff3]} 2> {log} > {log}"
 
         cmd = cmd.format(**locals())
         return cmd
