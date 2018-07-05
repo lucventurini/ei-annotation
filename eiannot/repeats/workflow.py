@@ -34,10 +34,10 @@ class RepeatMasking(EIWrapper):
 
         else:
             linker = Linker(sanitised.exit.genome, sanitised.exit.masked_genome,
-                            "genome", "genome", "link_genome_to_masked")
+                            "genome", "genome", "link_genome_to_masked", self.configuration)
             self.add_node(linker)
             fai_linker = Linker(sanitised.fai.output["fai"], sanitised.exit.masked_genome + ".fai",
-                                "fai", "fai", "link_genome_fai_to_masked")
+                                "fai", "fai", "link_genome_fai_to_masked", self.configuration)
             self.add_node(fai_linker)
             self.add_edge(linker, fai_linker)
 

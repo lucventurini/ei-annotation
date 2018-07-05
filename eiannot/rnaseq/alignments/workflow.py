@@ -1,9 +1,9 @@
 # from .bam import BamStats, BamIndex, BamSort
+from ...abstract import FinalFlag
 from .hisat2 import HisatWrapper
 from .gmap import GsnapWrapper, GmapLongWrapper
 from .tophat2 import TopHat2Wrapper
 from .star import StarWrapper, StarLongWrapper
-from .abstract import AlnFlag
 from ...abstract import EIWrapper, AtomicOperation
 import os
 
@@ -33,10 +33,7 @@ class ShortAlignmentsWrapper(EIWrapper):
                 self.merge([instance])
                 self.__bams.extend(instance.bams)
 
-        final_flag = ShortAlignersFlag(flags, outdir=self.outdir, prepare_wrapper=prepare_wrapper)
-        self.add_node(final_flag)  # We have to add the node, otherwise the workflow will be empty
-        self.add_edges_from([(flag, final_flag) for flag in flags])
-        assert self.exit == final_flag, self.nodes
+        self.add_final_flag(os.path.join(self.outdir, "short_reads.done"), "short_aln_all")
 
     @property
     def outdir(self):
@@ -75,9 +72,8 @@ class LongAlignmentsWrapper(EIWrapper):
             flags.append(instance.exit)
 
         # print(*[flag.rulename for flag in flags])
-        flag = LongAlignersFlag(flags, outdir=self.outdir)
-        self.add_node(flag)
-        self.add_edges_from([(f_flag, flag) for f_flag in flags])
+        self.add_final_flag(os.path.join(self.outdir, "long_reads.done"), "long_aln_all")
+
         # print(flag.input)
         self.add_flag_to_inputs(prepare_wrapper, "prep_flag", "fai")
 
@@ -90,41 +86,22 @@ class LongAlignmentsWrapper(EIWrapper):
         return self.__gf_rules
 
 
-class LongAlignersFlag(AtomicOperation):
-
-    def __init__(self, stats_runs: [AlnFlag], outdir=None):
-
-        super().__init__()
-        self.touch = True
-        if stats_runs:
-            outdir = os.path.dirname(stats_runs[0].output["flag"])
-            self.input["flags"] = [stat.output["flag"] for stat in stats_runs]
-        else:
-            assert outdir is not None
-        self.output["flag"] = os.path.join(outdir, "long_reads.done")
-
-    @property
-    def rulename(self):
-        return "long_aln_all"
-
-    @property
-    def loader(self):
-        return []
-
 
 class ShortAlignersFlag(AtomicOperation):
 
-    def __init__(self, flags: [AlnFlag], prepare_wrapper=None, outdir=None):
+    def __init__(self, flags: [FinalFlag], prepare_wrapper=None, outdir=None):
 
         super().__init__()
         self.touch = True
         if flags:
             self.input = {"flags": [flag.output["flag"] for flag in flags]}
             outdir = os.path.dirname(flags[0].output["flag"])
+            self.configuration = flags[0].configuration
         else:
             assert outdir is not None
             assert prepare_wrapper is not None
             self.input = prepare_wrapper.output
+
         self.output["flag"] = os.path.join(outdir, "short_reads.done")
 
     @property

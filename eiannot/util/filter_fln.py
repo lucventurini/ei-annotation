@@ -107,8 +107,6 @@ def main():
                               
                               metrics, left_on=fln.columns[0], right_on=metrics.columns[0])
 
-    print(orf_df.shape, metrics.shape, fln.shape, merged.shape)
-
     # Now that we have a complete table, it is easy to filter out
 
     # Now we have to exclude genes that are within 1000bps of another gene
@@ -123,7 +121,7 @@ def main():
         ((merged["ORF_start"] == merged["mikado_orf_start"]) & (merged["ORF_end"] == merged["mikado_orf_end"])) &
         ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length>=300) &
          (merged.five_utr_num == 2) & (merged.three_utr_num == 1))
-    )][[merged.columns[0], "parent"]]
+    )]  # [[merged.columns[0], "parent"]]
 
     training_candidates = gold[(
          (gold.combined_cds_fraction >= 0.5) &
@@ -147,7 +145,10 @@ def main():
                   silver=set(silver.iloc[:, 0].unique()),
                   bronze=set(bronze.iloc[:, 0].unique()))
 
-    merged["Category"] = merged.apply(cat, axis=1)
+    if merged.shape[0] > 0:
+        merged["Category"] = merged.apply(cat, axis=1)
+    else:
+        merged["Category"] = pd.Series()
 
     # Now write out the CSVs ...
     merged.to_csv(args.out + ".table.txt", sep="\t", index=False, header=True)

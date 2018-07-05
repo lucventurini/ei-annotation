@@ -1,18 +1,21 @@
 from ..abstract import EIWrapper, AtomicOperation
-from ..rnaseq.mikado import MikadoStats
+from ..rnaseq.mikado.pick import MikadoStats
 from ..rnaseq.mikado.workflow import Mikado
+from ..rnaseq.mikado import MikadoOp
 from ..repeats.workflow import RepeatMasking
 import os
+import abc
 
 
 class FlnWrapper(EIWrapper):
 
-    def __init__(self, mikado: Mikado, masker: RepeatMasking):
+    def __init__(self, mikado: Mikado):  #, masker: RepeatMasking):
 
         super().__init__()
 
         if mikado.stats:
             # Start extracting the data ...
+            self.configuration = mikado.configuration
             sequence_extractor = MikadoSequenceExtractor(mikado.stats)
             self.add_edge(mikado, sequence_extractor)
             indexer = MikadoSequenceIndexer(sequence_extractor)
@@ -23,26 +26,62 @@ class FlnWrapper(EIWrapper):
             self.add_edges_from([(splitter, chunk) for chunk in fln_chunks])
             concat = ConcatenateFLN(fln_chunks)
             self.add_edges_from([(chunk, concat) for chunk in fln_chunks])
-            fln_filter = FilterFLN(concat)
+            convert_mikado = ConvertMikadoToBed12(mikado.stats)
+            self.add_edge(mikado, convert_mikado)
+            fln_filter = FilterFLN(concat, convert_mikado)
             self.add_edge(concat, fln_filter)
+            self.add_edge(convert_mikado, fln_filter)
             self.categories = dict((cat, ExtractFLNClass(fln_filter, mikado.stats, cat))
                                    for cat in ("Gold", "Silver", "Bronze"))
             self.add_edges_from([(mikado.stats, self.categories[cat]) for cat in self.categories])
             self.add_edges_from([(fln_filter, self.categories[cat]) for cat in self.categories])
-            self.add_edges_from([(masker, self.categories[cat]) for cat in self.categories])
-            # TODO: devise a final flag
-            self.add_final_flag()
+            self.add_final_flag(os.path.join(self.categories["Gold"].outdir, "fln.done"),
+                                rulename="fln_done{long}".format(long="_long" if mikado.stats.is_long else ""))
+            assert self.exit
+            assert self.entries
+        else:
+            print("Nothing to do")
 
 
-class MikadoSequenceExtractor(AtomicOperation):
+class FLNOp(AtomicOperation, metaclass=abc.ABCMeta):
+
+    def __init__(self, ancestor):
+
+        super().__init__()
+        self.__is_long = ancestor.is_long
+        self.configuration = ancestor.configuration
+        self.input.update(ancestor.output)
+
+    @property
+    @abc.abstractmethod
+    def _rulename(self):
+        pass
+
+    @property
+    def is_long(self):
+        return self.__is_long
+
+    @property
+    def rulename(self):
+        return "{rulename}{long}".format(rulename=self._rulename,
+                                         long="_long" if self.is_long else "")
+
+    @property
+    def flndir(self):
+        return os.path.join("abinitio", "1-FLN{long}".format(long="-long-reads" if self.is_long else ""))
+
+    @property
+    def toolname(self):
+        return "full_lengther_next"
+
+
+class MikadoSequenceExtractor(FLNOp):
 
     def __init__(self, stats: MikadoStats):
 
-        super().__init__()
-        self.input = {"loci": stats.input["link"]}
-        self.input.update(stats.output)
+        super().__init__(stats)
+        self.input["loci"] = stats.input["link"]
         self.input["genome"] = self.genome
-        self.configuration = stats.configuration
         self.outdir = stats.outdir
         self.output = {"transcripts": os.path.join(self.outdir, "mikado.loci.transcripts.fasta")}
 
@@ -56,7 +95,6 @@ class MikadoSequenceExtractor(AtomicOperation):
         input, output = self.input, self.output
         genome = self.genome
         outdir = self.outdir
-
         cmd = "{load} gffread -g {genome} -w {output[transcripts]} -C {input[loci]}".format(**locals())
         return cmd
 
@@ -65,22 +103,20 @@ class MikadoSequenceExtractor(AtomicOperation):
         return 1
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "extract_mikado_fasta"
 
 
-class MikadoSequenceIndexer(AtomicOperation):
+class MikadoSequenceIndexer(FLNOp):
 
     def __init__(self, extractor: MikadoSequenceExtractor):
-        super().__init__()
-        self.input = extractor.output
-        self.configuration = extractor.configuration
+        super().__init__(extractor)
         self.outdir = extractor.outdir
         self.output = {"fai": self.input["transcripts"] + ".fai"}
         self.log = os.path.join(self.outdir, "mikado.faidx.log")
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "faidx_mikado_transcripts"
 
     @property
@@ -100,13 +136,11 @@ class MikadoSequenceIndexer(AtomicOperation):
         return cmd
 
 
-class SplitMikadoFasta(AtomicOperation):
+class SplitMikadoFasta(FLNOp):
 
     def __init__(self, indexer: MikadoSequenceIndexer):
-        super().__init__()
-        self.input = indexer.output
+        super().__init__(indexer)
         self.input.update(indexer.input)
-        self.configuration = indexer.configuration
         self.log = os.path.join(os.path.dirname(self.outdir), "split.log")
         self.output["split_flag"] = os.path.join(self.outdir, "split.done")
         self.output["chunks"] = ["{outprefix}_{chunk}.fasta".format(
@@ -114,10 +148,10 @@ class SplitMikadoFasta(AtomicOperation):
 
     @property
     def chunks(self):
-        raise NotImplementedError()
+        return self.configuration.get("full_lengther_next", dict()).get("chunks", 1)
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "split_mikado_loci_fasta"
 
     @property
@@ -137,7 +171,7 @@ class SplitMikadoFasta(AtomicOperation):
         chunks = self.chunks
         outprefix = self.outprefix
 
-        cmd = "{load} split_fasta.py -m {chunks} {input[fa]} {outprefix} && touch {output[split_flag]}".format(
+        cmd = "{load} split_fasta.py -m {chunks} {input[transcripts]} {outprefix} && touch {output[split_flag]}".format(
             **locals()
         )
 
@@ -146,27 +180,26 @@ class SplitMikadoFasta(AtomicOperation):
 
     @property
     def outdir(self):
-
-        return os.path.join(self.configuration["outdir"], "abinitio", "1-FLN", "Chunks")
+        # TODO: Change
+        return os.path.join(self.configuration["outdir"], self.flndir, "Chunks")
 
     @property
     def outprefix(self):
         return os.path.join(self.outdir, "chunk")
 
 
-class FLN(AtomicOperation):
+class FLN(FLNOp):
 
     def __init__(self, mikado_split: SplitMikadoFasta, chunk):
 
-        super().__init__()
+        super().__init__(mikado_split)
         self.__chunk = None
         self.__split = mikado_split
-        self.configuration = mikado_split.configuration
         self.chunk = chunk
-        self.input = {"chunk": self.fasta_chunk, "split_flag": self.__split.output["split_flag"]}
-        self.output = {"ptseq": os.path.join(self.outdir, "pt_seqs"),
+        # self.input["fasta_chunk"] = self.fasta_chunk
+        self.output = {"ptseq": os.path.join(self.outdir, "fln_results", "pt_seqs"),
                        "flag": os.path.join(self.outdir, "fln.done")}
-        self.touch = True
+        self.touch = False
         self.log = os.path.join(self.outdir, "fln.log")
 
     @property
@@ -186,14 +219,14 @@ class FLN(AtomicOperation):
     @property
     def fasta_chunk(self):
         return os.path.join(self.__split.outdir, "{outprefix}_{chunk}.fasta".format(
-            outprefix=self.__split.outprefix, chunk=str(self.chunk).zfill(3)))
+            outprefix=os.path.basename(self.__split.outprefix), chunk=str(self.chunk).zfill(3)))
 
     @property
     def loader(self):
         return ["full_lengther_next"]
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "fln_chunk_{}".format(self.chunk)
 
     @property
@@ -203,45 +236,64 @@ class FLN(AtomicOperation):
         dbs = self.fln_dbs
         outdir = self.outdir
         log = os.path.basename(self.log)
-        fasta_link_src = os.path.relpath(os.path.abspath(self.input["fasta_chunk"]),
+        fasta_link_src = os.path.relpath(os.path.abspath(self.fasta_chunk),
                                          start=os.path.abspath(self.outdir))
+        load = self.load
+        threads = self.threads
+        output = self.output
+        ptseq_verify = os.path.relpath(self.output["ptseq"],
+                                       start=self.outdir)
+        flag = os.path.basename(self.output["flag"])
 
-        cmd = "{load} mkdir -p {outdir} && cd {outdir} && ln -s {fasta_link_src} chunk.fasta && "
-        cmd += "full_lengther_next -w {threads} -g {taxon} -a {dbs} -f chunk.fasta 2>&1 > {log}"
+        cmd = "{load} mkdir -p {outdir} && cd {outdir} &&"
+        cmd += " if [[ ! -e chunk.fasta ]]; then ln -s {fasta_link_src} chunk.fasta; fi && "
+        cmd += "full_lengther_next -w {threads} --taxon_group={taxon} -a {dbs} -f chunk.fasta 2>&1 > {log}"
+        cmd += " && [[ -s {ptseq_verify} ]] && touch {flag}"
         cmd = cmd.format(**locals())
         return cmd
 
     @property
     def outdir(self):
 
-        return os.path.join(self.configuration["outdir"], "abinitio", "1-FLN", "FLN", "Chunk_{}".format(
+        return os.path.join(self.configuration["outdir"], self.flndir,
+                            "FLN", "Chunk_{}".format(
             str(self.chunk).zfill(3)))
 
     @property
     def taxon(self):
-        raise NotImplementedError()
+        assert self.configuration["programs"]["full_lengther_next"]["taxon"] in ["fungi",
+                                                                 "human", "invertebrates",
+                                                                 "mammals", "plants", "rodents",
+                                                                 "vertebrates"]
+
+        return self.configuration["programs"]["full_lengther_next"]["taxon"]
 
     @property
     def fln_dbs(self):
-        raise NotImplementedError()
+        if "dbs" not in self.configuration["programs"]["full_lengther_next"]:
+            return "stnp"
+        else:
+            assert all(item in ("s", "t", "n", "p", "c") for item
+                       in self.configuration["programs"]["full_lengther_next"]["dbs"])
+            return "".join(self.configuration["programs"]["full_lengther_next"]["dbs"])
 
 
-class ConcatenateFLN(AtomicOperation):
+class ConcatenateFLN(FLNOp):
 
     def __init__(self, runs: [FLN]):
 
         assert runs
-        super().__init__()
+        super().__init__(runs[0])
         self.configuration = runs[0].configuration
-        self.input["flns"] = [run.output["ptseq"] for run in runs]
-        self.output["fln_table"] = os.path.join(self.outdir, "fln_table.txt")
+        self.input = {"ptseq": [run.output["ptseq"] for run in runs]}
+        self.output["table"] = os.path.join(self.outdir, "fln_table.txt")
 
     @property
     def threads(self):
         return 1
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "concatenate_flns"
 
     @property
@@ -252,25 +304,57 @@ class ConcatenateFLN(AtomicOperation):
     def cmd(self):
 
         input, output = self.input, self.output
-        input = " ".join(self.input["flns"])
+        input = " ".join(self.input["ptseq"])
         outdir = self.outdir
         cmd = """mkdir -p {outdir} && cat {input} | """
-        cmd += """awk 'NR==1 || $1!="Query_id"' > {output[fln_table]}""".format(**locals())
+        cmd += """awk 'NR==1 || $1!="Query_id"' > {output[table]}"""
+        cmd = cmd.format(**locals())
         return cmd
 
     @property
     def outdir(self):
+        return os.path.join(self.configuration["outdir"], self.flndir, "output")
 
-        return os.path.join(self.configuration["outdir"], "abinitio", "1-FLN", "output")
+
+class ConvertMikadoToBed12(MikadoOp):
+
+    def __init__(self, mikado: MikadoStats):
+
+        super().__init__(is_long=mikado.is_long)
+        self.configuration = mikado.configuration
+        self.input = mikado.output
+        self.input.update(mikado.input)
+        self.output = {"bed12": os.path.splitext(mikado.input["link"])[0] + ".bed12"}
+        self.log = os.path.join(self.mikado_dir, "logs", "convert_to_bed12.log")
+
+    @property
+    def _rulename(self):
+        return "convert_mikado_to_bed12"
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def loader(self):
+        return ["mikado"]
+
+    @property
+    def cmd(self):
+        load = self.load
+        input, output = self.input, self.output
+        log = self.log
+        cmd = "{load} mikado util convert -of bed12 {input[loci]} {output[bed12]} 2> {log} > {log}"
+        cmd = cmd.format(**locals())
+        return cmd
 
 
-class FilterFLN(AtomicOperation):
+class FilterFLN(FLNOp):
 
-    def __init__(self, concat: ConcatenateFLN):
-        super().__init__()
-
-        self.configuration = concat.configuration
-        self.input = concat.output
+    def __init__(self, concat: ConcatenateFLN, to_bed12: ConvertMikadoToBed12):
+        super().__init__(concat)
+        self.input.update(to_bed12.output)
+        # self.input.update(to_bed12.input)
         self.outdir = concat.outdir
         self.output = {"table": self.outprefix + ".table.txt",
                        "list": self.outprefix + ".list.txt"}
@@ -278,15 +362,15 @@ class FilterFLN(AtomicOperation):
 
     @property
     def outprefix(self):
-
-        return os.path.join(self.outdir, "fln_filtered")
+        # TODO: change
+        return os.path.join(self.outdir, "output")
 
     @property
     def threads(self):
         return 1
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "filter_fln"
 
     @property
@@ -299,27 +383,30 @@ class FilterFLN(AtomicOperation):
         load = self.load
         outdir = self.outdir
         input, log = self.input, self.log
+        outprefix = self.outprefix
+        mikado_loci = os.path.splitext(self.input["bed12"])[0]
 
         cmd = "{load} "
-        cmd += "mkdir -p {outdir} && filter_fln.py {input[table]} {input[loci]} {outprefix} > {log} 2> {log}"
+        cmd += "mkdir -p {outdir} && filter_fln.py {input[table]} {mikado_loci} {outprefix} > {log} 2> {log}"
         cmd = cmd.format(**locals())
 
         return cmd
 
 
-class ExtractFLNClass(AtomicOperation):
+class ExtractFLNClass(FLNOp):
 
     def __init__(self, fln_filter: FilterFLN, stats: MikadoStats, category):
 
-        super().__init__()
+        super().__init__(fln_filter)
         self.configuration = fln_filter.configuration
         self.input = fln_filter.output
         self.input["loci"] = stats.input["loci"]
         self.outdir = fln_filter.outdir
         self.__category = None
         self.category = category
-        self.output = {"list": os.path.join(self.outdir, "{}_models.txt".format(self.category)),
-                       "gff3": os.path.join(self.outdir, "{}_models.gff3".format(self.category)),
+        self.output = {
+            "list": os.path.join(self.outdir, "{}_models.txt".format(self.category)),
+            "gff3": os.path.join(self.outdir, "{}_models.gff3".format(self.category)),
                        }
 
     @property
@@ -335,7 +422,7 @@ class ExtractFLNClass(AtomicOperation):
         self.__category = category
 
     @property
-    def rulename(self):
+    def _rulename(self):
         return "extract_fln_{}".format(self.category.lower())
 
     @property
@@ -349,7 +436,7 @@ class ExtractFLNClass(AtomicOperation):
         category = self.category
 
         cmd = "{load} "
-        cmd += """awk '{{if ($4=="{category}") {{OFS="\\t"; print $1,$2}} }} {input[list]} > {output[list]} && """
+        cmd += """awk '{{if ($4=="{category}") {{OFS="\\t"; print $1,$2}} }}' {input[list]} > {output[list]} && """
         cmd += """ mikado util grep {output[list]} {input[loci]} {output[gff3]}"""
         cmd = cmd.format(**locals())
 
@@ -358,4 +445,3 @@ class ExtractFLNClass(AtomicOperation):
     @property
     def threads(self):
         return 1
-

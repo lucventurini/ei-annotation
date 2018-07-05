@@ -19,7 +19,8 @@ class ModelerWorkflow(EIWrapper):
             else:
                 polisher = Linker(modeler.output["families"],
                                   os.path.join(self.outdir, PolishRepeats.outfile),
-                                  "families", "families", "link_unpolished_repeats")
+                                  "families", "families", "link_unpolished_repeats",
+                                  self.configuration)
             self.add_edges_from([(modeler, polisher)])
             assert self.exit
 

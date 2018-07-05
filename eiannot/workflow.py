@@ -7,6 +7,7 @@ from .rnaseq.alignments.portcullis import PortcullisWrapper
 from .rnaseq.mikado.workflow import Mikado
 from .rnaseq.assemblies.workflow import AssemblyWrapper
 from .proteins.workflow import ExonerateProteinWrapper
+from .abinitio.fln import FlnWrapper
 
 import os
 
@@ -33,15 +34,32 @@ class AnnotationWorklow(EIWorfkflow):
                                       long_alignments=self.long_wrapper,
                                       portcullis=self.portcullis,
                                       only_long=True)
+            assert self.mikado_long.exit
+            if not self.mikado_long.stats:
+                raise ValueError("No stats for mikado, number of gfs: {}".format(len(self.long_wrapper.gfs)))
             self.merge([self.mikado_long])
+            self.fln_long = FlnWrapper(self.mikado_long)
+            assert self.fln_long.entries
+            self.add_edge(self.mikado_long, self.fln_long)
+        else:
+            self.fln_long = None
+
         self.mikado = Mikado(assemblies=self.assemblies,
                              long_alignments=self.long_wrapper,
                              portcullis=self.portcullis,
                              only_long=False)
         self.merge([self.mikado])
+        if self.mikado.stats:
+            self.fln = FlnWrapper(self.mikado)
+            self.merge([self.fln])
+            self.add_edge(self.mikado, self.fln)
 
         self.repeats = RepeatMasking(self.prepare)
         self.protein_alignments = ExonerateProteinWrapper(self.repeats, self.portcullis)
         self.merge([self.repeats, self.protein_alignments])
+
+
+
+
         flag = os.path.join(self.configuration["outdir"], "all.done")
         self.add_final_flag(flag)

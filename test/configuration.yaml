@@ -2,6 +2,10 @@ reference:
   min_intron: 20
   max_intron: 10000
 programs:
+  default:
+    threads: 20
+    memory: 10000
+    queue: 'ei-medium,TempProject2'
   mikado:
     load: ''
   stringtie:
@@ -42,14 +46,22 @@ programs:
   class2:
     runs: ['']
     load: ''
+  full_lengther_next:
+    load: 'export BLASTDB=/usr/users/ga002/venturil/FLNDBs/'
+    execute: true  # unused as of yet
+    taxon: "plants"
+    dbs: "p"
 outdir: "Eiannot"
-homology:
-  prot_db: ["subset.sprot.fasta"]
+mikado_homology:
+  prot_db: &prot_db
+  - "subset.sprot.fasta"
   execute: true
   program: 'diamond'
   chunks: 2
   evalue: 0.000001
   max_target_seqs: 10
+homology:
+  prot_db: *prot_db
   protein_chunks: 3
   identity: 40
   coverage: 70
@@ -65,4 +77,3 @@ repeats:
   model: false
   species: "arabidopsis thaliana"
   # safe_proteins: []
-threads: 20

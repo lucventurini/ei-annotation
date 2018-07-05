@@ -286,10 +286,9 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
             new_bams.add(stater)
             self.__stats.append(stater)
         self.__bam_rules = new_bams
-        self.flag = AlnFlag(self.outdir, runs=self.__stats, toolname=self.toolname)
-        self.add_node(self.flag)
-        self.add_edges_from([(stat, self.flag) for stat in self.__stats])
         self.__add_flag_to_inputs()
+        self.add_final_flag(os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname)),
+                            "{toolname}_flag".format(toolname=self.toolname))
         self.__finalised = True
 
     def add_to_bams(self, rule):
@@ -333,24 +332,6 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
         return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "1-alignments"))
 
 
-class AlnFlag(AtomicOperation):
-
-    def __init__(self, outdir, toolname, runs=[]):
-        super().__init__()
-        self.__toolname = toolname
-        self.input["runs"] = [run.output["stats"] for run in runs]
-        self.output = {"flag": os.path.join(outdir, "{toolname}.done".format(**locals()))}
-        self.touch = True
-
-    @property
-    def rulename(self):
-        return "{}_flag".format(self.__toolname)
-
-    @property
-    def loader(self):
-        return []
-
-
 class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     def __init__(self, prepare_flag):
@@ -372,9 +353,8 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
             new_gfs.add(stats)
 
         self.__gf_rules = new_gfs
-        self.flag = AlnFlag(self.outdir, runs=list(self.gfs), toolname=self.toolname)
-        self.add_node(self.flag)
-        self.add_edges_from([(stat, self.flag) for stat in self.gfs])
+        self.add_final_flag(os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname)),
+                            "{toolname}_flag".format(toolname=self.toolname))
         self.__add_flag_to_inputs()
         self.__finalised = True
 

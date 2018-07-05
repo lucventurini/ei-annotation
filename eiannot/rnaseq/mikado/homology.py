@@ -23,7 +23,7 @@ class SplitMikadoPrepareFasta(MikadoOp):
 
     @property
     def chunks(self):
-        return self.configuration["homology"]["chunks"]
+        return self.configuration["mikado_homology"]["chunks"]
 
     @property
     def loader(self):
@@ -58,7 +58,7 @@ class SplitMikadoPrepareFasta(MikadoOp):
 
     @property
     def fasta_dir(self):
-        return os.path.join(self.mikado_dir, "homology", "fastas")
+        return os.path.join(self.mikado_dir, "mikado_homology", "fastas")
 
 
 class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
@@ -90,15 +90,15 @@ class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
 
     @property
     def max_target_seqs(self):
-        return self.configuration["homology"]["max_target_seqs"]
+        return self.configuration["mikado_homology"]["max_target_seqs"]
 
     @property
     def evalue(self):
-        return self.configuration["homology"]["evalue"]
+        return self.configuration["mikado_homology"]["evalue"]
 
     @property
     def log(self):
-        logdir = os.path.join(self.outdir, "homology", "logs")
+        logdir = os.path.join(self.outdir, "mikado_homology", "logs")
         if not os.path.exists(logdir):
             os.makedirs(logdir)
         name = self.loader[0]
@@ -111,11 +111,11 @@ class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
 
     @property
     def outdir(self):
-        return os.path.join(self.mikado_dir, "homology")
+        return os.path.join(self.mikado_dir, "mikado_homology")
 
     @property
     def fasta_dir(self):
-        return os.path.join(self.mikado_dir, "homology", "fastas")
+        return os.path.join(self.mikado_dir, "mikado_homology", "fastas")
 
 
 class MikadoDiamond(MikadoHomology):
@@ -188,7 +188,7 @@ class MikadoHomologyFlag(MikadoOp):
         self.outdir = homologies[0].outdir
         self.touch = True
         self.input = {"xmls": [homology.output["xml"] for homology in homologies]}
-        self.output = {"flag": os.path.join(self.outdir, "homology", "homology.done")}
+        self.output = {"flag": os.path.join(self.outdir, "mikado_homology", "homology.done")}
 
     @property
     def loader(self):
@@ -232,15 +232,15 @@ class MikadoHomologyWrapper(EIWrapper):
 
     @property
     def chunks(self):
-        return self.configuration["homology"]["chunks"]
+        return self.configuration["mikado_homology"]["chunks"]
 
     @property
     def program(self):
-        return self.configuration["homology"]["program"]
+        return self.configuration["mikado_homology"]["program"]
 
     @property
     def execute(self):
-        return self.configuration["homology"]["execute"] and len(self.sanitizer.protein_dbs) > 0
+        return self.configuration["mikado_homology"]["execute"] and len(self.sanitizer.protein_dbs) > 0
 
     @property
     def blast_xmls(self):

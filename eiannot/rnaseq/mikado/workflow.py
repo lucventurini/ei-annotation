@@ -30,9 +30,9 @@ class Mikado(EIWrapper):
 
         self.configuration = assemblies.configuration
         if only_long is True:
-            execute = (self.long_alignments.gfs)
+            execute = (len(self.long_alignments.gfs) > 0)
         else:
-            execute = (self.assemblies.gfs or self.long_alignments.gfs)
+            execute = (len(self.assemblies.gfs) > 0 or len(self.long_alignments.gfs) > 0)
 
         if execute:
 
@@ -74,8 +74,8 @@ class Mikado(EIWrapper):
             self.add_edge(self.serialiser, self.picker)
             self.indexer = IndexMikado(self.picker)
             self.add_edge(self.picker, self.indexer)
-            stats = MikadoStats(self.indexer)
-            self.add_edge(self.indexer, stats)
+            self.__stats = MikadoStats(self.indexer)
+            self.add_edge(self.indexer, self.__stats)
 
         if only_long:
             rulename = "mikado_done_long"

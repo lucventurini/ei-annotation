@@ -16,7 +16,10 @@ class MikadoPick(MikadoOp):
         mode = self.mode
         self.output = {"loci": os.path.join(
             self.loci_dir, "mikado-{mode}.loci.gff3").format(**locals()),
-                       "link": os.path.join(self.outdir, "mikado.loci.gff3")}
+                       "link": os.path.join(self.outdir, "mikado.loci.gff3"),
+                       "metrics": os.path.join(self.loci_dir, "mikado-{mode}.loci.metrics.tsv").format(**locals()),
+                       "metrics_link": os.path.join(self.outdir, "mikado.loci.metrics.tsv").format(**locals())
+                       }
         self.log = os.path.join(self.loci_dir, "mikado-{mode}.pick.err").format(
             **locals()
         )
@@ -57,8 +60,12 @@ class MikadoPick(MikadoOp):
         link_src = os.path.relpath(self.output["loci"],
                                    start=os.path.dirname(self.output["link"]))
         link_dest = os.path.basename(self.output["link"])
+        metrics_link_dest = os.path.basename(self.output["metrics_link"])
+        metrics_link_src = os.path.relpath(self.output["metrics"],
+                                           start=os.path.dirname(self.output["metrics_link"]))
         cmd += "-od {loci_dir} --loci_out {loci_out}  -lv INFO -db {input[db]} {input[gtf]} > {log} 2>&1 "
         cmd += " && mkdir -p {link_dir} && cd {link_dir} && ln -s {link_src} {link_dest}"
+        cmd += " && ln -s {metrics_link_src} {metrics_link_dest}"
         cmd = cmd.format(**locals())
 
         return cmd

@@ -166,10 +166,10 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         self.__cmd = None
         self.__log = None
         self.__params = dict()
-        self.__threads = None
         self.__configuration = dict()
         self.__temps = []
         self.__touchers = []
+        self.__threads = None
 
     def __hash__(self):
         """The hash will only consider the rule name. In a SnakeMake graph,
@@ -342,7 +342,10 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
         d = dict()
         rulename = re.sub("\.", "_", re.sub("-", "_", self.rulename))
-        string = ["rule {}:".format(rulename)]
+        if self.local is True:
+            string = ["localrules: {rulename}\n\nrule {rulename}:".format(rulename=self.rulename)]
+        else:
+            string = ["rule {}:".format(rulename)]
         # Inputs now are always dictionaries
         if not self.input:
             raise ValueError("Snakemake rules must have defined inputs and outputs. Offending rule: {}".format(
@@ -361,12 +364,12 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         string.append("  output:")
         for key, value in self.output.items():
             if self.touch is True or key in self.touchers:
-                assert len(self.output) == 1, (self.rulename, self.input, self.output)
-                string.append("    {key}=touch(\"{value}\")".format(**locals()))
+                # assert len(self.output) == 1, (self.rulename, self.input, self.output)
+                string.append("    {key}=touch(\"{value}\"),".format(**locals()))
             elif isinstance(value, list):
                 string.append("    {key}={value},".format(**locals()))
             elif key in self.temps:
-                string.append("    {key}=temp(\"{value}\")".format(**locals()))
+                string.append("    {key}=temp(\"{value}\"),".format(**locals()))
             else:
                 string.append("    {key}=\"{value}\",".format(**locals()))
         string[-1] = string[-1].rstrip(",")
@@ -380,14 +383,22 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             string.append("  threads: threads")
 
         # Add resources
-        if self.resources:
-            string.append("  resources:")
-            for resource in self.resources:
-                string.append('    {key}={value}'.format(key=resource, value=self.resources[resource]))
+        if self.resources and not self.local:
+            string.append("  params:")
+            for resource, value in self.resources.items():
+                if isinstance(value, str) and "," in value:
+                    value = "\"{value}\"".format(**locals())
+                string.append('    {resource}={value},'.format(**locals()))
+            string[-1] = string[-1].rstrip(",")
 
         if self.cmd:
-            string.append("  shell: \"{}\"".format(self.cmd))
+            cmd = re.sub('"', '\\"',
+                         re.sub("{", "{{",
+                                re.sub("}", "}}", self.cmd)))
 
+            string.append("  shell: \"{}\"".format(cmd))
+
+        string.append("")
         return "\n".join(string) + "\n"
 
     @property
@@ -403,17 +414,13 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     @property
     def threads(self):
         # Single location. We can change this whenever we desire.
-        if self.__threads is None:
-            return "{threads}"
-        else:
-            return self.__threads
+        if self.touch:
+            return 1
+        return self.__threads
 
-    @threads.setter
-    def threads(self, threads):
-        if threads is not None and (not isinstance(threads, int) or threads < 1):
-            raise ValueError
-        else:
-            self.__threads = threads
+    def __set_threads(self):
+        if self.__threads is None:
+            self.__threads = self.__retrieve_resource_from_programs("threads")
 
     @property
     def species(self):
@@ -437,17 +444,34 @@ class AtomicOperation(metaclass=abc.ABCMeta):
     def max_intron(self):
         return self.configuration["reference"]["max_intron"]
 
+    def __retrieve_resource_from_programs(self, resource):
+
+
+        if (hasattr(self, "toolname") and
+                    self.toolname in self.configuration["programs"] and
+                    resource in self.configuration["programs"][self.toolname]):
+            res = self.configuration["programs"][self.toolname][resource]
+        else:
+            res = self.configuration["programs"]["default"][resource]
+
+        return res
+
     @property
     def resources(self):
 
         """This property will define the resources to be used for each rule."""
 
-        # TODO: implement!
         # default = self.configuration["resources"]["default"]
         #
         # if self.step and self.step in self.configuration["resources"]:
         #     default.update(self.configuration["resources"][self.__step])
         default = dict()
+        assert "programs" in self.configuration, self.rulename
+        self.__set_threads()
+        default["threads"] = self.threads
+
+        for key in "memory", "queue":
+            default[key] = self.__retrieve_resource_from_programs(key)
 
         return default
 
@@ -456,13 +480,17 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         """This property is used to retrieve the resource definition from the dictionary"""
         return None
 
+    @property
+    def local(self):
+        return False
+
 
 class Linker(AtomicOperation):
 
     """Basic class to link an input into an output, when no operation is needed
     but still the pipeline needs two different files."""
 
-    def __init__(self, input_file, output_file, key_in, key_out, rulename):
+    def __init__(self, input_file, output_file, key_in, key_out, rulename, configuration):
         super().__init__()
         self.__key_in = None
         self.key_in = key_in
@@ -470,6 +498,7 @@ class Linker(AtomicOperation):
         self.key_out = key_out
         self.input[self.key_in] = input_file
         self.output[self.key_out] = output_file
+        self.configuration = configuration
         self.__rulename = rulename
 
     @property
@@ -491,6 +520,10 @@ class Linker(AtomicOperation):
         self.__key_out = key
 
     @property
+    def threads(self):
+        return 1
+
+    @property
     def cmd(self):
         try:
             outdir = os.path.dirname(self.output[self.key_out])
@@ -509,6 +542,14 @@ class Linker(AtomicOperation):
     @property
     def loader(self):
         return []
+
+    @property
+    def local(self):
+        return True
+
+    @property
+    def resources(self):
+        return {"threads": self.threads, "memory": 1, "queue": ""}
 
 
 class Toucher(AtomicOperation):
@@ -529,6 +570,18 @@ class Toucher(AtomicOperation):
     @property
     def loader(self):
         return []
+
+    @property
+    def local(self):
+        return True
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def resources(self):
+        return {"threads": self.threads, "memory": 1, "queue": ""}
 
 
 class EIWorfkflow:
@@ -655,16 +708,6 @@ class EIWorfkflow:
 
         return snake
 
-    @property
-    def resources(self):
-
-        resources = []
-        for rule in self.nodes:
-            if rule.resources:
-                resources.append(rule.resources)
-
-        return "\n".join(resources)
-
     def __len__(self):
         return len(self.graph)
 
@@ -736,19 +779,19 @@ class EIWorfkflow:
 
         # Remove redundancies
         finals["inputs"] = list(set(finals["inputs"]))
-        flag = FinalFlag(finals, flag, rulename=rulename)
+        flag = FinalFlag(finals, flag, configuration=self.configuration, rulename=rulename)
         self.add_node(flag)
         self.add_edges_from([(node, flag) for node in nodes])
         # assert flag in self.nodes
 
     @property
     def threads(self):
-        return self.configuration.get("threads", 1)
+        return self.configuration.get("programs", dict()).get("default", dict()).get("threads", 1)
 
 
 class FinalFlag(AtomicOperation):
 
-    def __init__(self, inputs, flag, rulename=None):
+    def __init__(self, inputs, flag, configuration, rulename=None):
 
         super().__init__()
         if not inputs:
@@ -757,6 +800,7 @@ class FinalFlag(AtomicOperation):
             self.input = inputs
         self.output["flag"] = flag
         self.touch = True
+        self.configuration = configuration
         self.__rulename = rulename
 
     @property
@@ -770,6 +814,10 @@ class FinalFlag(AtomicOperation):
     @property
     def threads(self):
         return 1
+
+    @property
+    def local(self):
+        return True
 
 
 class EIWrapper(EIWorfkflow):
