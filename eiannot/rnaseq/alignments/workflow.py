@@ -84,30 +84,3 @@ class LongAlignmentsWrapper(EIWrapper):
     @property
     def gfs(self):
         return self.__gf_rules
-
-
-
-class ShortAlignersFlag(AtomicOperation):
-
-    def __init__(self, flags: [FinalFlag], prepare_wrapper=None, outdir=None):
-
-        super().__init__()
-        self.touch = True
-        if flags:
-            self.input = {"flags": [flag.output["flag"] for flag in flags]}
-            outdir = os.path.dirname(flags[0].output["flag"])
-            self.configuration = flags[0].configuration
-        else:
-            assert outdir is not None
-            assert prepare_wrapper is not None
-            self.input = prepare_wrapper.output
-
-        self.output["flag"] = os.path.join(outdir, "short_reads.done")
-
-    @property
-    def rulename(self):
-        return "short_aln_all"
-
-    @property
-    def loader(self):
-        return []

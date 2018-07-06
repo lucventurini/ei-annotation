@@ -1,4 +1,4 @@
-from .abstract import AsmStats, AsmFlag, ShortAssemblerWrapper
+from .abstract import ShortAssemblerWrapper
 from .class2 import Class2Wrapper
 from .stringtie import StringtieWrapper
 from .cufflinks import CufflinksWrapper

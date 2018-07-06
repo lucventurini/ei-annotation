@@ -228,25 +228,3 @@ class AsmStats(AtomicOperation):
     @property
     def label(self):
         return self.__asm_run.label
-
-
-class AsmFlag(AtomicOperation):
-
-    def __init__(self, stats_runs: [AsmStats], outdir=None):
-
-        super().__init__()
-        self.touch = True
-        if stats_runs:
-            self.input["stats"] = [rule.output["stats"] for rule in stats_runs]
-            outdir = os.path.dirname(os.path.dirname(stats_runs[0].output["stats"]))
-        else:
-            assert outdir is not None
-        self.output["flag"] = os.path.join(outdir, "all.done")
-
-    @property
-    def rulename(self):
-        return "asm_all"
-
-    @property
-    def loader(self):
-        return []
