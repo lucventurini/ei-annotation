@@ -201,10 +201,13 @@ class MikadoHomologyFlag(MikadoOp):
 
 class MikadoHomologyWrapper(EIWrapper):
 
+    __final_rulename__ = "mikado_homology_flag"
+
     def __init__(self, preparer: MikadoPrepare):
 
         super().__init__()
         self.configuration = preparer.configuration
+        self.outdir = preparer.outdir
         self.sanitizer = SanitizeProteinBlastDB(self.configuration)
         if self.execute is True:
             split = SplitMikadoPrepareFasta(preparer)
@@ -229,6 +232,12 @@ class MikadoHomologyWrapper(EIWrapper):
             self.add_edges_from([(exe, self.flag) for exe in executers])
         else:
             self.remove_node(self.sanitizer)
+        if preparer.is_long:
+            self.__final_rulename__ += "_long"
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "homology.done")
 
     @property
     def chunks(self):

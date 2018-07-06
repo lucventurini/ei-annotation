@@ -7,6 +7,8 @@ import re
 
 class StringtieWrapper(ShortAssemblerWrapper):
 
+    __toolname__ = "stringtie"
+
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
 
@@ -28,32 +30,13 @@ class StringtieWrapper(ShortAssemblerWrapper):
         return "stringtie"
 
 
-class StringtieFlag(AtomicOperation):
-
-    def __init__(self, stringties, outdir):
-        super().__init__()
-        self.input = {"gtfs": [stringtie.output["link"] for stringtie in stringties]}
-        self.touch = True
-        self.output = {"flag": os.path.join(outdir, "stringtie.done")}
-
-    @property
-    def rulename(self):
-        return "stringtie_flag"
-
-    @property
-    def loader(self):
-        return []
-
-
 class Stringtie(ShortAssembler):
+
+    __toolname__ = "stringtie"
 
     def __init__(self, bam, run):
 
         super().__init__(bam, run)
-
-    @property
-    def toolname(self):
-        return "stringtie"
 
     @property
     def loader(self):

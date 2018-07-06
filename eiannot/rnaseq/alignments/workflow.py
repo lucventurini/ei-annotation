@@ -33,7 +33,13 @@ class ShortAlignmentsWrapper(EIWrapper):
                 self.merge([instance])
                 self.__bams.extend(instance.bams)
 
-        self.add_final_flag(os.path.join(self.outdir, "short_reads.done"), "short_aln_all")
+        self.add_final_flag()
+
+    __final_rulename__ = "short_aln_all"
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "short_reads.done")
 
     @property
     def outdir(self):
@@ -72,10 +78,16 @@ class LongAlignmentsWrapper(EIWrapper):
             flags.append(instance.exit)
 
         # print(*[flag.rulename for flag in flags])
-        self.add_final_flag(os.path.join(self.outdir, "long_reads.done"), "long_aln_all")
+        self.add_final_flag()
 
         # print(flag.input)
         self.add_flag_to_inputs(prepare_wrapper, "prep_flag", "fai")
+
+    __final_rulename__ = "long_aln_all"
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "long_reads.done")
 
     @property
     def outdir(self):

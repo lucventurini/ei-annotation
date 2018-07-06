@@ -6,6 +6,8 @@ import itertools
 
 class StarIndex(IndexBuilder):
 
+    __toolname__ = "star"
+
     def __init__(self, configuration, outdir):
 
         super().__init__(configuration, outdir)
@@ -13,10 +15,6 @@ class StarIndex(IndexBuilder):
         self.output = {"index": os.path.join(self.outdir, "SAindex")}
         self.touch = False
         self.message = "Indexing genome with star"
-
-    @property
-    def toolname(self):
-        return "star"
 
     @property
     def loader(self):
@@ -142,6 +140,8 @@ class StarAligner(ShortAligner):
 
 class StarWrapper(ShortWrapper):
 
+    __toolname__ = "star"
+
     def __init__(self, configuration, prepare_flag):
 
         # First, we have to build the index
@@ -166,15 +166,13 @@ class StarWrapper(ShortWrapper):
             self.add_edges_from([(indexer, run) for run in star_runs])
 
     @property
-    def toolname(self):
-        return "star"
-
-    @property
     def indexer(self):
         return StarIndex
 
 
 class StarLong(LongAligner):
+
+    __toolname__ = "star_long"
 
     def __init__(self, indexer: StarIndex, sample, run):
         if not isinstance(indexer, StarIndex):
@@ -238,15 +236,13 @@ class StarLong(LongAligner):
         return "star_long_{sample.label}_{run}".format(sample=self.sample, run=self.run)
 
     @property
-    def toolname(self):
-        return "star_long"
-
-    @property
     def suffix(self):
         return ".bam"
 
 
 class StarBam2Gtf(LongAligner):
+
+    __toolname__ = "star"
 
     def __init__(self, aligner: StarLong):
         super().__init__(indexer=aligner.indexer, sample=aligner.sample, run=aligner.run)
@@ -265,10 +261,6 @@ class StarBam2Gtf(LongAligner):
         return ".gtf"
 
     @property
-    def toolname(self):
-        return "star"
-
-    @property
     def rulename(self):
         return "starbam2gtf_{sample}_{run}".format(sample=self.sample.label, run=self.run)
 
@@ -284,6 +276,8 @@ class StarBam2Gtf(LongAligner):
 
 
 class StarLongWrapper(LongWrapper):
+
+    __toolname__ = "star_long"
 
     def __init__(self, prepare_flag):
 
@@ -309,32 +303,5 @@ class StarLongWrapper(LongWrapper):
                 self.add_edge(star_run, bam2gtf_run)
 
     @property
-    def toolname(self):
-        return "star_long"
-
-    @property
     def indexer(self):
         return StarIndex
-
-
-class StarLongFlag(AtomicOperation):
-
-    # rule hisat_all:
-    # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
-    # 	output: ALIGN_DIR+"/hisat.done"
-    # 	shell: "touch {output}"
-
-    def __init__(self, outdir, runs=[]):
-
-        super().__init__()
-        self.input["runs"] = [run.output["link"] for run in runs]
-        self.output["flag"] = os.path.join(outdir, "star_long.done")
-        self.touch = True
-
-    @property
-    def loader(self):
-        return []
-
-    @property
-    def rulename(self):
-        return "star_long_all"

@@ -23,6 +23,8 @@ def trinity_version(loader):
 
 class TrinityGGWrapper(ShortAssemblerWrapper):
 
+    __toolname__ = "trinity"
+
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
 
@@ -41,21 +43,10 @@ class TrinityGGWrapper(ShortAssemblerWrapper):
                 mappers.append(mapper)
                 self.add_to_gf(mapper)
 
-    @property
-    def toolname(self):
-        return "trinity"
-
-
-class TrinityFlag(AtomicOperation):
-
-    def __init__(self, outdir, gmaps):
-        super().__init__()
-        self.input = {"gffs": [gmap.output["gf"] for gmap in gmaps]}
-        self.touch = True
-        self.output = {"flag": os.path.join(outdir, "trinity_gg.done")}
-
 
 class TrinityGG(ShortAssembler):
+
+    __toolname__ = "trinity"
 
     def __init__(self, bam, run):
         super().__init__(bam, run)
@@ -151,12 +142,10 @@ class TrinityGG(ShortAssembler):
     def suffix(self):
         return ".fa"
 
-    @property
-    def toolname(self):
-        return "trinity"
-
 
 class TrinityGmap(ShortAssembler):
+
+    __toolname__ = "trinity"
 
     def __init__(self, trinitygg: TrinityGG, index: GmapIndex):
 
@@ -189,10 +178,6 @@ class TrinityGmap(ShortAssembler):
     @property
     def rulename(self):
         return 'trinity-gmap-{run}-{alrun}'.format(run=self.run, alrun=self._trinitygg.alrun)
-
-    @property
-    def toolname(self):
-        return "trinity"
 
     @property
     def loader(self):

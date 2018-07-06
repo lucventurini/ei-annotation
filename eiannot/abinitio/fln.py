@@ -9,6 +9,8 @@ import abc
 
 class FlnWrapper(EIWrapper):
 
+    __final_rulename__ = "fln_done"
+
     def __init__(self, mikado: Mikado):  #, masker: RepeatMasking):
 
         super().__init__()
@@ -35,13 +37,18 @@ class FlnWrapper(EIWrapper):
                                    for cat in ("Gold", "Silver", "Bronze"))
             self.add_edges_from([(mikado.stats, self.categories[cat]) for cat in self.categories])
             self.add_edges_from([(fln_filter, self.categories[cat]) for cat in self.categories])
-            self.add_final_flag(os.path.join(self.categories["Gold"].outdir, "fln.done"),
-                                rulename="fln_done{long}".format(long="_long" if mikado.stats.is_long else ""))
+            if mikado.stats.is_long:
+                self.__final_rulename__ += "_long"
+
+            self.add_final_flag()
             assert self.exit
             assert self.entries
         else:
             print("Nothing to do")
 
+    @property
+    def flag_name(self):
+        return os.path.join(self.categories["Gold"].outdir, "fln.done")
 
 class FLNOp(AtomicOperation, metaclass=abc.ABCMeta):
 

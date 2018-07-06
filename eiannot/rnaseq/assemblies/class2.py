@@ -17,10 +17,11 @@ def get_class_location(load):
 
 class Class2Wrapper(ShortAssemblerWrapper):
 
+    __toolname__ = "class2"
+
     def __init__(self, aln_wrapper):
 
         super().__init__(aln_wrapper)
-        outdir = ''  # TODO: implement!
         if len(self.runs) > 0 and len(self.bams) > 0:
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
                 class2 = Class2(bam, run)
@@ -29,19 +30,6 @@ class Class2Wrapper(ShortAssemblerWrapper):
                 self.add_to_gf(stat)
                 continue
 
-    @property
-    def toolname(self):
-        return "class2"
-
-
-class Class2Flag(AtomicOperation):
-
-    def __init__(self, class2s, outdir):
-        super().__init__()
-        self.input = {"gtfs": [class2.output["link"] for class2 in class2s]}
-        self.touch = True
-        self.output = {"flag": os.path.join(outdir, "class2.done")}
-
 
 class Class2(ShortAssembler):
 
@@ -49,9 +37,7 @@ class Class2(ShortAssembler):
 
         super().__init__(bam, run)
 
-    @property
-    def toolname(self):
-        return "class2"
+    __toolname__ = "class2"
 
     @property
     def loader(self):

@@ -584,12 +584,18 @@ class Toucher(AtomicOperation):
         return {"threads": self.threads, "memory": 1, "queue": ""}
 
 
-class EIWorfkflow:
+class EIWorfkflow(metaclass=abc.ABCMeta):
 
     """The workflow is, at its core, a nx.DiGraph.
     We use the dfs_postorder_nodes to get the correct order of printing.
     The goal is to print out a completely correct SnakeMake workflow, where all the
     computation necessary to determine input/output files and how to create them has been already pre-calculated."""
+
+    def __init_subclass__(cls, *args, **kwargs):
+
+        if not hasattr(cls, "__final_rulename__"):
+            raise NotImplementedError("Wrapper {} does not have a define final rulename!".format(cls.__name__))
+        # cls.__init__(*args, **kwargs)
 
     def __init__(self, configuration=None):
 
@@ -765,7 +771,7 @@ class EIWorfkflow:
             raise ValueError("Unexpected: no end nodes in a non-empty graph!")
         return nodes
 
-    def add_final_flag(self, flag, rulename=None):
+    def add_final_flag(self):
         """This method will find all the end nodes of the pipeline and connect them to the final flag."""
         finals = {"inputs": []}
 
@@ -779,7 +785,7 @@ class EIWorfkflow:
 
         # Remove redundancies
         finals["inputs"] = list(set(finals["inputs"]))
-        flag = FinalFlag(finals, flag, configuration=self.configuration, rulename=rulename)
+        flag = FinalFlag(finals, self.flag_name, configuration=self.configuration, rulename=self.final_rule)
         self.add_node(flag)
         self.add_edges_from([(node, flag) for node in nodes])
         # assert flag in self.nodes
@@ -787,6 +793,15 @@ class EIWorfkflow:
     @property
     def threads(self):
         return self.configuration.get("programs", dict()).get("default", dict()).get("threads", 1)
+
+    @property
+    @abc.abstractmethod
+    def flag_name(self):
+        pass
+
+    @property
+    def final_rule(self):
+        return self.__final_rulename__
 
 
 class FinalFlag(AtomicOperation):
@@ -820,7 +835,16 @@ class FinalFlag(AtomicOperation):
         return True
 
 
-class EIWrapper(EIWorfkflow):
+class EIWrapper(EIWorfkflow, metaclass=abc.ABCMeta):
+
+    # Necessary for inheritance
+    __final_rulename__ = "eiwrapper"
+
+    def __init_subclass__(cls, *args, **kwargs):
+
+        if not hasattr(cls, "__final_rulename__"):
+            raise NotImplementedError("Wrapper {} does not have a define final rulename!".format(cls.__name__))
+        super().__init_subclass__(*args, **kwargs)
 
     @property
     def output(self):

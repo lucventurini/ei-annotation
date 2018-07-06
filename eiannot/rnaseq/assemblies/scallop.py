@@ -6,6 +6,8 @@ import itertools
 
 class ScallopWrapper(ShortAssemblerWrapper):
 
+    __toolname__ = "scallop"
+
     def __init__(self, aln_wrapper):
 
         super().__init__(aln_wrapper)
@@ -20,40 +22,15 @@ class ScallopWrapper(ShortAssemblerWrapper):
                 self.add_to_gf(stat)
                 scallops.append(stat)
                 continue
-            # flag = ScallopFlag(scallops, self.outdir)
-            # self.add_edges_from([(scallop, flag) for scallop in scallops])
-
-    @property
-    def toolname(self):
-        return "scallop"
-
-#
-# class ScallopFlag(AtomicOperation):
-#
-#     def __init__(self, scallops, outdir):
-#         super().__init__()
-#         self.input = {"gtfs": [scallop.output["link"] for scallop in scallops]}
-#         self.touch = True
-#         self.output = {"flag": os.path.join(outdir, "scallop.done")}
-#
-#     @property
-#     def rulename(self):
-#         return "scallop_all"
-#
-#     @property
-#     def loader(self):
-#         return []
 
 
 class Scallop(ShortAssembler):
 
+    __toolname__ = "scallop"
+
     def __init__(self, bam, run):
 
         super().__init__(bam, run)
-
-    @property
-    def toolname(self):
-        return "scallop"
 
     @property
     def loader(self):

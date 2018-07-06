@@ -20,6 +20,8 @@ def gmap_intron_lengths(loader, max_intron):
 
 class GsnapWrapper(ShortWrapper):
 
+    __toolname__ = "gsnap"
+
     def __init__(self, configuration, prepare_flag):
 
         # First, we have to build the index
@@ -44,15 +46,13 @@ class GsnapWrapper(ShortWrapper):
             self.add_edges_from([(indexer, run) for run in gsnap_runs])
 
     @property
-    def toolname(self):
-        return "gsnap"  # TODO: double check
-
-    @property
     def indexer(self):
         return GmapIndex
 
 
 class GmapIndex(IndexBuilder):
+
+    __toolname__ = "gmap"
 
     def __init__(self, configuration, outdir):
 
@@ -60,10 +60,6 @@ class GmapIndex(IndexBuilder):
         # TODO: probably the input should be the cleaned up genome
         self.output = {"index": os.path.join(self.outdir, "{}.sachildguide1024".format(self.species))}
         self.touch = True
-
-    @property
-    def toolname(self):
-        return "gmap"
 
     @property
     def out_prefix(self):
@@ -172,9 +168,7 @@ class GsnapAligner(ShortAligner):
     def loader(self):
         return ["gmap", "samtools"]
 
-    @property
-    def toolname(self):
-        return "gsnap"
+    __toolname__ = "gsnap"
 
     @property
     def indexname(self):
@@ -215,9 +209,7 @@ class GmapLongReads(LongAligner):
     def loader(self):
         return ["gmap"]
 
-    @property
-    def toolname(self):
-        return "gmap"
+    __toolname__ = "gmap"
 
     @property
     def suffix(self):
@@ -273,9 +265,7 @@ class GmapLongWrapper(LongWrapper):
                 self.add_edge(indexer, gmap_run)
                 self.add_to_gfs(gmap_run)
 
-    @property
-    def toolname(self):
-        return "gmap_long"
+    __toolname__ = "gmap_long"
 
     @property
     def indexer(self):

@@ -6,6 +6,8 @@ import itertools
 
 class HisatWrapper(ShortWrapper):
 
+    __toolname__ = "hisat2"
+
     def __init__(self, configuration, prepare_flag):
 
         # First, we have to build the index
@@ -38,12 +40,10 @@ class HisatWrapper(ShortWrapper):
     def indexer(self):
         return HisatBuild
 
-    @property
-    def toolname(self):
-        return "hisat2"
-
 
 class HisatAligner(ShortAligner):
+
+    __toolname__ = "hisat2"
 
     def __init__(self, indexer, sample: ShortSample, run: int):
 
@@ -103,10 +103,6 @@ class HisatAligner(ShortAligner):
     def loader(self):
         return ["hisat2", "samtools"]
 
-    @property
-    def toolname(self):
-        return "hisat2"
-
 
 class HisatExtractSplices(AtomicOperation):
 
@@ -145,16 +141,14 @@ class HisatExtractSplices(AtomicOperation):
 
 class HisatBuild(IndexBuilder):
 
+    __toolname__ = "hisat2"
+
     def __init__(self, configuration, outdir):
 
         super().__init__(configuration, outdir)
         # TODO: probably the input should be the cleaned up genome
         self.output = {"flag": os.path.join(self.outdir, "hisat_index.done")}
         self.touch = True
-
-    @property
-    def toolname(self):
-        return "hisat2"
 
     @property
     def out_prefix(self):

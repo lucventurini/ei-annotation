@@ -32,7 +32,13 @@ class AssemblyWrapper(EIWrapper):
                 self.__add_to_gfs(instance)
 
         # print(self.gfs)
-        self.add_final_flag(os.path.join(self.outdir, "all.done"), rulename="asm_all")
+        self.add_final_flag()
+
+    __final_rulename__ = "asm_all"
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "all.done")
 
     @property
     def gfs(self):

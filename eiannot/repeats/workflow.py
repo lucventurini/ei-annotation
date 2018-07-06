@@ -5,72 +5,6 @@ import os
 # from .modeler import
 
 
-class RepeatMasking(EIWrapper):
-
-    def __init__(self, sanitised: PrepareWrapper):
-
-        super().__init__()
-        self.configuration = sanitised.configuration
-
-        if self.execute is True:
-            proteins = SanitizeProteinBlastDB(self.configuration)
-
-            if self.model is True:
-                modeler = ModelerWorkflow(sanitised, proteins)
-                self.add_edges_from([(sanitised, modeler), (proteins, modeler)])
-            else:
-                modeler = None
-            if self.retrieve_known is True:
-                retriever = RetrieveLibraries(self.configuration)
-                self.add_edge(sanitised, retriever)
-            else:
-                retriever = None
-            library_creator = LibraryCreator(sanitiser=sanitised, retriever=retriever, modeler=modeler)
-            [self.add_edge(_, library_creator) for _ in (retriever, modeler) if _ is not None]
-            masker = Masker(sanitised, library_creator)
-            self.add_edge(library_creator, masker)
-            faidx = FaidxMaskedGenome(masker)
-            self.add_edge(masker, faidx)
-
-        else:
-            linker = Linker(sanitised.exit.genome, sanitised.exit.masked_genome,
-                            "genome", "genome", "link_genome_to_masked", self.configuration)
-            self.add_node(linker)
-            fai_linker = Linker(sanitised.fai.output["fai"], sanitised.exit.masked_genome + ".fai",
-                                "fai", "fai", "link_genome_fai_to_masked", self.configuration)
-            self.add_node(fai_linker)
-            self.add_edge(linker, fai_linker)
-
-        assert self.exit
-
-    @property
-    def output(self):
-        return
-
-
-    @property
-    def model(self):
-        return self.configuration.get("repeats", dict()).get("model", True)
-
-    @property
-    def retrieve_known(self):
-        return (self.configuration.get("repeats", dict()).get("species", None) is not None or
-                self.configuration.get("repeats", dict()).get("clade", None) is not None)
-
-    @property
-    def execute(self):
-
-        return (self.model or self.retrieve_known) and self.configuration.get("repeats", dict()).get("execute", False)
-
-    @property
-    def masked_genome(self):
-        return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa")
-
-    @property
-    def fai(self):
-        return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa.fai")
-
-
 class RetrieveLibraries(AtomicOperation):
 
     def __init__(self, configuration):
@@ -224,3 +158,74 @@ class FaidxMaskedGenome(FaidxGenome):
     @property
     def rulename(self):
         return "faidx_masked_genome"
+
+
+class RepeatMasking(EIWrapper):
+
+    __final_rulename__ = "masker_done"
+
+    def __init__(self, sanitised: PrepareWrapper):
+
+        super().__init__()
+        self.configuration = sanitised.configuration
+
+        if self.execute is True:
+            proteins = SanitizeProteinBlastDB(self.configuration)
+
+            if self.model is True:
+                modeler = ModelerWorkflow(sanitised, proteins)
+                self.add_edges_from([(sanitised, modeler), (proteins, modeler)])
+            else:
+                modeler = None
+            if self.retrieve_known is True:
+                retriever = RetrieveLibraries(self.configuration)
+                self.add_edge(sanitised, retriever)
+            else:
+                retriever = None
+            library_creator = LibraryCreator(sanitiser=sanitised, retriever=retriever, modeler=modeler)
+            [self.add_edge(_, library_creator) for _ in (retriever, modeler) if _ is not None]
+            masker = Masker(sanitised, library_creator)
+            self.add_edge(library_creator, masker)
+            faidx = FaidxMaskedGenome(masker)
+            self.add_edge(masker, faidx)
+
+        else:
+            linker = Linker(sanitised.exit.genome, sanitised.exit.masked_genome,
+                            "genome", "genome", "link_genome_to_masked", self.configuration)
+            self.add_node(linker)
+            fai_linker = Linker(sanitised.fai.output["fai"], sanitised.exit.masked_genome + ".fai",
+                                "fai", "fai", "link_genome_fai_to_masked", self.configuration)
+            self.add_node(fai_linker)
+            self.add_edge(linker, fai_linker)
+
+        assert self.exit
+
+    @property
+    def output(self):
+        return
+
+    @property
+    def model(self):
+        return self.configuration.get("repeats", dict()).get("model", True)
+
+    @property
+    def retrieve_known(self):
+        return (self.configuration.get("repeats", dict()).get("species", None) is not None or
+                self.configuration.get("repeats", dict()).get("clade", None) is not None)
+
+    @property
+    def execute(self):
+
+        return (self.model or self.retrieve_known) and self.configuration.get("repeats", dict()).get("execute", False)
+
+    @property
+    def masked_genome(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa")
+
+    @property
+    def fai(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa.fai")
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.exit.outdir, "repeat_masking.done")

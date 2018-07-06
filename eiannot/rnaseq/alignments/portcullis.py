@@ -62,7 +62,13 @@ class PortcullisWrapper(EIWrapper):
                 filters.append(filt)
         self.merger = PortcullisMerge(self.configuration, filters, self.outdir)
         self.add_edges_from([(filt, self.merger) for filt in filters])
-        self.add_final_flag(os.path.join(self.outdir, "portcullis.done"), rulename="portcullis_flag")
+        self.add_final_flag()
+
+    __final_rulename__ = "portcullis_flag"
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "portcullis.done")
 
     @property
     def junctions(self):
@@ -379,43 +385,3 @@ class PortcullisMerge(AtomicOperation):
             cmd += "junctools convert -if portcullis -of igff -o {output[gff3]}  {output[tab]}"
         cmd = cmd.format(**locals())
         return cmd
-
-
-# class PortcullisMergeFailed(AtomicOperation):
-#
-#     def __init__(self, juncs: [PortcullisJunc], merged: PortcullisMerge):
-#
-#         super().__init__()
-#         self.configuration = merged.configuration
-#         self.input["merged"] = merged.output["tab"]
-#         self.input["juncs"] = [junc.output["tab"] for junc in juncs]
-#         self.outdir = merged.outdir
-#         self.output["tab"] = os.path.join(self.outdir, "portcullis.failed.tab"),
-#         self.output["bed"] = os.path.join(self.outdir, "portcullis.failed.bed")
-#         self.output["gff3"] = os.path.join(self.outdir, "portcullis.failed.gff3")
-#         self.output["all"] = os.path.join(self.outdir, "portcullis.all.bed")
-#         self.temps = ["all"]
-#
-#     @property
-#     def loader(self):
-#         return ["portcullis"]
-#
-#     @property
-#     def rulename(self):
-#         return "portcullis_extract_failed"
-#
-#     @property
-#     def cmd(self):
-#
-#         load = self.load
-#         input, output = self.input, self.output
-#         tab_inputs = " ".join(self.input["juncs"])
-#         prefix = "--prefix=portcullis_failed"
-#
-#         cmd = "{load} junctools set union --output {output[all]} {tab_inputs} && "
-#         cmd += " junctools set subtract {prefix} --output={output[tab]} {output[all]} {input[merged]} && "
-#         cmd += " junctools convert -if portcullis -of ebed -o {output[bed]} {output[tab]} && "
-#         cmd += "junctools convert -if portcullis -of igff -o {output[gff3]}  {output[tab]}"
-#         cmd = cmd.format(**locals())
-#         return cmd
-#

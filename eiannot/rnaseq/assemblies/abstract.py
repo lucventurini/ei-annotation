@@ -8,6 +8,13 @@ import networkx as nx
 
 class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError("Wrapper {} does not have a defined toolname!".format(cls.__name__))
+        cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
+        super().__init_subclass__()
+
     def __init__(self, bam: BamStats, run, ref_transcriptome=None):
 
         super(ShortAssembler, self).__init__()
@@ -36,9 +43,8 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
             input=self.input, run=run, toolname=self.toolname)
 
     @property
-    @abc.abstractmethod
     def toolname(self):
-        pass
+        return self.__toolname__
 
     @property
     def gfdir(self):
@@ -145,6 +151,13 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
 class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError("Wrapper {} does not have a defined toolname!".format(cls.__name__))
+        cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
+        super().__init_subclass__()
+
     def __init__(self, aln_wrapper):
         super().__init__(configuration=aln_wrapper.configuration)
         self.__gf_rules = set()
@@ -154,9 +167,8 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         self.configuration = aln_wrapper.configuration
 
     @property
-    @abc.abstractmethod
     def toolname(self):
-        pass
+        return self.__toolname__
 
     def add_to_gf(self, rule):
         if not isinstance(rule, AsmStats):
@@ -187,6 +199,10 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
         assert isinstance(bams, list) and all(isinstance(bam, AtomicOperation) for bam in bams)
         assert all("bam" in bam.input for bam in bams), [bam.output for bam in bams]
         self.__bams = bams
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname))
 
 
 class AsmStats(AtomicOperation):

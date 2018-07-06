@@ -8,7 +8,6 @@ from .rnaseq.mikado.workflow import Mikado
 from .rnaseq.assemblies.workflow import AssemblyWrapper
 from .proteins.workflow import ExonerateProteinWrapper
 from .abinitio.fln import FlnWrapper
-
 import os
 
 
@@ -58,8 +57,10 @@ class AnnotationWorklow(EIWorfkflow):
         self.protein_alignments = ExonerateProteinWrapper(self.repeats, self.portcullis)
         self.merge([self.repeats, self.protein_alignments])
 
+        self.add_final_flag()
 
+    @property
+    def flag_name(self):
+        return os.path.join(self.configuration["outdir"], "all.done")
 
-
-        flag = os.path.join(self.configuration["outdir"], "all.done")
-        self.add_final_flag(flag)
+    __final_rulename__ = "all"

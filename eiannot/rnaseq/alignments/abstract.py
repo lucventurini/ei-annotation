@@ -8,6 +8,13 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
 
     """Abstract class for building the index of a genome, given a tool"""
 
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError("Operation {} does not have a defined toolname!".format(cls.__name__))
+        super().__init_subclass__()
+
+
     def __init__(self, configuration, outdir):
         super(IndexBuilder, self).__init__()
         self.configuration = configuration
@@ -22,9 +29,8 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
         return self.__configuration["programs"][self.toolname]["index"]
 
     @property
-    @abc.abstractmethod
     def toolname(self):
-        pass
+        return self.__toolname__
 
     @property
     def rulename(self):
@@ -75,9 +81,8 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
         return self.__indexer
 
     @property
-    @abc.abstractmethod
     def toolname(self):
-        pass
+        return self.__toolname__
 
     @property
     def bamdir(self):
@@ -180,6 +185,12 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
 class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError()
+        super().__init_subclass__()
+
     def __init__(self,
                  indexer: IndexBuilder,
                  sample,
@@ -206,9 +217,8 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
         )
 
     @property
-    @abc.abstractmethod
     def toolname(self):
-        pass
+        return self.__toolname__
 
     @property
     @abc.abstractmethod
@@ -256,6 +266,13 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
 class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError("Wrapper {} does not have a defined toolname!".format(cls.__name__))
+        cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
+        super().__init_subclass__()
+
     def __init__(self, configuration, prepare_flag):
         self.__finalised = False
         self.__prepare_flag = prepare_flag
@@ -266,9 +283,12 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
         self.__stats = []
 
     @property
-    @abc.abstractmethod
     def toolname(self):
-        pass
+        return self.__toolname__
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname))
 
     def finalise(self):
 
@@ -287,8 +307,7 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
             self.__stats.append(stater)
         self.__bam_rules = new_bams
         self.__add_flag_to_inputs()
-        self.add_final_flag(os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname)),
-                            "{toolname}_flag".format(toolname=self.toolname))
+        self.add_final_flag()
         self.__finalised = True
 
     def add_to_bams(self, rule):
@@ -334,6 +353,13 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
 class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError()
+        cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
+        super().__init_subclass__()
+
     def __init__(self, prepare_flag):
         self.__prepare_flag = prepare_flag
         super().__init__()
@@ -353,8 +379,7 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
             new_gfs.add(stats)
 
         self.__gf_rules = new_gfs
-        self.add_final_flag(os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname)),
-                            "{toolname}_flag".format(toolname=self.toolname))
+        self.add_final_flag()
         self.__add_flag_to_inputs()
         self.__finalised = True
 
@@ -373,9 +398,8 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "4-long-alignments"))
 
     @property
-    @abc.abstractmethod
-    def toolname(self):
-        pass
+    def flag_name(self):
+        return os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname))
 
     def add_to_gfs(self, rule):
         if not isinstance(rule, LongAligner):
@@ -391,6 +415,10 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
     @property
     def gfs(self):
         return self.__gf_rules
+
+    @property
+    def toolname(self):
+        return self.__toolname__
 
     def __add_flag_to_inputs(self):
         self.add_node(self.__prepare_flag.exit)

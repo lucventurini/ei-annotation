@@ -16,6 +16,9 @@ import networkx as nx
 
 
 class Mikado(EIWrapper):
+
+    __final_rulename__ = "mikado_done"
+
     def __init__(self,
                  assemblies: AssemblyWrapper,
                  long_alignments: LongAlignmentsWrapper,
@@ -78,16 +81,19 @@ class Mikado(EIWrapper):
             self.add_edge(self.indexer, self.__stats)
 
         if only_long:
-            rulename = "mikado_done_long"
-        else:
-            rulename = "mikado_done"
-        self.add_final_flag(os.path.join(self.outdir, "mikado.done"), rulename)
+            self.__final_rulename__ = "mikado_done_long"
+
+        self.add_final_flag()
 
         try:
             _ = self.exit.rulename
         except ValueError:
             nodes = [_.rulename for _ in self if not self.adj[_]]
             raise ValueError([(_, [n.rulename for n in nx.ancestors(self.graph, _)]) for _ in nodes])
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "mikado.done")
 
     @property
     def outdir(self):

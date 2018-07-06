@@ -136,8 +136,9 @@ class FaidxProtein(AtomicOperation):
 
 class PrepareWrapper(EIWrapper):
 
-    def __init__(self, configuration, genome):
+    __final_rulename__ = "prepare_flag"
 
+    def __init__(self, configuration, genome):
         super().__init__(configuration)
         self.sanitizer = SanitizeGenome(configuration, genome)
         self.faidx = FaidxGenome(self.sanitizer)
@@ -146,6 +147,10 @@ class PrepareWrapper(EIWrapper):
     @property
     def fai(self):
         return self.faidx
+
+    @property
+    def flag_name(self):
+        return os.path.join(os.path.dirname(self.faidx.output["fai"]), "prepare.done")
 
 
 class DiamondIndex(AtomicOperation):

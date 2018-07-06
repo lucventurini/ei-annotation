@@ -5,35 +5,6 @@ from ..repeats.workflow import RepeatMasking
 import os
 
 
-class ExonerateProteinWrapper(EIWrapper):
-
-    def __init__(self,
-                 masker: RepeatMasking, portcullis: PortcullisWrapper):
-
-        super().__init__()
-        self.configuration = masker.configuration
-        sanitised = SanitizeProteinBlastDB(self.configuration)
-
-        if sanitised.protein_dbs:
-            faidx = FaidxProtein(sanitised)
-            self.add_edge(sanitised, faidx)
-            chunk_proteins = ChunkProteins(sanitised)
-            chunks = [Exonerate(chunk_proteins, chunk, masker) for chunk in range(1, chunk_proteins.chunks + 1)]
-            self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
-            self.add_edges_from([(masker, chunk) for chunk in chunks])
-            collapsed = CollapseExonerate(chunks)
-            self.add_edges_from([(chunk, collapsed) for chunk in chunks])
-            convert = ConvertExonerate(collapsed, faidx)
-            self.add_edge(faidx, convert)
-            self.add_edge(collapsed, convert)
-            filterer = FilterExonerate(converter=convert, portcullis=portcullis,
-                                       masker=masker)
-            self.add_edge(masker, filterer)
-            self.add_edge(portcullis, filterer)
-            self.add_edge(convert, filterer)
-            assert self.exit
-
-
 class ChunkProteins(AtomicOperation):
 
     def __init__(self, sanitised: SanitizeProteinBlastDB):
@@ -225,6 +196,8 @@ class ConvertExonerate(AtomicOperation):
 
 class FilterExonerate(AtomicOperation):
 
+    __rulename__ = "filter_exonerate_alignments"
+
     def __init__(self, converter: ConvertExonerate, portcullis: PortcullisWrapper, masker: RepeatMasking):
 
         super().__init__()
@@ -238,7 +211,7 @@ class FilterExonerate(AtomicOperation):
 
     @property
     def rulename(self):
-        return "filter_exonerate_alignments"
+        return self.__rulename__
 
     @property
     def loader(self):
@@ -285,3 +258,38 @@ class FilterExonerate(AtomicOperation):
     @property
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "proteins", "output")
+
+
+class ExonerateProteinWrapper(EIWrapper):
+
+    __final_rulename__ = "exonerate_done"
+
+    def __init__(self,
+                 masker: RepeatMasking, portcullis: PortcullisWrapper):
+
+        super().__init__()
+        self.configuration = masker.configuration
+        sanitised = SanitizeProteinBlastDB(self.configuration)
+
+        if sanitised.protein_dbs:
+            faidx = FaidxProtein(sanitised)
+            self.add_edge(sanitised, faidx)
+            chunk_proteins = ChunkProteins(sanitised)
+            chunks = [Exonerate(chunk_proteins, chunk, masker) for chunk in range(1, chunk_proteins.chunks + 1)]
+            self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
+            self.add_edges_from([(masker, chunk) for chunk in chunks])
+            collapsed = CollapseExonerate(chunks)
+            self.add_edges_from([(chunk, collapsed) for chunk in chunks])
+            convert = ConvertExonerate(collapsed, faidx)
+            self.add_edge(faidx, convert)
+            self.add_edge(collapsed, convert)
+            filterer = FilterExonerate(converter=convert, portcullis=portcullis,
+                                       masker=masker)
+            self.add_edge(masker, filterer)
+            self.add_edge(portcullis, filterer)
+            self.add_edge(convert, filterer)
+            assert self.exit
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.exit.outdir, "proteins.done")

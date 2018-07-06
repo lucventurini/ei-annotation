@@ -5,6 +5,8 @@ import itertools
 
 class CufflinksWrapper(ShortAssemblerWrapper):
 
+    __toolname__ = "cufflinks"
+
     def __init__(self, align_wrapper):
         super().__init__(align_wrapper)
 
@@ -16,25 +18,17 @@ class CufflinksWrapper(ShortAssemblerWrapper):
                 stat = AsmStats(cufflinks)
                 self.add_edge(cufflinks, stat)
                 self.add_to_gf(stat)
-                # self.add_to_gf(cuffs)
-
-
-    @property
-    def toolname(self):
-        return "cufflinks"
 
 
 class Cufflinks(ShortAssembler):
+
+    __toolname__ = "cufflinks"
 
     def __init__(self, bam, run):
 
         super().__init__(bam, run)
         # Cufflinks has a set name for the output
         self.output["gf"] = os.path.join(self.gfdir, "transcripts.gtf")
-
-    @property
-    def toolname(self):
-        return "cufflinks"
 
     @property
     def loader(self):

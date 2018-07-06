@@ -6,6 +6,8 @@ import itertools
 
 class TopHat2Index(IndexBuilder):
 
+    __toolname__ = "tophat2"
+
     def __init__(self, configuration, outdir):
 
         super().__init__(configuration, outdir)
@@ -18,10 +20,6 @@ class TopHat2Index(IndexBuilder):
     @property
     def out_prefix(self):
         return os.path.abspath(os.path.join(self.outdir[0], self.species))
-
-    @property
-    def toolname(self):
-        return "tophat2"
 
     @property
     def loader(self):
@@ -54,6 +52,8 @@ class TopHat2Index(IndexBuilder):
 
 
 class TopHat2Aligner(ShortAligner):
+
+    __toolname__ = "tophat2"
 
     def __init__(self, index, sample, run):
 
@@ -101,10 +101,6 @@ class TopHat2Aligner(ShortAligner):
         return ["tophat2"]
 
     @property
-    def toolname(self):
-        return "tophat2"
-
-    @property
     def strand(self):
 
         if self.sample.strandedness:
@@ -113,28 +109,10 @@ class TopHat2Aligner(ShortAligner):
             return ''
 
 
-class TopHat2Flag(AtomicOperation):
-
-    def __init__(self, outdir, runs=[]):
-
-        super().__init__()
-        for number, run in enumerate(runs):
-            self.input["run{}".format(number)] = run
-        self.output["flag"] = os.path.join(outdir, "tophat2.done")
-        self.touch = True
-
-    @property
-    def loader(self):
-        return []
-
-    @property
-    def rulename(self):
-        return "tophat2_all"
-
-
 class TopHat2Wrapper(ShortWrapper):
 
     __indexer = TopHat2Index
+    __toolname__ = "tophat2"
 
     def __init__(self, configuration, prepare_flag):
 
@@ -159,10 +137,6 @@ class TopHat2Wrapper(ShortWrapper):
                 self.add_to_bams(tophat2_run)
             self.add_edges_from([(indexer, run) for run in top_runs])
         self.finalise()
-
-    @property
-    def toolname(self):
-        return "tophat2"
 
     @property
     def indexer(self):

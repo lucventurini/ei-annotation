@@ -5,6 +5,8 @@ import itertools
 
 class StrawberryWrapper(ShortAssemblerWrapper):
 
+    __toolname__ = "strawberry"
+
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
 
@@ -18,21 +20,15 @@ class StrawberryWrapper(ShortAssemblerWrapper):
                 self.add_to_gf(stat)
             return
 
-    @property
-    def toolname(self):
-        return "strawberry"
-
 
 class Strawberry(ShortAssembler):
+
+    __toolname__ = "strawberry"
 
     def __init__(self, bam, run):
 
         super().__init__(bam, run)
         self.output["gf"] = os.path.join(self.gfdir, "assembled_transcripts.gtf")
-
-    @property
-    def toolname(self):
-        return "strawberry"
 
     @property
     def loader(self):

@@ -3,41 +3,6 @@ from ..preparation import PrepareWrapper
 import os
 
 
-class ModelerWorkflow(EIWrapper):
-
-    def __init__(self, sanitiser: PrepareWrapper):
-
-        super().__init__()
-        self.configuration = sanitiser.configuration
-        if self.model_repeats is True:
-            builder = BuildModelerDB(sanitiser)
-            modeler = RepeatModeler(builder)
-            # polisher = PolishRepeats(modeler)
-            self.add_edges_from([(sanitiser, builder), (builder, modeler)])
-            if self.polishing_models is not None:
-                polisher = PolishRepeats(modeler)
-            else:
-                polisher = Linker(modeler.output["families"],
-                                  os.path.join(self.outdir, PolishRepeats.outfile),
-                                  "families", "families", "link_unpolished_repeats",
-                                  self.configuration)
-            self.add_edges_from([(modeler, polisher)])
-            assert self.exit
-
-    @property
-    def model_repeats(self):
-        return self.configuration.get("repeats", dict()).get("model", True)
-
-    @property
-    def polishing_models(self):
-        return self.configuration.get("repeats", dict()).get("polishing_models", None)
-
-    @property
-    def outdir(self):
-
-        return os.path.join(self.configuration["outdir"], "repeats", "output")
-
-
 class BuildModelerDB(AtomicOperation):
 
     def __init__(self, sanitiser: PrepareWrapper):
@@ -137,6 +102,7 @@ class PolishRepeats(AtomicOperation):
 
     masked_file = RepeatModeler.outfile + ".masked"
     outfile = "modelled_repeats.fa"
+    __rulename__ = "polish_modeler_repeats"
 
     def __init__(self, modeler: RepeatModeler):
 
@@ -159,7 +125,7 @@ class PolishRepeats(AtomicOperation):
 
     @property
     def rulename(self):
-        return "polish_modeler_repeats"
+        return self.__rulename__
 
     @property
     def cmd(self):
@@ -188,3 +154,44 @@ class PolishRepeats(AtomicOperation):
     @property
     def polishing_models(self):
         return self.configuration.get("repeats", dict()).get("polishing_models", None)
+
+
+class ModelerWorkflow(EIWrapper):
+
+    __final_rulename__ = PolishRepeats.__rulename__
+
+    def __init__(self, sanitiser: PrepareWrapper):
+
+        super().__init__()
+        self.configuration = sanitiser.configuration
+        if self.model_repeats is True:
+            builder = BuildModelerDB(sanitiser)
+            modeler = RepeatModeler(builder)
+            # polisher = PolishRepeats(modeler)
+            self.add_edges_from([(sanitiser, builder), (builder, modeler)])
+            if self.polishing_models is not None:
+                self.polisher = PolishRepeats(modeler)
+            else:
+                self.polisher = Linker(modeler.output["families"],
+                                  os.path.join(self.outdir, PolishRepeats.outfile),
+                                  "families", "families", "link_unpolished_repeats",
+                                  self.configuration)
+            self.add_edges_from([(modeler, self.polisher)])
+            assert self.exit
+
+    @property
+    def model_repeats(self):
+        return self.configuration.get("repeats", dict()).get("model", True)
+
+    @property
+    def polishing_models(self):
+        return self.configuration.get("repeats", dict()).get("polishing_models", None)
+
+    @property
+    def outdir(self):
+
+        return os.path.join(self.configuration["outdir"], "repeats", "output")
+
+    @property
+    def flag_name(self):
+        return self.polisher.output["link"]
