@@ -28,16 +28,16 @@ def get_sub_commands(SCHEDULER, prefix, additional, log_folder):
     res_cmd = ""
     sub_cmd = ""
 
-    if SCHEDULER == "LSF":
+    if SCHEDULER.upper() == "LSF":
         sub_cmd = "bsub"
         res_cmd = " ".join([" -R rusage[mem={{cluster.memory}}]span[ptile={{threads}}] -n {{threads}}",
                             "-q {{cluster.queue}} -oo /dev/null",
                             "-J {prefix}_{rule} -oo {log_folder}/{prefix}_{{rule}}_%j.out"]).format(
             **locals())
-    elif SCHEDULER == "PBS":
+    elif SCHEDULER.upper() == "PBS":
         sub_cmd = "qsub"
         res_cmd = " -lselect=1:mem={cluster.memory}MB:ncpus={threads} -q {cluster.queue}"
-    elif SCHEDULER == "SLURM":
+    elif SCHEDULER.upper() == "SLURM":
         sub_cmd = "sbatch"
         res_cmd = " ".join([" -N 1 -n 1 -c {{threads}} -p {{params.queue}} --mem={{params.memory}}",
                             "-J {prefix}_{{rule}} -o {log_folder}/{prefix}_{{rule}}_%j.out ",
