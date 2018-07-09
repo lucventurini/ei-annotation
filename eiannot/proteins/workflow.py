@@ -288,6 +288,7 @@ class ExonerateProteinWrapper(EIWrapper):
             self.add_edge(masker, filterer)
             self.add_edge(portcullis, filterer)
             self.add_edge(convert, filterer)
+            self.add_final_flag()
             assert self.exit
 
     @property
