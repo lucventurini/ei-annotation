@@ -1,7 +1,7 @@
 from ..alignments.portcullis import PortcullisWrapper
-from ..assemblies.workflow import AssemblyWrapper
-from . import MikadoOp
-from ..alignments.workflow import LongAlignmentsWrapper  # , LongAligner
+# from ..assemblies.workflow import AssemblyWrapper
+from .abstract import MikadoOp
+from ..alignments.__init__ import LongAlignmentsWrapper  # , LongAligner
 import os
 
 
@@ -9,7 +9,7 @@ class MikadoConfig(MikadoOp):
 
     def __init__(self,
                  portcullis_wrapper: PortcullisWrapper,
-                 assemblies: AssemblyWrapper,
+                 assemblies,  #: AssemblyWrapper,
                  long_aln_wrapper: LongAlignmentsWrapper,
                  is_long: bool):
         super().__init__(is_long=is_long)

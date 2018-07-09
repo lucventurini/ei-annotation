@@ -1,5 +1,5 @@
 from ...abstract import AtomicOperation, EIWrapper, ShortSample
-from .workflow import ShortAlignmentsWrapper
+from .__init__ import ShortAlignmentsWrapper
 import os
 import re
 import functools

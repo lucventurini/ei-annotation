@@ -1,5 +1,5 @@
 # from distutils.core import setup
-from setuptools import setup
+from setuptools import setup, find_packages
 from distutils.extension import Extension
 import os
 from glob import glob
@@ -19,5 +19,7 @@ setup(
     version="0.0.1",
     ext_modules=extensions,
     scripts=glob(os.path.join("eiannot", "util", "*py")) + glob(os.path.join("eiannot", "util", "*pl")),
-    entry_points={"console_scripts": ["eiannot = eiannot.cli:main"]}
+    entry_points={"console_scripts": ["eiannot = eiannot.cli:main"]},
+    install_requires=[line.rstrip() for line in open("requirements.txt", "rt")],
+    packages=find_packages(".")
 )

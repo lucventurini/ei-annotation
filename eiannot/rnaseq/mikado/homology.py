@@ -3,7 +3,7 @@ import abc
 from ...abstract import AtomicOperation, EIWrapper
 from .prepare import MikadoPrepare
 from ...preparation import DiamondIndex, BlastxIndex, SanitizeProteinBlastDB
-from . import MikadoOp
+from .abstract import MikadoOp
 
 
 class SplitMikadoPrepareFasta(MikadoOp):

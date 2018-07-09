@@ -1,8 +1,8 @@
 from ..abstract import EIWrapper, AtomicOperation
 from ..rnaseq.mikado.pick import MikadoStats
-from ..rnaseq.mikado.workflow import Mikado
-from ..rnaseq.mikado import MikadoOp
-from ..repeats.workflow import RepeatMasking
+from ..rnaseq.mikado import Mikado
+from ..rnaseq.mikado.abstract import MikadoOp
+from ..repeats.__init__ import RepeatMasking
 import os
 import abc
 

@@ -1,4 +1,4 @@
-from . import MikadoOp
+from .abstract import MikadoOp
 from ...preparation import FaidxGenome
 from ..alignments.portcullis import PortcullisWrapper
 from .prepare import MikadoPrepare

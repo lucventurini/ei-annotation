@@ -1,6 +1,5 @@
 import os
-from . import MikadoOp
-from ...abstract import AtomicOperation
+from .abstract import MikadoOp
 import abc
 from Bio.Data import CodonTable
 from .prepare import MikadoPrepare

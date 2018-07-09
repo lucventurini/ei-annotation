@@ -1,12 +1,12 @@
 from .abstract import EIWorfkflow, FinalFlag
 from .preparation import PrepareWrapper, FaidxProtein, SanitizeProteinBlastDB
-from .repeats.workflow import RepeatMasking
+from .repeats.__init__ import RepeatMasking
 from .preparation.prepare import parse_samplesheet
-from .rnaseq.alignments.workflow import ShortAlignmentsWrapper, LongAlignmentsWrapper
+from .rnaseq.alignments.__init__ import ShortAlignmentsWrapper, LongAlignmentsWrapper
 from .rnaseq.alignments.portcullis import PortcullisWrapper
-from .rnaseq.mikado.workflow import Mikado
-from .rnaseq.assemblies.workflow import AssemblyWrapper
-from .proteins.workflow import ExonerateProteinWrapper
+from .rnaseq.mikado.__init__ import Mikado
+from .rnaseq.assemblies.__init__ import AssemblyWrapper
+from .proteins.__init__ import ExonerateProteinWrapper
 from .abinitio.fln import FlnWrapper
 import os
 

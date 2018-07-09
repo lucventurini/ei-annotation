@@ -1,11 +1,11 @@
 import argparse
 from ..workflow import AnnotationWorklow
-from ..rnaseq.alignments.workflow import LongAlignmentsWrapper, ShortAlignmentsWrapper
+from ..rnaseq.alignments.__init__ import LongAlignmentsWrapper, ShortAlignmentsWrapper
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
-from ..rnaseq.assemblies.workflow import ShortAssemblerWrapper
-from ..proteins.workflow import ExonerateProteinWrapper
-from ..repeats.workflow import RepeatMasking
-from ..rnaseq.mikado.workflow import Mikado
+from ..rnaseq.assemblies.__init__ import ShortAssemblerWrapper
+from ..proteins.__init__ import ExonerateProteinWrapper
+from ..repeats.__init__ import RepeatMasking
+from ..rnaseq.mikado.__init__ import Mikado
 import yaml
 import snakemake
 from itertools import chain

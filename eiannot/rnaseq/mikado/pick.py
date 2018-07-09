@@ -1,5 +1,5 @@
 import os
-from . import MikadoOp, __modes__
+from .abstract import MikadoOp, __modes__
 from .serialise import MikadoSerialise
 
 

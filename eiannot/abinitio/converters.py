@@ -1,8 +1,8 @@
 from ..abstract import AtomicOperation, EIWrapper
-from ..rnaseq.mikado.workflow import Mikado
+from ..rnaseq.mikado.__init__ import Mikado
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
-from ..repeats.workflow import RepeatMasking
-from ..proteins.workflow import ExonerateProteinWrapper
+from ..repeats.__init__ import RepeatMasking
+from ..proteins.__init__ import ExonerateProteinWrapper
 import os
 
 
