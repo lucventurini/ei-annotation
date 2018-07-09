@@ -4,6 +4,7 @@ from ..rnaseq.alignments.workflow import LongAlignmentsWrapper, ShortAlignmentsW
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
 from ..rnaseq.assemblies.workflow import ShortAssemblerWrapper
 from ..proteins.workflow import ExonerateProteinWrapper
+from ..repeats.workflow import RepeatMasking
 from ..rnaseq.mikado.workflow import Mikado
 import yaml
 import snakemake
@@ -53,9 +54,10 @@ def main():
         "align": [
                 LongAlignmentsWrapper.__final_rulename__,
                 ShortAlignmentsWrapper.__final_rulename__,
-                ExonerateProteinWrapper.__final_rulename__,
                 PortcullisWrapper.__final_rulename__
                   ],
+        "repeats": [RepeatMasking.__final_rulename__],
+        "proteins": [ExonerateProteinWrapper.__final_rulename__],
         "assemble": [ShortAssemblerWrapper.__final_rulename__],
     }
 

@@ -159,6 +159,10 @@ class FaidxMaskedGenome(FaidxGenome):
     def rulename(self):
         return "faidx_masked_genome"
 
+    @property
+    def outdir(self):
+        return os.path.dirname(self.masked_genome)
+
 
 class RepeatMasking(EIWrapper):
 
@@ -173,7 +177,7 @@ class RepeatMasking(EIWrapper):
             proteins = SanitizeProteinBlastDB(self.configuration)
 
             if self.model is True:
-                modeler = ModelerWorkflow(sanitised, proteins)
+                modeler = ModelerWorkflow(sanitised)
                 self.add_edges_from([(sanitised, modeler), (proteins, modeler)])
             else:
                 modeler = None
@@ -192,13 +196,20 @@ class RepeatMasking(EIWrapper):
         else:
             linker = Linker(sanitised.exit.genome, sanitised.exit.masked_genome,
                             "genome", "genome", "link_genome_to_masked", self.configuration)
+            linker.outdir = self.outdir
             self.add_node(linker)
             fai_linker = Linker(sanitised.fai.output["fai"], sanitised.exit.masked_genome + ".fai",
                                 "fai", "fai", "link_genome_fai_to_masked", self.configuration)
+            fai_linker.outdir = self.outdir
             self.add_node(fai_linker)
             self.add_edge(linker, fai_linker)
 
+        self.add_final_flag()
         assert self.exit
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "repeats", "output")
 
     @property
     def output(self):
