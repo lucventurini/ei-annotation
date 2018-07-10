@@ -1,6 +1,6 @@
 from .abstract import ShortAssembler, ShortAssemblerWrapper
 from ...abstract import AtomicOperation, ShortSample
-from ..alignments.gmap import GmapIndex, gmap_intron_lengths
+from ..alignments.gmap import GmapIndex, GmapLink, gmap_intron_lengths
 import functools
 import subprocess as sp
 import re
@@ -29,7 +29,13 @@ class TrinityGGWrapper(ShortAssemblerWrapper):
         super().__init__(aln_wrapper)
 
         if len(self.runs) > 0 and len(self.bams) > 0:
-            indexer = GmapIndex(aln_wrapper.configuration, self.outdir)
+            indexer = None
+            for node in aln_wrapper:
+                if isinstance(node, (GmapIndex, GmapLink)):
+                    indexer = node
+                    break
+            if indexer is None:
+                indexer = GmapIndex(aln_wrapper.configuration, self.outdir)
 
             trinities = []
             mappers = []

@@ -1,7 +1,8 @@
-from ...abstract import AtomicOperation, EIWrapper, ShortSample
-from .abstract import IndexBuilder, ShortAligner, ShortWrapper
+from ...abstract import AtomicOperation, ShortSample
+from .abstract import IndexBuilder, ShortAligner, ShortWrapper, IndexLinker
 import os
 import itertools
+import glob
 
 
 class HisatWrapper(ShortWrapper):
@@ -19,7 +20,11 @@ class HisatWrapper(ShortWrapper):
 
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = self.indexer(configuration, self.outdir)
+            print(self.configuration["programs"][self.toolname])
+            if self.prebuilt is True:
+                indexer = HisatLinker(configuration, self.outdir)
+            else:
+                indexer = self.indexer(configuration, self.outdir)
             self.add_node(indexer)
             assert len(indexer.output) == 1, indexer.output
             # Optionally build the reference splice catalogue
@@ -39,6 +44,42 @@ class HisatWrapper(ShortWrapper):
     @property
     def indexer(self):
         return HisatBuild
+
+
+class HisatLinker(IndexLinker):
+
+    __toolname__ = "hisat2"
+
+    def __init__(self, configuration, outdir):
+
+        super().__init__(configuration, outdir)
+        self.configuration = configuration
+        self.input["index_folder"] = self.index_folder
+        self.input["index_files"] = glob.glob(os.path.join(self.index_folder,
+                                                           "{index_name}*".format(index_name=self.index_name)))
+        self.output = {"flag": os.path.join(self.outdir, "hisat_index.done")}
+        self.touch = True
+
+    @property
+    def cmd(self):
+        outdir = self.outdir
+        cmd = "mkdir -p {outdir} ".format(**locals())
+        for fname in self.input["index_files"]:
+            link_src = os.path.relpath(os.path.abspath(fname), start=self.outdir)
+
+            link_dest = os.path.join(self.outdir,
+                                     self.species + '.' + '.'.join(fname.split('.')[1:]))
+            cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
+
+        return cmd
+
+    @property
+    def index(self):
+        return os.path.abspath(os.path.join(self.outdir, self.species))
+
+    @property
+    def loader(self):
+        return []
 
 
 class HisatAligner(ShortAligner):

@@ -67,6 +67,8 @@ def main():
     parser.add_argument('-g', '--genome', help="Genome FASTA file. Required.", required=True)
     parser.add_argument("--steps", choices=steps, nargs="+", default=[])
     parser.add_argument("--logdir", default=os.path.join(".", "eiannot-log"))
+    parser.add_argument("-w", "--write-only", action="store_true", default=False, dest="write_only",
+                        help="Flag. If set, the program will stop after creating the Snakemake.")
 
     snakeparse = parser.add_argument_group("Snakemake options")
     snakeparse.add_argument("--cores", default=1, type=int)
@@ -143,6 +145,9 @@ Please use the \"-nd\" flag to run the Ei-Annot pipeline if you do not plan to u
             args.no_drmaa = True
         else:
             drmaa_var = res_cmd
+
+    if args.write_only:
+        return
 
     snakemake.snakemake(out.name,
                         dryrun=args.dryrun,

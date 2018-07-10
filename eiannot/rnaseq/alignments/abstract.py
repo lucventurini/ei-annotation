@@ -2,6 +2,7 @@ import abc
 from ...abstract import ShortSample, LongSample, AtomicOperation, EIWrapper
 import os
 from .bam import BamIndex, BamSort, BamStats
+import glob
 
 
 class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
@@ -25,10 +26,6 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
         self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
 
     @property
-    def extra(self):
-        return self.__configuration["programs"][self.toolname]["index"]
-
-    @property
     def toolname(self):
         return self.__toolname__
 
@@ -47,7 +44,92 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def extra(self):
-        return self.configuration["programs"].get(self.toolname, dict()).get("index_extra", '')
+        return self.configuration["programs"].get(self.toolname, dict()).get("index", {}).get("extra", '')
+
+    @property
+    def resources(self):
+
+        """This property will define the resources to be used for each rule."""
+
+        # default = self.configuration["resources"]["default"]
+        #
+        # if self.step and self.step in self.configuration["resources"]:
+        #     default.update(self.configuration["resources"][self.__step])
+        default = dict()
+        assert "programs" in self.configuration, self.rulename
+
+        for key in "memory", "queue", "threads":
+            default[key] = self.__retrieve_resource_from_programs(key)
+
+        return default
+
+    def __retrieve_resource_from_programs(self, resource):
+
+        res = None
+        if (hasattr(self, "toolname") and
+                    self.toolname in self.configuration["programs"]):
+            if ("index" in self.configuration["programs"][self.toolname] and
+                    resource in self.configuration["programs"][self.toolname]["index"]):
+                res = self.configuration["programs"][self.toolname]["index"][resource]
+            elif resource in self.configuration["programs"][self.toolname]:
+                res = self.configuration["programs"][self.toolname][resource]
+        if res is None:
+            res = self.configuration["programs"]["default"][resource]
+
+        return res
+
+
+class IndexLinker(AtomicOperation, metaclass=abc.ABCMeta):
+
+    """Abstract atomic operation for linking a pre-built genome index into place, if available."""
+
+    """Abstract class for building the index of a genome, given a tool"""
+
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError("Operation {} does not have a defined toolname!".format(cls.__name__))
+        super().__init_subclass__()
+
+    def __init__(self, configuration, outdir):
+        super(IndexLinker, self).__init__()
+        self.configuration = configuration
+        self.input = {"genome": self.genome}
+        self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
+
+    @property
+    def index_folder(self):
+        return self.configuration["programs"][self.toolname]["index"]["index_folder"]
+
+    @property
+    def index_name(self):
+        return self.configuration["programs"][self.toolname]["index"]["index_name"]
+
+    @property
+    def toolname(self):
+        return self.__toolname__
+
+    @property
+    def rulename(self):
+        return "{toolname}_index_link".format(toolname=self.toolname)
+
+    @property
+    @abc.abstractmethod
+    def index(self):
+        pass
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "indices", self.toolname)
+
+    @property
+    @abc.abstractmethod
+    def cmd(self):
+        pass
+
+    @property
+    def threads(self):
+        return 1
 
 
 class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
@@ -321,6 +403,16 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
         self.__bam_rules.add(rule)
 
     @property
+    def prebuilt(self):
+        if "index" not in self.configuration["programs"][self.toolname]:
+            print("Index not found for {}".format(self.toolname))
+            return False
+
+        if (self.configuration["programs"][self.toolname]["index"].get("index_folder", None) and
+                self.configuration["programs"][self.toolname]["index"].get("index_name", None)):
+            return True
+
+    @property
     def bams(self):
         """This property will the output files (ie BAMs) of the wrapper."""
         return self.__bam_rules
@@ -382,6 +474,16 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         self.add_final_flag()
         self.__add_flag_to_inputs()
         self.__finalised = True
+
+    @property
+    def prebuilt(self):
+        if "index" not in self.configuration["programs"][self.toolname]:
+            print("Index not found for {}".format(self.toolname))
+            return False
+
+        if (self.configuration["programs"][self.toolname]["index"].get("index_folder", None) and
+                self.configuration["programs"][self.toolname]["index"].get("index_name", None)):
+            return True
 
     @property
     @abc.abstractmethod

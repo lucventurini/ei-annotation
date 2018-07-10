@@ -14,9 +14,9 @@ programs:
   hisat2:
     load: ''
     runs: ['']
-  gsnap:
-    load: ''
-    runs: ['']
+    index:
+      index_name: 'eiannot'
+      index_folder: 'Eiannot/indices/hisat2'
   star:
     load: ''
     runs: []  # ['']
@@ -25,9 +25,17 @@ programs:
   portcullis:
     execute: true
     load: ''
-  gmap_long:
-    runs: ['']
+  gmap: &gmap
     load: ''
+    index:
+      index_name: 'eiannot'
+      index_folder: 'Eiannot/indices/gmap/'
+  gsnap:
+    <<: *gmap
+    runs: ['']
+  gmap_long:
+    <<: *gmap
+    runs: []
   star_long:
     runs: []
     load: ''
@@ -51,7 +59,8 @@ programs:
     execute: true  # unused as of yet
     taxon: "plants"
     dbs: "p"
-outdir: "Eiannot"
+outdir: "eitest"
+name: "eitest"
 mikado_homology:
   prot_db: &prot_db
   - "subset.sprot.fasta"

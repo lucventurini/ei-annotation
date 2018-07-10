@@ -1,9 +1,9 @@
-# from ...abstract import AtomicOperation, EIWrapper, ShortSample
-from .abstract import IndexBuilder, ShortAligner, ShortWrapper, LongWrapper, LongAligner
+from .abstract import IndexBuilder, ShortAligner, ShortWrapper, LongWrapper, LongAligner, IndexLinker
 import os
 import itertools
 import functools
 import subprocess
+import glob
 
 
 @functools.lru_cache(4, typed=True)
@@ -32,7 +32,6 @@ class GsnapWrapper(ShortWrapper):
         # Retrieve the running parameters
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            self.add_node(self.indexer(configuration, self.outdir))
             # Optionally build the reference splice catalogue
             gsnap_runs = []
             indexer = self.indexer(self.configuration, self.outdir)
@@ -47,7 +46,10 @@ class GsnapWrapper(ShortWrapper):
 
     @property
     def indexer(self):
-        return GmapIndex
+        if self.prebuilt:
+            return GmapLink
+        else:
+            return GmapIndex
 
 
 class GmapIndex(IndexBuilder):
@@ -85,21 +87,82 @@ class GmapIndex(IndexBuilder):
         log = self.log
         extra = self.extra
 
-        if False:  #  TODO: self.index_folder and self.index_name:
-            pass
-        else:
-            cmd = "{load} gmap_build --dir={outdir} --db={species} {extra} {input[genome]} > {log} 2>&1".format(
-            **locals())
+        cmd = "{load} gmap_build --dir={outdir} --db={species} {extra} {input[genome]} > {log} 2>&1".format(**locals())
 
         return cmd
 
     @property
     def loader(self):
-        return ["gmap", "eiannot"]
+        return ["gmap"]
 
     @property
     def indexdir(self):
         return os.path.abspath(os.path.dirname(self.output["index"]))
+
+    @property
+    def dbname(self):
+        return self.species
+
+    @property
+    def index(self):
+        return self.dbname
+
+
+class GmapLink(IndexLinker):
+
+    __toolname__ = "gmap"
+
+    def __init__(self, configuration, outdir):
+
+        super().__init__(configuration, outdir)
+        self.input["index_folder"] = self.index_folder
+        self.input["index_files"] = glob.glob(os.path.join(self.index_folder,
+                                                           self.index_name,
+                                                           "{index_name}*".format(index_name=self.index_name)))
+        self.input["index_files"] += glob.glob(os.path.join(self.index_folder,
+                                                            "{index_name}*".format(index_name=self.index_name)))
+        self.output = {"index": os.path.join(self.outdir, "{}.sachildguide1024".format(self.species))}
+        self.touch = True
+
+    @property
+    def cmd(self):
+        outdir = self.outdir
+        species = self.species
+
+        cmd = "mkdir -p {outdir} && mkdir -p {outdir}/{species}".format(**locals())
+        for fname in glob.glob(os.path.join(
+                os.path.abspath(self.index_folder),
+                "{index_name}*".format(index_name=self.index_name))):
+            if os.path.isdir(fname):
+                continue
+            link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir))
+            link_dest = os.path.join(self.outdir,
+                                     '.'.join([self.species] + os.path.basename(fname).split('.')[1:]))
+            cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
+        # Now inside the folder
+
+        for fname in glob.glob(os.path.join(
+                os.path.abspath(self.index_folder),
+                self.index_name,
+                "{index_name}*".format(index_name=self.index_name))):
+            if os.path.isdir(fname):
+                continue
+            link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir,
+                                                                                  self.species))
+            link_dest = os.path.join(self.outdir,
+                                     self.species,
+                                     '.'.join([self.species] + os.path.basename(fname).split('.')[1:]))
+            cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
+
+        return cmd
+
+    @property
+    def indexdir(self):
+        return os.path.abspath(os.path.dirname(self.output["index"]))
+
+    @property
+    def loader(self):
+        return []
 
     @property
     def dbname(self):
@@ -275,4 +338,7 @@ class GmapLongWrapper(LongWrapper):
 
     @property
     def indexer(self):
-        return GmapIndex
+        if self.prebuilt:
+            return GmapLink
+        else:
+            return GmapIndex

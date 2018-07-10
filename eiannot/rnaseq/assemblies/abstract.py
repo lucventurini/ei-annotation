@@ -217,7 +217,7 @@ class AsmStats(AtomicOperation):
             raise KeyError((asm_run.rulename, asm_run.output))
         self.sample = asm_run.sample
         self.output["stats"] = self.input["gf"] + ".stats"
-        self.message = "Computing assembly stats for: {input[gf]}"
+        self.message = "Computing assembly stats for: {input[gf]}".format(input=self.input)
         self.log = self.output["stats"] + ".log"
         self.__asm_run = asm_run
 
