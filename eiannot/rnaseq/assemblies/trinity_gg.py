@@ -151,6 +151,7 @@ class TrinityGmap(ShortAssembler):
 
         super().__init__(bam=trinitygg, run=trinitygg.run)
         self.input['transcripts'] = trinitygg.output["transcripts"]
+        self.input["fai"] = index.input["fai"]
         self.input.update(index.output)
         self.message = "Mapping trinity transcripts to the genome: {input[transcripts]}".format(
             input=self.input
@@ -181,7 +182,7 @@ class TrinityGmap(ShortAssembler):
 
     @property
     def loader(self):
-        return ["gmap"]
+        return ["gmap", "eiannot"]
 
     @property
     def coverage(self):
@@ -204,7 +205,8 @@ class TrinityGmap(ShortAssembler):
         strand = self.strand
         min_intron = self.min_intron
         max_intron = gmap_intron_lengths(self.load, self.max_intron)
-        cmd += "gmap --dir={index_dir} {strand} --db {db} --min-intronlength={min_intron} "
+        genome = self.genome
+        cmd += "$(determine_gmap.py {genome}) --dir={index_dir} {strand} --db {db} --min-intronlength={min_intron} "
         cmd += "{max_intron} "
         identity = self.identity
         coverage = self.coverage

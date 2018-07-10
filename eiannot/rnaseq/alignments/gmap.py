@@ -85,14 +85,17 @@ class GmapIndex(IndexBuilder):
         log = self.log
         extra = self.extra
 
-        cmd = "{load} gmap_build --dir={outdir} --db={species} {extra} {input[genome]} > {log} 2>&1".format(
-            **locals()
-        )
+        if False:  #  TODO: self.index_folder and self.index_name:
+            pass
+        else:
+            cmd = "{load} gmap_build --dir={outdir} --db={species} {extra} {input[genome]} > {log} 2>&1".format(
+            **locals())
+
         return cmd
 
     @property
     def loader(self):
-        return ["gmap"]
+        return ["gmap", "eiannot"]
 
     @property
     def indexdir(self):
@@ -148,7 +151,8 @@ class GsnapAligner(ShortAligner):
         cmd = "{load}"
         indexdir = self.indexer.indexdir
         dbname = self.indexer.dbname
-        cmd += "gsnap --dir={indexdir} --db={dbname} {extra} --novelsplicing=1 "
+        genome = self.genome
+        cmd += "$(determine_gmap.py -s {genome}) --dir={indexdir} --db={dbname} {extra} --novelsplicing=1 "
         min_intron, max_intron = self.min_intron, self.max_intron
         extra = self.extra
         bamdir = self.bamdir
@@ -166,7 +170,7 @@ class GsnapAligner(ShortAligner):
 
     @property
     def loader(self):
-        return ["gmap", "samtools"]
+        return ["gmap", "samtools", "eiannot"]
 
     __toolname__ = "gsnap"
 
@@ -207,7 +211,7 @@ class GmapLongReads(LongAligner):
 
     @property
     def loader(self):
-        return ["gmap"]
+        return ["gmap", "eiannot"]
 
     __toolname__ = "gmap"
 
@@ -228,7 +232,9 @@ class GmapLongReads(LongAligner):
         min_intron = self.min_intron
         index = self.indexer.indexdir
         dbname = self.indexer.dbname
-        cmd = "{load} gmap --dir={index} --db {dbname} --min-intronlength={min_intron} {max_intron}"
+        genome = self.genome
+
+        cmd = "{load} $(determine_gmap.py {genome}) --dir={index} --db {dbname} --min-intronlength={min_intron} {max_intron}"
         input, output, log = self.input, self.output, self.log
         cmd += " --format=3 {input[read1]} > {output[gf]} 2> {log} "
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))

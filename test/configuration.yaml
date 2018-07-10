@@ -16,7 +16,7 @@ programs:
     runs: ['']
   gsnap:
     load: ''
-    runs: []
+    runs: ['']
   star:
     load: ''
     runs: []  # ['']

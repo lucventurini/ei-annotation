@@ -183,9 +183,9 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
         # TODO: this must be changed!
 
-        return (hash(self) == hash(other) and
-                self.input == other.input and self.output == other.output and
-                str(self) == str(other))
+        return (type(self) == type(other) and
+                self.rulename == other.rulename and
+                self.input == other.input and self.output == other.output)
 
     @property
     @abc.abstractmethod

@@ -85,6 +85,7 @@ def main():
 
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--flank", type=int, default=1000)
+    parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
     parser.add_argument("fln")
     parser.add_argument("mikado")
     parser.add_argument("out")
@@ -119,12 +120,13 @@ def main():
     gold = merged[(
         (merged.Status.str.match("complete", case=False)) &
         ((merged["ORF_start"] == merged["mikado_orf_start"]) & (merged["ORF_end"] == merged["mikado_orf_end"])) &
-        ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length>=300) &
+        ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length >= 300) &
          (merged.five_utr_num == 2) & (merged.three_utr_num == 1))
     )]  # [[merged.columns[0], "parent"]]
 
     training_candidates = gold[(
          (gold.combined_cds_fraction >= 0.5) &
+         (gold.max_intron_length <= args.max_intron) &
          (gold.transcripts_per_gene == 1) & (gold.source_score == gold.source_score.max()))
     ][[gold.columns[0], "parent"]]
     training_candidates = remove_genes_with_overlaps(training_candidates, indexer, positions, genes, args.flank)
