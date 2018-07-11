@@ -55,8 +55,15 @@ class HisatLinker(IndexLinker):
         super().__init__(configuration, outdir)
         self.configuration = configuration
         self.input["index_folder"] = self.index_folder
-        self.input["index_files"] = glob.glob(os.path.join(self.index_folder,
-                                                           "{index_name}*".format(index_name=self.index_name)))
+
+        index_files = []
+
+        for fname in glob.glob(os.path.join(self.index_folder,
+                                                           "{index_name}*".format(index_name=self.index_name))):
+            if fname.endswith("ht2") or fname.endswith("ht2l"):
+                index_files.append(fname)
+        assert len(index_files) > 0
+        self.input["index_files"] = index_files
         self.output = {"flag": os.path.join(self.outdir, "hisat_index.done")}
         self.touch = True
 
