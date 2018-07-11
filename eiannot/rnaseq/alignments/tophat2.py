@@ -1,7 +1,50 @@
-from ...abstract import AtomicOperation, EIWrapper, ShortSample, LongSample
-from .abstract import IndexBuilder, ShortAligner, ShortWrapper
+from .abstract import IndexBuilder, IndexLinker, ShortAligner, ShortWrapper
 import os
 import itertools
+import glob
+
+
+class TopHat2IndexLink(IndexLinker):
+
+    __toolname__ = "tophat2"
+
+    def __init__(self, configuration, outdir):
+
+        super().__init__(configuration, outdir)
+        self.input["index_folder"] = self.index_folder
+
+        index_files = []
+
+        for fname in glob.glob(os.path.join(self.index_folder,
+                                            "{index_name}*".format(index_name=self.index_name))):
+            if fname.endswith("bt2") or fname.endswith("bt2l"):
+                index_files.append(fname)
+        assert len(index_files) > 0
+        self.input["index_files"] = index_files
+        self.output = {"flag": os.path.join(self.outdir, "tophat2_index.done")}
+        self.touch = True
+        self.message = "Linking pre-built {} genome index".format(self.toolname)
+
+    @property
+    def cmd(self):
+        outdir = self.outdir
+        cmd = "mkdir -p {outdir} ".format(**locals())
+        for fname in self.input["index_files"]:
+            link_src = os.path.relpath(os.path.abspath(fname), start=self.outdir)
+
+            link_dest = os.path.join(self.outdir,
+                                     self.species + '.' + '.'.join(fname.split('.')[1:]))
+            cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
+
+        return cmd
+
+    @property
+    def index(self):
+        return os.path.abspath(os.path.join(self.outdir, self.species))
+
+    @property
+    def loader(self):
+        return []
 
 
 class TopHat2Index(IndexBuilder):
@@ -79,7 +122,7 @@ class TopHat2Aligner(ShortAligner):
         outdir = self.bamdir
         cmd += "tophat2 --num-threads={threads} --output-dir={outdir} --no-sort-bam"
         min_intron, max_intron = self.min_intron, self.max_intron
-        cmd += "--min-intron-length={min_intron} --max-intron-length={max_intron} "
+        cmd += " --min-intron-length={min_intron} --max-intron-length={max_intron} "
         if self.input.get("transcriptome", None):
             cmd += "--GTF={}".format(self.input.get("transcriptome"))
         extra = self.extra
@@ -89,8 +132,8 @@ class TopHat2Aligner(ShortAligner):
         output = self.output
         index = self.index
         log = self.log
-        cmd += "{strand} {extra} {index} {infiles} > {log}"
-        cmd += "| samtools view -b -@ {threads} - > {output[bam]}"
+        cmd += "{strand} {extra} {index} {infiles} 2> {log} "
+        cmd += "| samtools view -b -@ {threads} - > {output[bam]} "
         link_src = self.link_src
         cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
@@ -104,7 +147,7 @@ class TopHat2Aligner(ShortAligner):
     def strand(self):
 
         if self.sample.strandedness:
-            return '--library-type={}'.format(self.sample)
+            return '--library-type={}'.format(self.sample.strandedness)
         else:
             return ''
 
@@ -140,4 +183,7 @@ class TopHat2Wrapper(ShortWrapper):
 
     @property
     def indexer(self):
-        return TopHat2Index
+        if self.prebuilt:
+            return TopHat2IndexLink
+        else:
+            return TopHat2Index
