@@ -416,6 +416,8 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         # Single location. We can change this whenever we desire.
         if self.touch:
             return 1
+        self.__set_threads()
+        assert self.__threads is not None, (self.rulename, )
         return self.__threads
 
     def __set_threads(self):

@@ -24,6 +24,7 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
         if self.configuration.get("reference", dict()).get("transcriptome", ""):
             self.input["ref_transcriptome"] = os.path.abspath(self.configuration["reference"]["transcriptome"])
         self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
+        self.__threads = 1
 
     @property
     def toolname(self):
@@ -60,23 +61,37 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
 
         for key in "memory", "queue", "threads":
             default[key] = self.__retrieve_resource_from_programs(key)
+            if key == "threads":
+                self.__threads = default[key]
+        assert self.threads is not None
 
         return default
 
     def __retrieve_resource_from_programs(self, resource):
 
         res = None
-        if (hasattr(self, "toolname") and
-                    self.toolname in self.configuration["programs"]):
+        if self.toolname in self.configuration["programs"]:
             if ("index" in self.configuration["programs"][self.toolname] and
                     resource in self.configuration["programs"][self.toolname]["index"]):
                 res = self.configuration["programs"][self.toolname]["index"][resource]
             elif resource in self.configuration["programs"][self.toolname]:
                 res = self.configuration["programs"][self.toolname][resource]
+            else:
+                res = None
         if res is None:
             res = self.configuration["programs"]["default"][resource]
-
+        # assert res is not None, (resource,)
+        if resource == "threads":
+            assert res != 0 and res is not None
+            self.__threads = res
         return res
+
+    @property
+    def threads(self):
+        if self.__threads is None:
+            self.__set_threads()
+        assert self.__threads is not None
+        return self.__threads
 
 
 class IndexLinker(AtomicOperation, metaclass=abc.ABCMeta):

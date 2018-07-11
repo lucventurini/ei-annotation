@@ -1,8 +1,41 @@
-from ...abstract import AtomicOperation, EIWrapper, ShortSample, LongSample
-from .abstract import IndexBuilder, ShortAligner, LongAligner, ShortWrapper, LongWrapper
+from .abstract import IndexBuilder, IndexLinker, ShortAligner, LongAligner, ShortWrapper, LongWrapper
 import os
 import itertools
 
+
+class StarIndexLink(IndexLinker):
+
+    __toolname__ = "star"
+
+    def __init__(self, configuration, outdir):
+        super().__init__(configuration, outdir)
+        self.input["index_files"] = [os.path.join(self.index_folder, self.index_name, fname) for fname in
+                                     ["Genome", "SA", "chrLength.txt", "chrNameLength.txt",
+                                      "genomeParameters.txt", "Log.out",
+                                      "SAindex", "chrName.txt", "chrStart.txt"]]
+
+        self.output = {"index": os.path.join(self.outdir, "SAindex")}
+        self.touch = False
+        self.message = "Linking pre-indexed genome with star"
+
+    @property
+    def loader(self):
+        return []
+
+    @property
+    def cmd(self):
+        outdir = self.outdir
+        cmd = "mkdir -p {outdir} ".format(**locals())
+        for fname in self.input["index_files"]:
+            rel_path = os.path.relpath(fname, self.outdir)
+            new_path = os.path.join(self.outdir, os.path.basename(fname))
+            cmd += " && ln -sf {rel_path} {new_path}".format(**locals())
+
+        return cmd
+
+    @property
+    def index(self):
+        return self.output["index"]
 
 class StarIndex(IndexBuilder):
 
@@ -167,7 +200,10 @@ class StarWrapper(ShortWrapper):
 
     @property
     def indexer(self):
-        return StarIndex
+        if self.prebuilt:
+            return StarIndexLink
+        else:
+            return StarIndex
 
 
 class StarLong(LongAligner):
@@ -175,7 +211,7 @@ class StarLong(LongAligner):
     __toolname__ = "star_long"
 
     def __init__(self, indexer: StarIndex, sample, run):
-        if not isinstance(indexer, StarIndex):
+        if not isinstance(indexer, (StarIndex, StarIndexLink)):
             raise TypeError("Invalid indexer: {}".format(type(indexer)))
 
         super().__init__(indexer, sample, run)
@@ -189,20 +225,24 @@ class StarLong(LongAligner):
 
     @property
     def cmd(self):
-        log = self.log  # TODO: implement
+
+        outdir = os.path.dirname(self.output["bam"])
         try:
-            index = os.path.dirname(self.input["index"])
+            index = os.path.relpath(os.path.dirname(self.input["index"]), start=outdir)
         except KeyError:
             raise KeyError(self.input)
+
+        log = os.path.relpath(self.log, start=outdir)
         input_reads = self.input_reads
         threads = self.threads
         min_intron, max_intron = self.min_intron, self.max_intron
         ref_transcriptome = self.ref_transcriptome
         load = self.load
-        outdir = os.path.dirname(self.output["bam"])
+
         extra = self.extra
 
         cmd = "{load} "
+        cmd += " mkdir -p {outdir} && cd {outdir} && "
         cmd += "STARlong --runThreadN={threads} --runMode alignReads --outSAMattributes NH HI NM MD "
         cmd += " --readNameSeparator space --outFilterMultimapScoreRange 1 --outFilterMismatchNmax 2000 "
         cmd += " --scoreGapNoncan -20 --scoreGapGCAG -4 --scoreGapATAC -8 --scoreDelOpen -1 --scoreDelBase -1 "
@@ -211,7 +251,7 @@ class StarLong(LongAligner):
         cmd += " --alignTranscriptsPerWindowNmax 10000 --genomeDir {index}"
         cmd += " {input_reads} --outSAMtype BAM Unsorted --outSAMstrandField intronMotif "
         cmd += " --alignIntronMin {min_intron} --alignIntronMax {max_intron} "
-        cmd += " {ref_transcriptome} --outFileNamePrefix {outdir}/ > {log} 2>&1"
+        cmd += " {ref_transcriptome} {extra} > {log} 2>&1 "
 
         cmd = cmd.format(**locals())
         return cmd
@@ -304,4 +344,7 @@ class StarLongWrapper(LongWrapper):
 
     @property
     def indexer(self):
-        return StarIndex
+        if self.prebuilt:
+            return StarIndexLink
+        else:
+            return StarIndex
