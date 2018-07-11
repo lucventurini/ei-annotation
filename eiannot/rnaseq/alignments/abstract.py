@@ -503,8 +503,7 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
     def indexer(self):
-        assert isinstance(self.__indexer, IndexBuilder)
-        return self.__indexer(self.configuration, self.outdir)
+        pass
 
     @property
     def samples(self):

@@ -45,7 +45,7 @@ class Sample(metaclass=abc.ABCMeta):
 
 class LongSample(Sample):
 
-    def __init__(self, readfile, label, read_dir, strandedness):
+    def __init__(self, readfile, label, read_dir, strandedness, type):
 
         super().__init__(label=label, read_dir=read_dir)
         suffix = readfile.split(".")[-1]
@@ -62,6 +62,8 @@ class LongSample(Sample):
             os.symlink(os.path.abspath(readfile), rout)
         self.__readfile = rout
         self.__strandedness = strandedness
+        self.__type = None
+        self.type = type
 
     @property
     def readfile(self):
@@ -82,7 +84,13 @@ class LongSample(Sample):
 
     @property
     def type(self):
-        return "long"
+        return self.__type
+
+    @type.setter
+    def type(self, typ):
+        if not isinstance(typ, str) and typ.lower() not in ("cdna", "est", "pacbio", "ont", "ont-direct", None):
+            raise ValueError("Invalid type: {}".format(typ))
+        self.__type = typ
 
 
 class ShortSample(Sample):

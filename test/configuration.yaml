@@ -17,9 +17,13 @@ programs:
     index:
       index_name: 'eiannot'
       index_folder: 'Eiannot/indices/hisat2'
-  star:
+  star: &star
     load: ''
-    runs: []  # ['']
+    runs: ['']  # ['']
+    index:
+      threads: 5
+      index_folder: 'Eiannot/indices/'
+      index_name: 'star'
   samtools:
     load: ''
   portcullis:
@@ -28,6 +32,7 @@ programs:
   gmap: &gmap
     load: ''
     index:
+      threads: 3
       index_name: 'eiannot'
       index_folder: 'Eiannot/indices/gmap/'
   gsnap:
@@ -37,14 +42,21 @@ programs:
     <<: *gmap
     runs: []
   star_long:
-    runs: []
-    load: ''
-  cufflinks:
+    <<: *star
     runs: ['']
+    threads: 1
+  cufflinks:
+    runs: []
     load: ''
   strawberry:
     runs: []  # ['']
     load: ''
+  tophat2:
+    load: ''
+    runs: ['']
+    index:
+      index_name: 'eiannot'
+      index_folder: 'Eiannot/indices/tophat2/'
 #  scallop:
 #    runs: ['']
 #    load: ''
@@ -59,7 +71,7 @@ programs:
     execute: true  # unused as of yet
     taxon: "plants"
     dbs: "p"
-outdir: "eitest"
+outdir: "eitest" # "Eiannot"  # "eitest" 
 name: "eitest"
 mikado_homology:
   prot_db: &prot_db
