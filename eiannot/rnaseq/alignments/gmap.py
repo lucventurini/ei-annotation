@@ -59,8 +59,7 @@ class GmapIndex(IndexBuilder):
     def __init__(self, configuration, outdir):
 
         super().__init__(configuration, outdir)
-        # TODO: probably the input should be the cleaned up genome
-        self.output = {"index": os.path.join(self.outdir, "{}.sachildguide1024".format(self.species))}
+        self.output = {"flag": os.path.join(self.outdir, "gmap_index.done")}
         self.touch = True
 
     @property
@@ -82,7 +81,7 @@ class GmapIndex(IndexBuilder):
 
         load = self.load
         input = self.input
-        outdir = os.path.dirname(self.output["index"])
+        outdir = os.path.dirname(self.output["flag"])
         species = self.species
         log = self.log
         extra = self.extra
@@ -97,7 +96,7 @@ class GmapIndex(IndexBuilder):
 
     @property
     def indexdir(self):
-        return os.path.abspath(os.path.dirname(self.output["index"]))
+        return os.path.abspath(os.path.dirname(self.output["flag"]))
 
     @property
     def dbname(self):
@@ -121,7 +120,7 @@ class GmapLink(IndexLinker):
                                                            "{index_name}*".format(index_name=self.index_name)))
         self.input["index_files"] += glob.glob(os.path.join(self.index_folder,
                                                             "{index_name}*".format(index_name=self.index_name)))
-        self.output = {"index": os.path.join(self.outdir, "{}.sachildguide1024".format(self.species))}
+        self.output = {"flag": os.path.join(self.outdir, "gmap_index.done")}
         self.touch = True
 
     @property
@@ -158,7 +157,7 @@ class GmapLink(IndexLinker):
 
     @property
     def indexdir(self):
-        return os.path.abspath(os.path.dirname(self.output["index"]))
+        return os.path.abspath(os.path.dirname(self.output["flag"]))
 
     @property
     def loader(self):
@@ -184,6 +183,7 @@ class GsnapAligner(ShortAligner):
         super().__init__(indexer=indexer, sample=sample, run=run)
         self.output["link"] = self.link
         self.output["bam"] = os.path.join(self.bamdir, "gsnap.bam")
+        # self.index = indexer.index
 
     @property
     def compression_option(self):
@@ -208,7 +208,7 @@ class GsnapAligner(ShortAligner):
     def cmd(self):
 
         load = self.load
-        index = os.path.dirname(self.input["index"])
+        # index = self.index
         output = self.output
         threads = self.threads
         cmd = "{load}"
