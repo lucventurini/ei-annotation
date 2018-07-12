@@ -142,7 +142,7 @@ class GmapLink(IndexLinker):
             cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
         # Now inside the folder
 
-        cmd += " && cd {species} "
+        cmd += " && cd {species} ".format(**locals())
         for fname in glob.glob(os.path.join(
                 os.path.abspath(self.index_folder),
                 self.index_name,
