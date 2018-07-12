@@ -3,6 +3,9 @@ from ..preparation import SanitizeProteinBlastDB, FaidxProtein
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
 from ..repeats.__init__ import RepeatMasking
 import os
+import functools
+import subprocess as sp
+import re
 
 
 class ChunkProteins(AtomicOperation):
@@ -50,6 +53,17 @@ class ChunkProteins(AtomicOperation):
         return self.configuration["homology"]["protein_chunks"]
 
 
+@functools.lru_cache(maxsize=4, typed=True)
+def exonerate_multithread(loader):
+    cmd = "{} exonerate --help && set -u".format(loader)
+    output = sp.Popen(cmd, shell=True, stdout=sp.PIPE).stdout.read().decode()
+    try:
+        _ = [_ for _ in output.split("\n") if re.match("--cores", _)][0]
+    except IndexError:
+        return False
+    return True
+
+
 class Exonerate(AtomicOperation):
 
     def __init__(self,
@@ -91,7 +105,10 @@ class Exonerate(AtomicOperation):
 
     @property
     def threads(self):
-        return 4  # TODO: Ask Gemy about this
+        if exonerate_multithread(self.load):
+            return self.threads
+        else:
+            return 4
 
     @property
     def cmd(self):
@@ -101,8 +118,11 @@ class Exonerate(AtomicOperation):
         logdir = self.logdir
         outdir = self.outdir
         fasta = self.input["fasta"]
-        threads = self.threads
-        cmd += " exonerate --model protein2genome -c {threads} --showtargetgff yes --showvulgar yes "
+        if exonerate_multithread(self.load):
+            threads = "-c {threads}".format(threads=self.threads)
+        else:
+            threads = ""
+        cmd += " exonerate --model protein2genome {threads} --showtargetgff yes --showvulgar yes "
         min_intron, max_intron = self.min_intron, self.max_intron
         cmd += " --softmaskquery yes --softmasktarget yes --bestn 10  --minintron {min_intron} "
         cmd += " --maxintron {max_intron} --percent 30 --score 50 --geneseed 50 --showalignment no "

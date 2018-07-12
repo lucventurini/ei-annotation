@@ -25,10 +25,10 @@ class StarIndexLink(IndexLinker):
     @property
     def cmd(self):
         outdir = self.outdir
-        cmd = "mkdir -p {outdir} ".format(**locals())
+        cmd = "mkdir -p {outdir} && cd {outdir} ".format(**locals())
         for fname in self.input["index_files"]:
             rel_path = os.path.relpath(fname, self.outdir)
-            new_path = os.path.join(self.outdir, os.path.basename(fname))
+            new_path = os.path.basename(fname)
             cmd += " && ln -sf {rel_path} {new_path}".format(**locals())
 
         return cmd

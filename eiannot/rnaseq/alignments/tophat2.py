@@ -28,12 +28,11 @@ class TopHat2IndexLink(IndexLinker):
     @property
     def cmd(self):
         outdir = self.outdir
-        cmd = "mkdir -p {outdir} ".format(**locals())
+        cmd = "mkdir -p {outdir} && cd {outdir} ".format(**locals())
         for fname in self.input["index_files"]:
             link_src = os.path.relpath(os.path.abspath(fname), start=self.outdir)
 
-            link_dest = os.path.join(self.outdir,
-                                     self.species + '.' + '.'.join(fname.split('.')[1:]))
+            link_dest = self.species + '.' + '.'.join(fname.split('.')[1:])
             cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
 
         return cmd

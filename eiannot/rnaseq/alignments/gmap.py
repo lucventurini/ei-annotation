@@ -131,18 +131,18 @@ class GmapLink(IndexLinker):
         outdir = self.outdir
         species = self.species
 
-        cmd = "mkdir -p {outdir} && mkdir -p {outdir}/{species}".format(**locals())
+        cmd = "mkdir -p {outdir} && mkdir -p {outdir}/{species} && cd {outdir} ".format(**locals())
         for fname in glob.glob(os.path.join(
                 os.path.abspath(self.index_folder),
                 "{index_name}*".format(index_name=self.index_name))):
             if os.path.isdir(fname):
                 continue
             link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir))
-            link_dest = os.path.join(self.outdir,
-                                     '.'.join([self.species] + os.path.basename(fname).split('.')[1:]))
+            link_dest = '.'.join([self.species] + os.path.basename(fname).split('.')[1:])
             cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
         # Now inside the folder
 
+        cmd += " && cd {species} "
         for fname in glob.glob(os.path.join(
                 os.path.abspath(self.index_folder),
                 self.index_name,
@@ -151,9 +151,7 @@ class GmapLink(IndexLinker):
                 continue
             link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir,
                                                                                   self.species))
-            link_dest = os.path.join(self.outdir,
-                                     self.species,
-                                     '.'.join([self.species] + os.path.basename(fname).split('.')[1:]))
+            link_dest = os.path.join('.'.join([self.species] + os.path.basename(fname).split('.')[1:]))
             cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
 
         return cmd

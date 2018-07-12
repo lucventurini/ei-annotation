@@ -2,7 +2,7 @@ import argparse
 from ..workflow import AnnotationWorklow
 from ..rnaseq.alignments.__init__ import LongAlignmentsWrapper, ShortAlignmentsWrapper
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
-from ..rnaseq.assemblies.__init__ import ShortAssemblerWrapper
+from ..rnaseq.assemblies.__init__ import AssemblyWrapper
 from ..proteins.__init__ import ExonerateProteinWrapper
 from ..repeats.__init__ import RepeatMasking
 from ..rnaseq.mikado.__init__ import Mikado
@@ -58,7 +58,7 @@ def main():
                   ],
         "repeats": [RepeatMasking.__final_rulename__],
         "proteins": [ExonerateProteinWrapper.__final_rulename__],
-        "assemble": [ShortAssemblerWrapper.__final_rulename__],
+        "assemble": [AssemblyWrapper.__final_rulename__],
     }
 
     parser = argparse.ArgumentParser(__doc__)
