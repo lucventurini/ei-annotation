@@ -8,7 +8,8 @@ USE_CYTHON = True
 
 ext = '.pyx' if USE_CYTHON else '.c'
 
-extensions = [Extension("eiannot.util.bam2hints", sources=[os.path.join("eiannot", "util", "bam2hints.pyx")], language="c++")]
+extensions = [Extension("eiannot.util.bam2hints", sources=[os.path.join("eiannot", "util", "bam2hints.pyx")],
+                        language="c++")]
 
 if USE_CYTHON:
     from Cython.Build import cythonize
@@ -16,7 +17,7 @@ if USE_CYTHON:
 
 setup(
     name='eiannot',
-    version="0.0.1",
+    version="0.0.2",
     ext_modules=extensions,
     scripts=glob(os.path.join("eiannot", "util", "*py")) + glob(os.path.join("eiannot", "util", "*pl")),
     entry_points={"console_scripts": ["eiannot = eiannot.cli:main"]},

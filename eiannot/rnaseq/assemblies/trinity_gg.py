@@ -203,6 +203,10 @@ class TrinityGmap(ShortAssembler):
         return self.configuration["programs"][self.toolname]["paths"]
 
     @property
+    def max_intron_middle(self):
+        return self.configuration["programs"][self.toolname].get("max_intron_middle", None)
+
+    @property
     def cmd(self):
         load = self.load
         cmd = "{load}"
@@ -210,7 +214,7 @@ class TrinityGmap(ShortAssembler):
         db = os.path.basename(self._gmapdb.out_prefix)
         strand = self.strand
         min_intron = self.min_intron
-        max_intron = gmap_intron_lengths(self.load, self.max_intron)
+        max_intron = gmap_intron_lengths(self.load, self.max_intron, max_intron_middle=self.max_intron_middle)
         genome = self.genome
         cmd += "$(determine_gmap.py {genome}) --dir={index_dir} {strand} --db {db} --min-intronlength={min_intron} "
         cmd += "{max_intron} "

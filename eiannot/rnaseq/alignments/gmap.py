@@ -7,13 +7,16 @@ import glob
 
 
 @functools.lru_cache(4, typed=True)
-def gmap_intron_lengths(loader, max_intron):
+def gmap_intron_lengths(loader, max_intron, max_intron_middle=None):
     """Function to check the exact format of GMAP intron lengths"""
     cmd = "{} gmap --help".format(loader)
     output = subprocess.Popen(cmd, shell=True,
                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout.read().decode()
+    if max_intron_middle is None:
+        max_intron_middle = max_intron
     if "--max-intronlength-middle" in output:
-        return "--max-intronlength-middle={mi} --max-intronlength-ends={mi}".format(mi=max_intron)
+        return "--max-intronlength-middle={mim} --max-intronlength-ends={mi}".format(mi=max_intron,
+                                                                                     mim=max_intron_middle)
     else:
         return "--intronlength={}".format(max_intron)
 
@@ -307,8 +310,12 @@ class GmapLongReads(LongAligner):
         return cmd
 
     @property
+    def max_intron_middle(self):
+        return self.configuration["programs"][self.toolname].get("max_intron_middle", None)
+
+    @property
     def max_intron_cli(self):
-        return gmap_intron_lengths(self.load, self.max_intron)
+        return gmap_intron_lengths(self.load, self.max_intron, max_intron_middle=self.max_intron_middle)
 
 
 class GmapLongWrapper(LongWrapper):
