@@ -27,7 +27,7 @@ def parse_samplesheet(samplesheet, configuration):
 
     with open(samplesheet) as sheet:
         for line in csv.reader(sheet, delimiter="\t"):
-            label, read1, read2, is_long, strandedness = line
+            label, read1, read2, is_long, strandedness, type = line
             if is_long not in ("True", "False"):
                 raise ValueError("Invalid is_long flag: {}".format(is_long))
             elif is_long == "True":
@@ -35,7 +35,7 @@ def parse_samplesheet(samplesheet, configuration):
             else:
                 is_long = False
             if is_long:
-                sample = LongSample(read1, label, outdir, strandedness)
+                sample = LongSample(read1, label, outdir, strandedness, type)
                 tag = "long_reads"
             else:
                 sample = ShortSample(read1, read2, label, outdir, strandedness=strandedness)

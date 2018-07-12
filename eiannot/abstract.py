@@ -889,12 +889,15 @@ class EIWrapper(EIWorfkflow, metaclass=abc.ABCMeta):
         # >>> set.difference(*[set(_) for _ in list(zip(*g.in_edges))])
         # {0}  # CVD
 
+        if len(self.graph.edges) == 0:
+            return {}
         in_edges, out_edges = zip(*self.graph.edges)
         return set.difference(set(in_edges), set(out_edges))
 
     def add_flag_to_inputs(self, flag, flag_name, key):
         assert isinstance(flag, (AtomicOperation, EIWrapper))
-
+        if not self.entries:
+            return
         self.add_edges_from([(flag, entry) for entry in self.entries])
         if isinstance(flag, EIWrapper):
             flag = flag.exit
@@ -902,4 +905,5 @@ class EIWrapper(EIWorfkflow, metaclass=abc.ABCMeta):
         preds = nx.ancestors(self.graph, flag)
         for edge in self.edges:
             if edge[0] == flag and edge[1] not in preds:
-                edge[1].input[flag_name] = flag.output[key]
+                if flag.output[key] not in edge[1].input.values():
+                    edge[1].input[flag_name] = flag.output[key]

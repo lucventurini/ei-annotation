@@ -6,6 +6,9 @@ programs:
     threads: 20
     memory: 10000
     queue: 'ei-medium,TempProject2'
+  minimap2:
+    load: ''
+    runs: ['']
   mikado:
     load: ''
   stringtie:

@@ -1,10 +1,9 @@
-# from .bam import BamStats, BamIndex, BamSort
-from ...abstract import FinalFlag
 from .hisat2 import HisatWrapper
 from .gmap import GsnapWrapper, GmapLongWrapper
 from .tophat2 import TopHat2Wrapper
 from .star import StarWrapper, StarLongWrapper
-from ...abstract import EIWrapper, AtomicOperation
+from ...abstract import EIWrapper
+from .minimap2 import MiniMap2Wrapper
 import os
 
 
@@ -59,6 +58,7 @@ class LongAlignmentsWrapper(EIWrapper):
     wrappers = {
         "star": StarLongWrapper,
         "gmap": GmapLongWrapper,
+        "minimap2": MiniMap2Wrapper
     }
 
     def __init__(self, prepare_wrapper):

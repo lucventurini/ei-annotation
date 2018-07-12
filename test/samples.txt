@@ -1,2 +1,2 @@
-combined	combined.r1.fq.gz	combined.r2.fq.gz	False	fr-secondstrand
-models	sample.models.fa		True	fr-firststrand
+combined	combined.r1.fq.gz	combined.r2.fq.gz	False	fr-secondstrand	illumina
+models	sample.models.fa		True	fr-firststrand	cdna

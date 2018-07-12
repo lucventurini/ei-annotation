@@ -486,8 +486,8 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
             new_gfs.add(stats)
 
         self.__gf_rules = new_gfs
+        self.add_flag_to_inputs(self.__prepare_flag, "prep_flag", "fai")
         self.add_final_flag()
-        self.__add_flag_to_inputs()
         self.__finalised = True
 
     @property
@@ -535,14 +535,6 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
     @property
     def toolname(self):
         return self.__toolname__
-
-    def __add_flag_to_inputs(self):
-        self.add_node(self.__prepare_flag.exit)
-        for rule in self.nodes:
-            if rule == self.__prepare_flag.exit:
-                continue
-            rule.input["prep_flag"] = self.__prepare_flag.output["fai"]
-            self.add_edge(self.__prepare_flag.exit, rule)
 
 
 class LongAlignerStats(AtomicOperation):

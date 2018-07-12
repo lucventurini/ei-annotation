@@ -333,12 +333,10 @@ class StarLongWrapper(LongWrapper):
             indexer = self.indexer(self.configuration, self.outdir)
             self.add_node(indexer)
             # Optionally build the reference splice catalogue
-            star_runs = []
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
                 star_run = StarLong(indexer=indexer, sample=sample, run=run)
                 self.add_edge(indexer, star_run)
                 bam2gtf_run = StarBam2Gtf(star_run)
-                star_runs.append(bam2gtf_run)
                 self.add_to_gfs(bam2gtf_run)
                 self.add_edge(star_run, bam2gtf_run)
 

@@ -38,7 +38,7 @@ class AnnotationWorklow(EIWorfkflow):
                 raise ValueError("No stats for mikado, number of gfs: {}".format(len(self.long_wrapper.gfs)))
             self.merge([self.mikado_long])
             self.fln_long = FlnWrapper(self.mikado_long)
-            assert self.fln_long.entries
+            # assert self.fln_long.entries
             self.add_edge(self.mikado_long, self.fln_long)
         else:
             self.fln_long = None

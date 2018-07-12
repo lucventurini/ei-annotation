@@ -41,10 +41,10 @@ class FlnWrapper(EIWrapper):
                 self.__final_rulename__ += "_long"
 
             self.add_final_flag()
-            assert self.exit
-            assert self.entries
+            # assert self.exit
+            # assert self.entries
         else:
-            print("Nothing to do")
+            pass
 
     @property
     def flag_name(self):

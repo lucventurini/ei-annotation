@@ -20,7 +20,6 @@ class HisatWrapper(ShortWrapper):
 
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            print(self.configuration["programs"][self.toolname])
             if self.prebuilt is True:
                 indexer = HisatLinker(configuration, self.outdir)
             else:

@@ -31,7 +31,6 @@ class AssemblyWrapper(EIWrapper):
                 instance.add_flag_to_inputs(short_alignments, "aln_flag", "flag")
                 self.__add_to_gfs(instance)
 
-        # print(self.gfs)
         self.add_final_flag()
 
     __final_rulename__ = "asm_all"
