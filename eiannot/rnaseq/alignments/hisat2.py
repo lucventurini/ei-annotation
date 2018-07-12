@@ -3,6 +3,7 @@ from .abstract import IndexBuilder, ShortAligner, ShortWrapper, IndexLinker
 import os
 import itertools
 import glob
+import re
 
 
 class HisatWrapper(ShortWrapper):
@@ -73,7 +74,8 @@ class HisatLinker(IndexLinker):
         for fname in self.input["index_files"]:
             link_src = os.path.relpath(os.path.abspath(fname), start=self.outdir)
 
-            link_dest = self.species + '.' + '.'.join(fname.split('.')[1:])
+            link_dest = self.species + re.sub(self.index_name, '', os.path.basename(fname))
+
             cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
 
         return cmd

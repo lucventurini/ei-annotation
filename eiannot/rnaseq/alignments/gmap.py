@@ -4,6 +4,7 @@ import itertools
 import functools
 import subprocess
 import glob
+import re
 
 
 @functools.lru_cache(4, typed=True)
@@ -138,7 +139,7 @@ class GmapLink(IndexLinker):
             if os.path.isdir(fname):
                 continue
             link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir))
-            link_dest = '.'.join([self.species] + os.path.basename(fname).split('.')[1:])
+            link_dest = self.species + re.sub(self.index_name, '', os.path.basename(fname))
             cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
         # Now inside the folder
 
@@ -151,7 +152,7 @@ class GmapLink(IndexLinker):
                 continue
             link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir,
                                                                                   self.species))
-            link_dest = os.path.join('.'.join([self.species] + os.path.basename(fname).split('.')[1:]))
+            link_dest = self.species + re.sub(self.index_name, '', os.path.basename(fname))
             cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
 
         return cmd
