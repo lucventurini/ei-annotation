@@ -36,10 +36,6 @@ class BamSort(AtomicOperation):
     def loader(self):
         return ["samtools"]
 
-    @property
-    def threads(self):
-        return 1
-
 
 class BamIndex(AtomicOperation):
 
