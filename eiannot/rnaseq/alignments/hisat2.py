@@ -107,9 +107,9 @@ class HisatAligner(ShortAligner):
         cmd = "{load}"
         cmd += "hisat2 -p {threads} "
         min_intron, max_intron = self.min_intron, self.max_intron
-        cmd += "--min-intronlen={min_intron} --max-intronlen={max_intron} "
+        cmd += " --min-intronlen={min_intron} --max-intronlen={max_intron} "
         if self.input.get("transcriptome", None):
-            cmd += "--known-splicesite-infile={}".format(self.input.get("transcriptome"))
+            cmd += " --known-splicesite-infile={} ".format(self.input.get("transcriptome"))
         extra = self.extra
         strand = self.strand
         infiles = self.input_reads
@@ -117,10 +117,10 @@ class HisatAligner(ShortAligner):
         output = self.output
         index = self.index
         log = self.log
-        cmd += "{strand} {extra} -x {index} {infiles} 2> {log}"
-        cmd += "| samtools view -b -@ {threads} - > {output[bam]}"
+        cmd += " {strand} {extra} -x {index} {infiles} 2> {log} "
+        cmd += " | samtools view -b -@ {threads} - > {output[bam]} "
         link_src = self.link_src
-        cmd += "&& ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -217,7 +217,7 @@ class HisatBuild(IndexBuilder):
         out_prefix = self.out_prefix
         log = self.log
         extra = self.extra
-        cmd = "{load} hisat2-build {extra} -p {threads} {input[genome]} {out_prefix} > {log} 2>&1".format(
+        cmd = "{load} hisat2-build {extra} -p {threads} {input[genome]} {out_prefix} > {log} 2>&1 ".format(
             **locals()
         )
         return cmd

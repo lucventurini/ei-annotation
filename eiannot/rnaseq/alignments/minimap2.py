@@ -52,8 +52,8 @@ class MiniMap2(LongAligner):
         log = self.log
 
         cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra} {type_args}"
-        cmd += " -C 5 {input[genome]} {input[read1]} 2> {log} |"  # -C 5 :> cost for non-canonical splicing site
-        cmd += "k8 $(which paftools.js) splice2bed -m - > {output[gf]} "
+        cmd += " -C 5 {input[genome]} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
+        cmd += " k8 $(which paftools.js) splice2bed -m - > {output[gf]} "
         # Now link
         link_dir = os.path.dirname(self.link)
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
