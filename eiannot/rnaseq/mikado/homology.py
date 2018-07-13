@@ -230,8 +230,6 @@ class MikadoHomologyWrapper(EIWrapper):
 
             self.flag = MikadoHomologyFlag(executers)
             self.add_edges_from([(exe, self.flag) for exe in executers])
-        else:
-            self.remove_node(self.sanitizer)
         if preparer.is_long:
             self.__final_rulename__ += "_long"
 

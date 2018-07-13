@@ -78,6 +78,7 @@ class Exonerate(AtomicOperation):
         self.chunk = chunk
         self.input["flag"] = chunks.output["flag"]
         self.input["genome"] = self.masked_genome
+        self.input["repeat_flag"] = masked.exit.output["flag"]
         assert self.input["fasta"] in chunks.output["chunks"]
         self.output["txt"] = os.path.join(self.outdir, "{chunk}.exonerate.txt").format(chunk=self.chunk)
         self.log = os.path.join(self.logdir, "exonerate.{}.log".format(self.chunk))
