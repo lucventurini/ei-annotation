@@ -148,7 +148,7 @@ class MikadoPrepare(MikadoOp):
         cmd = "{load} "
         outdir = self.outdir
         cmd += "mikado prepare --procs={threads} "
-        cmd += "--json-conf={input[cfg]} -od {outdir} > {log} 2>&1"
+        cmd += "--json-conf={input[cfg]} -od {outdir} --strip-cds > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 

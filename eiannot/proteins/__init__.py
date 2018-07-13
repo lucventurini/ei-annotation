@@ -120,7 +120,7 @@ class Exonerate(AtomicOperation):
         outdir = self.outdir
         fasta = self.input["fasta"]
         if exonerate_multithread(self.load):
-            threads = "-c {threads}".format(threads=self.threads)
+            threads = " -c {threads} ".format(threads=self.threads)
         else:
             threads = ""
         cmd += " exonerate --model protein2genome {threads} --showtargetgff yes --showvulgar yes "

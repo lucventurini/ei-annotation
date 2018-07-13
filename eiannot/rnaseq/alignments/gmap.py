@@ -300,14 +300,47 @@ class GmapLongReads(LongAligner):
         dbname = self.indexer.dbname
         genome = self.genome
 
-        cmd = "{load} $(determine_gmap.py {genome}) --dir={index} --db {dbname} --min-intronlength={min_intron} {max_intron}"
+        cmd = "{load} $(determine_gmap.py {genome}) --dir={index} --db {dbname} "
+        cmd += " --min-intronlength={min_intron} {max_intron} "
         input, output, log = self.input, self.output, self.log
-        cmd += " --format=3 {input[read1]} > {output[gf]} 2> {log} "
+        coverage, identity, cross, strand = self.coverage, self.identity, self.cross_species, self.strand
+        cmd += " {coverage} {identity} {cross} {strand}"
+        threads = self.threads
+        cmd += " --format=2 {input[read1]} --nthreads={threads} > {output[gf]} 2> {log} "
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
         cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
-
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def cross_species(self):
+        if self.sample.type in ("pacbio", "ont", "ont-direct"):
+            return " --cross-species "
+        else:
+            return ""
+
+    @property
+    def coverage(self):
+        if "coverage" in self.configuration["programs"][self.toolname]:
+            return "--min-trimmed-coverage={}".format(self.configuration["programs"][self.toolname]["coverage"])
+        else:
+            return ""
+
+    @property
+    def identity(self):
+        if "identity" in self.configuration["programs"][self.toolname]:
+            return "--min-identity={}".format(self.configuration["programs"][self.toolname]["identity"])
+        else:
+            return ""
+
+    @property
+    def strand(self):
+        if self.sample.strandedness == "fr-firststrand":
+            return " -z sense_force "
+        elif self.sample.strandedness == "fr-secondstrand":
+            return " -z antisense_force "
+        else:
+            return " "
 
     @property
     def max_intron_middle(self):
