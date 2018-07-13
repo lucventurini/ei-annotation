@@ -18,15 +18,21 @@ class MikadoSerialise(MikadoOp):
 
         super().__init__(is_long=prepare.is_long)
         self.input = prepare.output
-        self.input.update(orfs.output)
-        self.input.update(homology.output)
+        self.homology = homology
+        self.orfs = orfs
+        self.portcullis = portcullis
+        if self.orfs:
+            self.input.update(self.orfs.output)
+        if homology:
+            self.input.update(self.homology.output)
+        if self.portcullis:
+            self.input.update(self.portcullis.output)
         self.input.update(faidx.output)
         self.input["cfg"] = prepare.config
         self.configuration = prepare.configuration
         self.outdir = prepare.outdir
         self.output = {"db": os.path.join(self.outdir, "mikado.db")}
         self.log = os.path.join(self.outdir, "mikado_serialise.err")
-        self.homology = homology
         self.message = "Running Mikado serialise to move numerous data sources into a single database"
         self.portcullis = portcullis
 
@@ -40,6 +46,9 @@ class MikadoSerialise(MikadoOp):
 
     @property
     def blast_xmls(self):
+        if not self.homology:
+            return ""
+
         pref = "--xml="
         xmls = self.homology.blast_xmls
         if len(xmls) == 0:
@@ -57,8 +66,11 @@ class MikadoSerialise(MikadoOp):
             return ""
 
     @property
-    def orfs(self):
-        return " --orfs={input[orfs]}".format(input=self.input)
+    def orfs_cli(self):
+        if not self.orfs:
+            return ""
+        else:
+            return " --orfs={input[orfs]}".format(input=self.input)
 
     @property
     def junctions(self):
@@ -76,7 +88,7 @@ class MikadoSerialise(MikadoOp):
         blast_targets = self.blast_targets
         junctions = self.junctions
         input = self.input
-        orfs = self.orfs
+        orfs = self.orfs_cli
         cmd += "mikado serialise {blast_xmls} {blast_targets} {junctions} {orfs} --transcripts={input[fa]} "
         cmd += "--genome_fai={input[fai]} --json-conf={input[cfg]} --force --start-method=spawn "
         outdir = self.outdir

@@ -292,7 +292,7 @@ class ExonerateProteinWrapper(EIWrapper):
         self.configuration = masker.configuration
         sanitised = SanitizeProteinBlastDB(self.configuration)
 
-        if sanitised.protein_dbs:
+        if sanitised.protein_dbs and self.execute:
             faidx = FaidxProtein(sanitised)
             self.add_edge(sanitised, faidx)
             chunk_proteins = ChunkProteins(sanitised)
@@ -315,3 +315,7 @@ class ExonerateProteinWrapper(EIWrapper):
     @property
     def flag_name(self):
         return os.path.join(self.exit.outdir, "proteins.done")
+
+    @property
+    def execute(self):
+        return self.configuration["homology"].get("execute", True)
