@@ -108,7 +108,7 @@ class Exonerate(AtomicOperation):
         if exonerate_multithread(self.load):
             return self.threads
         else:
-            return 4
+            return 1
 
     @property
     def cmd(self):
