@@ -481,6 +481,8 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         new_gfs = set()
 
         for gf in self.gfs:
+            if self._do_stats is False:
+                continue
             stats = LongAlignerStats(gf)
             self.add_edge(gf, stats)
             new_gfs.add(stats)
@@ -489,6 +491,12 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         self.add_flag_to_inputs(self.__prepare_flag, "prep_flag", "fai")
         self.add_final_flag()
         self.__finalised = True
+
+    @property
+    def _do_stats(self):
+        """Boolean flag. Hack used to avoid computing stats for MiniMap2 BED12, as they crash Mikado stats.
+        This will be solved at a later date."""
+        return True
 
     @property
     def prebuilt(self):

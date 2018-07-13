@@ -375,7 +375,7 @@ class GmapLongWrapper(LongWrapper):
                 self.add_edge(indexer, gmap_run)
                 self.add_to_gfs(gmap_run)
 
-    __toolname__ = "gmap_long"
+    __toolname__ = "gmap"
 
     @property
     def indexer(self):

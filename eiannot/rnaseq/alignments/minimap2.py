@@ -17,6 +17,10 @@ class MiniMap2Wrapper(LongWrapper):
                 self.add_edge(prepare_flag, mini_run)
 
     @property
+    def _do_stats(self):
+        return False
+
+    @property
     def prebuilt(self):
         return False
 
