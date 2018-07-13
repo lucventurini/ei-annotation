@@ -1,3 +1,8 @@
+from ..abstract import AtomicOperation
+from ..preparation import SanitizeProteinBlastDB
+import os
+
+
 class ChunkProteins(AtomicOperation):
 
     def __init__(self, sanitised: SanitizeProteinBlastDB):
@@ -41,5 +46,3 @@ class ChunkProteins(AtomicOperation):
     @property
     def chunks(self):
         return self.configuration["homology"]["protein_chunks"]
-
-
