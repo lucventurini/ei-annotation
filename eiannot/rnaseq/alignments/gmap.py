@@ -140,7 +140,7 @@ class GmapLink(IndexLinker):
                 continue
             link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir))
             link_dest = self.species + re.sub(self.index_name, '', os.path.basename(fname))
-            cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
+            cmd += " && cp {link_src} {link_dest}".format(**locals())
         # Now inside the folder
 
         species = self.species
@@ -154,7 +154,7 @@ class GmapLink(IndexLinker):
             link_src = os.path.relpath(os.path.abspath(fname), start=os.path.join(self.outdir,
                                                                                   self.species))
             link_dest = self.species + re.sub(self.index_name, '', os.path.basename(fname))
-            cmd += " && ln -sf {link_src} {link_dest}".format(**locals())
+            cmd += " && cp {link_src} {link_dest}".format(**locals())
 
         return cmd
 
