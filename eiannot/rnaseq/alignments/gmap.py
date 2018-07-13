@@ -268,7 +268,7 @@ class GmapLongReads(LongAligner):
 
         self.output = {
             "link": self.link,
-            "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "star-{sample}-{run}{suffix}").format(
+            "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "gmap-{sample}-{run}{suffix}").format(
                 sample=self.sample.label, run=self.run, suffix=self.suffix)
         }
 

@@ -5,6 +5,7 @@ import os
 from frozendict import frozendict
 import re
 import copy
+import subprocess as sp
 
 
 class Sample(metaclass=abc.ABCMeta):
@@ -49,6 +50,12 @@ class LongSample(Sample):
 
         super().__init__(label=label, read_dir=read_dir)
         suffix = readfile.split(".")[-1]
+        if suffix in ("bz2", "gz"):
+            comp_suffix = "." + suffix
+            suffix = readfile.split(".")[-2]
+        else:
+            comp_suffix = ""
+
         if suffix in ("fa", "fna", "fasta"):
             suffix = ".fa"
         elif suffix in ("fq", "fastq"):
@@ -58,8 +65,14 @@ class LongSample(Sample):
 
         rout = os.path.join(self.read_dir,
                             "{label}.long{suffix}".format(**locals()))
-        if not os.path.islink(rout):
-            os.symlink(os.path.abspath(readfile), rout)
+        if comp_suffix and not os.path.exists(rout):
+            if comp_suffix == "gz":
+                sp.call("gzip -dc {readfile} > {rout}", shell=True)
+            else:
+                sp.call("bzip2 -dc {readfile} > {rout}", shell=True)
+        else:
+            if not os.path.islink(rout):
+                os.symlink(os.path.abspath(readfile), rout)
         self.__readfile = rout
         self.__strandedness = strandedness
         self.__type = None
