@@ -306,7 +306,8 @@ class GmapLongReads(LongAligner):
         coverage, identity, cross, strand = self.coverage, self.identity, self.cross_species, self.strand
         cmd += " {coverage} {identity} {cross} {strand}"
         threads = self.threads
-        cmd += " --format=2 {input[read1]} --nthreads={threads} > {output[gf]} 2> {log} "
+        extra = self.extra
+        cmd += " --format=2 {extra} --nthreads={threads} {input[read1]} > {output[gf]} 2> {log} "
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
         cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
