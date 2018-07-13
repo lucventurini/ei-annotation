@@ -481,8 +481,6 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         new_gfs = set()
 
         for gf in self.gfs:
-            if self._do_stats is False:
-                continue
             stats = LongAlignerStats(gf)
             self.add_edge(gf, stats)
             new_gfs.add(stats)
@@ -491,12 +489,6 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         self.add_flag_to_inputs(self.__prepare_flag, "prep_flag", "fai")
         self.add_final_flag()
         self.__finalised = True
-
-    @property
-    def _do_stats(self):
-        """Boolean flag. Hack used to avoid computing stats for MiniMap2 BED12, as they crash Mikado stats.
-        This will be solved at a later date."""
-        return True
 
     @property
     def prebuilt(self):
@@ -559,6 +551,12 @@ class LongAlignerStats(AtomicOperation):
             raise KeyError(type(aligner), aligner.rulename)
         self.message = "Calculating statistics for: {input[link]}".format(input=self.input)
         self.log = self.output["stats"] + ".log"
+        if aligner.suffix.lower().lstrip(".") not in ("gff", "gff3", "gtf"):
+            self.touch = True
+            self._null_cmd = True
+        else:
+            self.touch = False
+            self._null_cmd = False
 
     @property
     def rulename(self):
@@ -578,6 +576,8 @@ class LongAlignerStats(AtomicOperation):
 
     @property
     def cmd(self):
+        if self._null_cmd is True:
+            return ""
         load = self.load
         input, output, log = self.input, self.output, self.log
         cmd = "{load} mikado util stats {input[link]} {output[stats]} > {log} 2>&1"
