@@ -64,7 +64,7 @@ class Scallop(ShortAssembler):
         cmd += "mkdir -p {outdir} && "
         strand = self.strand
         log = self.log
-        cmd += "scallop -i {input[bam]} -o {output[gf]} {strand} {extra} > log 2>&1"
+        cmd += "scallop -i {input[bam]} -o {output[gf]} {strand} {extra} > {log} 2>&1"
         cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd

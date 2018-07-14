@@ -59,7 +59,8 @@ class Strawberry(ShortAssembler):
         else:
             trans = " "
         alrun = self.alrun
-        cmd += " strawberry {extra} {trans} -o {gfdir} -j {min_intron} -J {max_intron} "
+        strand = self.strand
+        cmd += " strawberry {extra} {trans} -o {gfdir} -j {min_intron} -J {max_intron} {strand} "
         cmd += " -p {threads} {input[bam]} > {log} 2>&1 && "
         cmd += "ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
