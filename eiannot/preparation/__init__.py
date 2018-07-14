@@ -18,6 +18,10 @@ class SanitizeGenome(AtomicOperation):
         return ["ei-annotation"]
 
     @property
+    def threads(self):
+        return 1
+
+    @property
     def rulename(self):
         return "sanitize_genome"
 
@@ -107,6 +111,10 @@ class SanitizeProteinBlastDB(AtomicOperation):
     def rulename(self):
         return "sanitize_protein_db"
 
+    @property
+    def threads(self):
+        return 1
+
 
 class FaidxProtein(AtomicOperation):
 
@@ -121,6 +129,10 @@ class FaidxProtein(AtomicOperation):
     @property
     def loader(self):
         return ["samtools"]
+
+    @property
+    def threads(self):
+        return 1
 
     @property
     def rulename(self):
@@ -201,6 +213,10 @@ class BlastxIndex(AtomicOperation):
     @property
     def rulename(self):
         return "protein_blast_index"
+
+    @property
+    def threads(self):
+        return 1
 
     @property
     def cmd(self):
