@@ -118,10 +118,12 @@ def main():
     # This instead are the gold/silver/bronze categories for the training
 
     gold = merged[(
-        (merged.Status.str.match("complete", case=False)) &
-        ((merged["ORF_start"] == merged["mikado_orf_start"]) & (merged["ORF_end"] == merged["mikado_orf_end"])) &
+        (merged.Status.str.contains("complete", case=False)) &
+        ((merged["ORF_start"] == merged["mikado_orf_start"]) &
+         # Mikado and FLN account for the end of the ORF differently. This ensures that they mean the same codon.
+         (abs(merged["ORF_end"] - merged["mikado_orf_end"])) < 3) &
         ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length >= 300) &
-         (merged.five_utr_num == 2) & (merged.three_utr_num == 1))
+         (merged.five_utr_num > 0) & (merged.three_utr_num > 0))
     )]  # [[merged.columns[0], "parent"]]
 
     training_candidates = gold[(
@@ -133,7 +135,7 @@ def main():
 
     silver = merged[(
         (~merged["parent"].isin(gold["parent"])) &
-        ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length>=300) &
+        ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length >= 300) &
          (merged.five_utr_num == 2) & (merged.three_utr_num == 1))
     )][[merged.columns[0], "parent"]]
 

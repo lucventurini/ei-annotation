@@ -30,16 +30,24 @@ def _is_intron_valid(intron: (int, int), intron_index, minI: int, maxI: int, ver
 
 def evaluate(transcript: Transcript, args, verified_introns: set):
 
+    if not transcript:
+        print("Null transcript")
+        return None
+
+    transcript.finalize()
     if "note" in transcript.attributes:
 
         transcript.note = dict((_[0], _[1]) for _ in transcript.attributes["note"])
         if not ("cov" in transcript.note and "id" in transcript.note):
             # No coverage and identity!
+            print("No cov/iden for {}".format(transcript.id))
             return None
         transcript.note["cov"] = float(transcript.note["cov"])
         transcript.note["id"] = float(transcript.note["id"])
         if transcript.note["cov"] < args.min_coverage or transcript.note["id"] < args.min_identity:
             return None
+    else:
+        print("No note")
 
     if transcript.monoexonic is True:
         # No further check is needed
@@ -113,7 +121,7 @@ def main():
                         type=float, default=80)
     parser.add_argument("-g", "--genome", required=True, type=pyfaidx.Fasta)
     parser.add_argument("gff", type=to_gff)
-    parser.add_argument("out", type=argparse.FileType("wt"), default=sys.stdout)
+    parser.add_argument("out", type=argparse.FileType("wt"), default=sys.stdout, nargs="?")
     args = parser.parse_args()
 
     current = None

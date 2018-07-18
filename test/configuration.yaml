@@ -2,6 +2,8 @@ reference:
   min_intron: 20
   max_intron: 10000
 programs:
+  gth:
+    species: 'arabidopsis'
   default:
     threads: 20
     memory: 10000
@@ -70,10 +72,10 @@ programs:
     runs: ['']
     load: ''
   full_lengther_next:
-    load: 'export BLASTDB=/usr/users/ga002/venturil/FLNDBs/'
+    load: 'export BLASTDB=/Users/venturil/FLNDBs/'
     execute: true  # unused as of yet
     taxon: "plants"
-    dbs: "p"
+    dbs: "tpn"
 outdir: "eitest" # "Eiannot"  # "eitest" 
 name: "eitest"
 mikado_homology:
@@ -92,6 +94,7 @@ homology:
   min_intron: 20
   max_intron_ends: 500
   max_intron_middle: 1000
+  use_exonerate: false
 mikado:
   pick:
     mode: 'permissive'

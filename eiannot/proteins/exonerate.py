@@ -1,4 +1,5 @@
 from ..abstract import EIWrapper, AtomicOperation
+from .abstract import ProteinChunkAligner
 import functools
 from .chunking import ChunkProteins
 from ..repeats import RepeatMasking
@@ -20,41 +21,18 @@ def exonerate_multithread(loader):
     return True
 
 
-class Exonerate(AtomicOperation):
+class Exonerate(ProteinChunkAligner):
+
+    __toolname__ = "exonerate"
 
     def __init__(self,
                  chunks: ChunkProteins,
                  chunk,
                  masked: RepeatMasking
                  ):
-        super().__init__()
-        self._chunks = chunks
-        self.configuration = chunks.configuration
-        self.__chunk = None
-        self.chunk = chunk
-        self.input["flag"] = chunks.output["flag"]
-        self.input["genome"] = self.masked_genome
-        self.input["repeat_flag"] = masked.exit.output["flag"]
-        assert self.input["fasta"] in chunks.output["chunks"]
+        super().__init__(chunks, chunk, masked)
         self.output["txt"] = os.path.join(self.outdir, "{chunk}.exonerate.txt").format(chunk=self.chunk)
         self.log = os.path.join(self.logdir, "exonerate.{}.log".format(self.chunk))
-
-    @property
-    def chunk(self):
-        return self.__chunk
-
-    @chunk.setter
-    def chunk(self, chunk):
-
-        assert isinstance(chunk, int)
-        fasta = os.path.join(self._chunks.outdir, "chunk_{}.fasta".format(str(chunk).zfill(3)))
-        assert fasta in self._chunks.output["chunks"], (fasta, self._chunks.output["chunks"])
-        self.input["fasta"] = fasta
-        self.__chunk = chunk
-
-    @property
-    def rulename(self):
-        return "align_protein_{chunk}".format(chunk=self.chunk)
 
     @property
     def loader(self):
@@ -89,14 +67,6 @@ class Exonerate(AtomicOperation):
         cmd += " > {output[txt]} 2> {log}"
         cmd = cmd.format(**locals())
         return cmd
-
-    @property
-    def outdir(self):
-        return os.path.join(self.configuration["outdir"], "proteins", "alignments")
-
-    @property
-    def logdir(self):
-        return os.path.join(self.configuration["outdir"], "proteins", "logs")
 
 
 class CollapseExonerate(AtomicOperation):
@@ -248,7 +218,7 @@ class ExonerateProteinWrapper(EIWrapper):
         self.configuration = masker.configuration
         sanitised = SanitizeProteinBlastDB(self.configuration)
 
-        if sanitised.protein_dbs and self.execute:
+        if sanitised.protein_dbs and self.execute and self.use_exonerate:
             faidx = FaidxProtein(sanitised)
             self.add_edge(sanitised, faidx)
             chunk_proteins = ChunkProteins(sanitised)
@@ -275,3 +245,7 @@ class ExonerateProteinWrapper(EIWrapper):
     @property
     def execute(self):
         return self.configuration["homology"].get("execute", True)
+
+    @property
+    def use_exonerate(self):
+        return self.configuration["homology"].get("use_exonerate", False)

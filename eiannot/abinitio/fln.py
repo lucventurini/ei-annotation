@@ -5,6 +5,7 @@ from ..rnaseq.mikado.abstract import MikadoOp
 from ..repeats.__init__ import RepeatMasking
 import os
 import abc
+import functools
 
 
 class FlnWrapper(EIWrapper):
@@ -49,6 +50,7 @@ class FlnWrapper(EIWrapper):
     @property
     def flag_name(self):
         return os.path.join(self.categories["Gold"].outdir, "fln.done")
+
 
 class FLNOp(AtomicOperation, metaclass=abc.ABCMeta):
 
@@ -195,6 +197,12 @@ class SplitMikadoFasta(FLNOp):
         return os.path.join(self.outdir, "chunk")
 
 
+@functools.lru_cache(typed=True, maxsize=4)
+def get_fln_version(loader):
+
+    return False
+
+
 class FLN(FLNOp):
 
     def __init__(self, mikado_split: SplitMikadoFasta, chunk):
@@ -204,7 +212,7 @@ class FLN(FLNOp):
         self.__split = mikado_split
         self.chunk = chunk
         # self.input["fasta_chunk"] = self.fasta_chunk
-        self.output = {"ptseq": os.path.join(self.outdir, "fln_results", "pt_seqs"),
+        self.output = {"dbannotated": os.path.join(self.outdir, "fln_results", "dbannotated.txt"),
                        "flag": os.path.join(self.outdir, "fln.done")}
         self.touch = False
         self.log = os.path.join(self.outdir, "fln.log")
@@ -248,14 +256,16 @@ class FLN(FLNOp):
         load = self.load
         threads = self.threads
         output = self.output
-        ptseq_verify = os.path.relpath(self.output["ptseq"],
-                                       start=self.outdir)
+        db_verify = os.path.relpath(self.output["dbannotated"],
+                                    start=self.outdir)
         flag = os.path.basename(self.output["flag"])
+
+        dbs = "-a {dbs}".format(**locals()) if get_fln_version(self.load) else ""
 
         cmd = "{load} mkdir -p {outdir} && cd {outdir} &&"
         cmd += " if [[ ! -e chunk.fasta ]]; then ln -s {fasta_link_src} chunk.fasta; fi && "
-        cmd += "full_lengther_next -w {threads} --taxon_group={taxon} -a {dbs} -f chunk.fasta 2>&1 > {log}"
-        cmd += " && [[ -s {ptseq_verify} ]] && touch {flag}"
+        cmd += "full_lengther_next -w {threads} --taxon_group={taxon} {dbs} -f chunk.fasta 2>&1 > {log}"
+        cmd += " && [[ -s {db_verify} ]] && touch {flag}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -292,7 +302,7 @@ class ConcatenateFLN(FLNOp):
         assert runs
         super().__init__(runs[0])
         self.configuration = runs[0].configuration
-        self.input = {"ptseq": [run.output["ptseq"] for run in runs]}
+        self.input = {"dbs": [run.output["dbannotated"] for run in runs]}
         self.output["table"] = os.path.join(self.outdir, "fln_table.txt")
 
     @property
@@ -311,7 +321,7 @@ class ConcatenateFLN(FLNOp):
     def cmd(self):
 
         input, output = self.input, self.output
-        input = " ".join(self.input["ptseq"])
+        input = " ".join(self.input["dbs"])
         outdir = self.outdir
         cmd = """mkdir -p {outdir} && cat {input} | """
         cmd += """awk 'NR==1 || $1!="Query_id"' > {output[table]}"""

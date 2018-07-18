@@ -1,12 +1,12 @@
-from .abstract import EIWorfkflow, FinalFlag
-from .preparation import PrepareWrapper, FaidxProtein, SanitizeProteinBlastDB
-from .repeats.__init__ import RepeatMasking
+from .abstract import EIWorfkflow
+from .preparation import PrepareWrapper
+from .repeats import RepeatMasking
 from .preparation.prepare import parse_samplesheet
-from .rnaseq.alignments.__init__ import ShortAlignmentsWrapper, LongAlignmentsWrapper
+from .rnaseq.alignments import ShortAlignmentsWrapper, LongAlignmentsWrapper
 from .rnaseq.alignments.portcullis import PortcullisWrapper
-from .rnaseq.mikado.__init__ import Mikado
-from .rnaseq.assemblies.__init__ import AssemblyWrapper
-from .proteins.__init__ import ExonerateProteinWrapper
+from .rnaseq.mikado import Mikado
+from .rnaseq.assemblies import AssemblyWrapper
+from .proteins import ExonerateProteinWrapper, GTHProteinWrapper
 from .abinitio.fln import FlnWrapper
 import os
 
@@ -54,7 +54,12 @@ class AnnotationWorklow(EIWorfkflow):
             self.add_edge(self.mikado, self.fln)
 
         self.repeats = RepeatMasking(self.prepare)
-        self.protein_alignments = ExonerateProteinWrapper(self.repeats, self.portcullis)
+
+        if self.configuration["homology"]["use_exonerate"] is True:
+            self.protein_alignments = ExonerateProteinWrapper(self.repeats, self.portcullis)
+        else:
+            self.protein_alignments = GTHProteinWrapper(self.repeats, self.portcullis)
+
         self.merge([self.repeats, self.protein_alignments])
 
         self.add_final_flag()
