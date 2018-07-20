@@ -174,7 +174,7 @@ class FilterGTH(AtomicOperation):
 
 class GTHProteinWrapper(EIWrapper):
 
-    __final_rulename__ = "gth_done"
+    __final_rulename__ = "proteins_done"
 
     def __init__(self,
                  masker: RepeatMasking, portcullis: PortcullisWrapper):

@@ -209,7 +209,7 @@ class FilterExonerate(AtomicOperation):
 
 class ExonerateProteinWrapper(EIWrapper):
 
-    __final_rulename__ = "exonerate_done"
+    __final_rulename__ = "proteins_done"
 
     def __init__(self,
                  masker: RepeatMasking, portcullis: PortcullisWrapper):
