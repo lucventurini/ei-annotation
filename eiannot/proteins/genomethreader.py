@@ -85,7 +85,7 @@ class GTH(ProteinChunkAligner):
     @property
     def coverage(self):
         if self._coverage_value:
-            return " -gcmincoverage {} ".format(self.configuration["homology"]["coverage"])
+            return " -gcmincoverage {} ".format(self._coverage_value)
         else:
             return " "
 
@@ -95,7 +95,10 @@ class GTH(ProteinChunkAligner):
 
     @property
     def gcintron(self):
-        return "-gcmaxgapwidth {}".format(_get_value(self.configuration, self.dbname, "max_intron_ends"))
+        if _get_value(self.configuration, self.dbname, "max_intron_middle"):
+            return "-gcmaxgapwidth {}".format(_get_value(self.configuration, self.dbname, "max_intron_middle"))
+        else:
+            return " "
 
     @property
     def cmd(self):

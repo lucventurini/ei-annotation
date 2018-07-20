@@ -48,6 +48,20 @@ class Exonerate(ProteinChunkAligner):
             return 1
 
     @property
+    def min_intron_cli(self):
+        if _get_value(self.configuration, self.dbname, "min_intron"):
+            return _get_value(self.configuration, self.dbname, "min_intron")
+        else:
+            return self.min_intron
+
+    @property
+    def max_intron_cli(self):
+        if _get_value(self.configuration, self.dbname, "max_intron_middle"):
+            return _get_value(self.configuration, self.dbname, "max_intron_middle")
+        else:
+            return self.max_intron
+
+    @property
     def cmd(self):
 
         load = self.load
@@ -60,7 +74,7 @@ class Exonerate(ProteinChunkAligner):
         else:
             threads = ""
         cmd += " exonerate --model protein2genome {threads} --showtargetgff yes --showvulgar yes "
-        min_intron, max_intron = self.min_intron, self.max_intron
+        min_intron, max_intron = self.min_intron_cli, self.max_intron_cli
         cmd += " --softmaskquery yes --softmasktarget yes --bestn 10  --minintron {min_intron} "
         cmd += " --maxintron {max_intron} --percent 30 --score 50 --geneseed 50 --showalignment no "
         cmd += " --query {input[fasta]} --target {input[genome]} "
