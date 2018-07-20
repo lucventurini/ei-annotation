@@ -56,7 +56,7 @@ class AnnotationWorklow(EIWorfkflow):
 
         self.repeats = RepeatMasking(self.prepare)
 
-        if self.configuration["homology"]["use_exonerate"] is True:
+        if self.configuration["homology"].get("use_exonerate", False) is True:
             self.protein_alignments = ExonerateProteinWrapper(self.repeats, self.portcullis)
         else:
             self.protein_alignments = GTHProteinWrapper(self.repeats, self.portcullis)

@@ -108,14 +108,15 @@ class CollapseGTH(AtomicOperation):
 
 class FilterGTH(AtomicOperation):
 
-    __rulename__ = "filter_exonerate_alignments"
+    __rulename__ = "filter_gth_alignments"
 
     def __init__(self, collapse: CollapseGTH, portcullis: PortcullisWrapper, masker: RepeatMasking):
 
         super().__init__()
         self.configuration = collapse.configuration
         self.input = collapse.output
-        self.input["junctions"] = portcullis.junctions
+        if portcullis.output.input:
+            self.input["junctions"] = portcullis.junctions
         self.input["fai"] = masker.fai
         self.input["genome"] = self.masked_genome
         self.log = os.path.join(os.path.dirname(self.outdir), "logs", "filter_gth.log")
@@ -160,8 +161,13 @@ class FilterGTH(AtomicOperation):
         logdir = os.path.dirname(self.log)
         min_coverage, min_identity = self.coverage, self.identity
         input, output, log = self.input, self.output, self.log
+        if "junctions" in self.input:
+            junctions = "-j {input[junctions]}".format(**locals())
+        else:
+            junctions = ""
+
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
-        cmd += " filter_exonerate.py -minI {mini} -maxE {maxe} -maxM {maxm} -j {input[junctions]} -g {genome} "
+        cmd += " filter_exonerate.py -minI {mini} -maxE {maxe} -maxM {maxm} {junctions} -g {genome} "
         cmd += " -minid {min_identity} -mincov {min_coverage} {input[gff3]} {output[gff3]} 2> {log} > {log}"
 
         cmd = cmd.format(**locals())
