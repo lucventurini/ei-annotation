@@ -1,5 +1,5 @@
 snakemake
 networkx
 eicore
-mikado>=1.2.1
+mikado>=1.2.4
 pandas

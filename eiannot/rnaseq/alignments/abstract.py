@@ -551,12 +551,12 @@ class LongAlignerStats(AtomicOperation):
             raise KeyError(type(aligner), aligner.rulename)
         self.message = "Calculating statistics for: {input[link]}".format(input=self.input)
         self.log = self.output["stats"] + ".log"
-        if aligner.suffix.lower().lstrip(".") not in ("gff", "gff3", "gtf"):
-            self.touch = True
-            self._null_cmd = True
-        else:
-            self.touch = False
-            self._null_cmd = False
+        # if aligner.suffix.lower().lstrip(".") not in ("gff", "gff3", "gtf"):
+        #     self.touch = True
+        #     self._null_cmd = True
+        # else:
+        #     self.touch = False
+        #     self._null_cmd = False
 
     @property
     def rulename(self):
@@ -576,8 +576,8 @@ class LongAlignerStats(AtomicOperation):
 
     @property
     def cmd(self):
-        if self._null_cmd is True:
-            return ""
+        # if self._null_cmd is True:
+        #     return ""
         load = self.load
         input, output, log = self.input, self.output, self.log
         cmd = "{load} mikado util stats {input[link]} {output[stats]} > {log} 2>&1"
