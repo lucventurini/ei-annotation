@@ -97,7 +97,7 @@ class GTH(ProteinChunkAligner):
         load = self.load
         gcintron = self.gcintron
         coverage = self.coverage
-        cmd = "{load} gth -intermediate  -introncutout -first 10 {gcintron} "
+        cmd = "{load} gth -intermediate  -introncutout {gcintron} "
         species = self.species
         extra = self.extra
         cmd += " {species} -gff3out {coverage} {extra} -paralogs "
