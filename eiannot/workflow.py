@@ -43,15 +43,16 @@ class AnnotationWorklow(EIWorfkflow):
         else:
             self.fln_long = None
 
-        self.mikado = Mikado(assemblies=self.assemblies,
-                             long_alignments=self.long_wrapper,
-                             portcullis=self.portcullis,
-                             only_long=False)
-        self.merge([self.mikado])
-        if self.mikado.stats:
-            self.fln = FlnWrapper(self.mikado)
-            self.merge([self.fln])
-            self.add_edge(self.mikado, self.fln)
+        if self.long_wrapper.gfs or self.assemblies.gfs:
+            self.mikado = Mikado(assemblies=self.assemblies,
+                                 long_alignments=self.long_wrapper,
+                                 portcullis=self.portcullis,
+                                 only_long=False)
+            self.merge([self.mikado])
+            if self.mikado.stats:
+                self.fln = FlnWrapper(self.mikado)
+                self.merge([self.fln])
+                self.add_edge(self.mikado, self.fln)
 
         self.repeats = RepeatMasking(self.prepare)
 
