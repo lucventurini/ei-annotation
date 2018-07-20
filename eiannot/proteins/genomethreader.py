@@ -12,6 +12,7 @@ class MKVTreeIndex(AtomicOperation):
     def __init__(self, masked: RepeatMasking):
 
         super().__init__()
+        self.configuration = masked.configuration
         self.masked = masked
         self.input["genome"] = self.masked_genome
         self.output["indices"] = [self.masked_genome + "." + suff for suff in
