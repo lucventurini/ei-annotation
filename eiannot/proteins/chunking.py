@@ -23,11 +23,11 @@ class ChunkProteins(AtomicOperation):
 
     @property
     def rulename(self):
-        return "chunk_proteins_for_exonerate"
+        return "chunk_proteins_for_alignment"
 
     @property
     def loader(self):
-        return ["mikado"]
+        return ["mikado", "genometools"]
 
     @property
     def cmd(self):
@@ -42,6 +42,10 @@ class ChunkProteins(AtomicOperation):
         cmd += " && touch {output[flag]}"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def threads(self):
+        return 1
 
     @property
     def chunks(self):

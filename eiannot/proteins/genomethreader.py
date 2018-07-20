@@ -7,12 +7,45 @@ from ..rnaseq.alignments.portcullis import PortcullisWrapper
 import os
 
 
+class MKVTreeIndex(AtomicOperation):
+
+    def __init__(self, masked: RepeatMasking):
+
+        super().__init__()
+        self.masked = masked
+        self.input["genome"] = self.masked_genome
+        self.output["indices"] = [self.masked_genome + "." + suff for suff in
+                                  ["ssp", "tis", "ois", "des", "sds", "lcp", "llv",
+                                   "bck", "suf", "sti1", "bwt", "prj", "al1", "skp"]]
+
+    @property
+    def loader(self):
+        return ["vmatch"]
+
+    @property
+    def rulename(self):
+        return "mkvtree_index"
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def cmd(self):
+        outdir = os.path.dirname(self.masked_genome)
+        load = self.load
+        masked = os.path.basename(self.masked_genome)
+        cmd = "{load} cd {outdir} && mkvtree -v -dna -allout -pl -db {masked}".format(**locals())
+        return cmd
+
+
 class GTH(ProteinChunkAligner):
 
     ___toolname__ = "gth"
 
-    def __init__(self, chunks: ChunkProteins, chunk, masked: RepeatMasking):
-        super().__init__(chunks, chunk, masked)
+    def __init__(self, chunks: ChunkProteins, chunk, vtree: MKVTreeIndex):
+        super().__init__(chunks, chunk, vtree.masked)
+        self.input.update(vtree.output)
         self.output["gff3"] = os.path.join(self.outdir, "{chunk}.{tool}.gff3").format(chunk=self.chunk,
                                                                                      tool=self.toolname)
         self.log = os.path.join(self.logdir, "{tool}.{chunk}.log".format(tool=self.toolname,
@@ -194,9 +227,11 @@ class GTHProteinWrapper(EIWrapper):
             self.add_edge(sanitised, faidx)
             chunk_proteins = ChunkProteins(sanitised)
             self.add_edge(faidx, chunk_proteins)
-            chunks = [GTH(chunk_proteins, chunk, masker) for chunk in range(1, chunk_proteins.chunks + 1)]
+            vtree = MKVTreeIndex(masker)
+            self.add_edge(masker, vtree)
+            chunks = [GTH(chunk_proteins, chunk, vtree) for chunk in range(1, chunk_proteins.chunks + 1)]
             self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
-            self.add_edges_from([(masker, chunk) for chunk in chunks])
+            self.add_edges_from([(vtree, chunk) for chunk in chunks])
             collapsed = CollapseGTH(chunks)
             self.add_edges_from([(chunk, collapsed) for chunk in chunks])
             filterer = FilterGTH(collapse=collapsed, portcullis=portcullis,

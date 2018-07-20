@@ -84,7 +84,7 @@ class SanitizeProteinBlastDB(AtomicOperation):
 
     @property
     def loader(self):
-        return ["ei-annotation"]
+        return ["ei-annotation", "genometools"]
 
     @property
     def cmd(self):
@@ -93,7 +93,8 @@ class SanitizeProteinBlastDB(AtomicOperation):
         log = self.log
         dbs = " ".join(self.input["db"])
 
-        cmd = "{load} sanitize_blast_db.py -o {output[db]} {dbs} 2> {log} > {log}"
+        cmd = "{load} sanitize_blast_db.py {dbs} 2> {log} |"
+        cmd += " gt seqtransform -addstopaminos -width 60 > {output[db]} 2> {log}"
         cmd = cmd.format(**locals())
 
         return cmd
