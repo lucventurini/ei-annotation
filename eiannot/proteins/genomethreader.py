@@ -115,7 +115,7 @@ class FilterGTH(AtomicOperation):
         super().__init__()
         self.configuration = collapse.configuration
         self.input = collapse.output
-        if portcullis.output.input:
+        if portcullis.merger.input["beds"]:
             self.input["junctions"] = portcullis.junctions
         self.input["fai"] = masker.fai
         self.input["genome"] = self.masked_genome

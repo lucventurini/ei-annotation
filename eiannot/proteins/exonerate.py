@@ -150,7 +150,7 @@ class FilterExonerate(AtomicOperation):
         super().__init__()
         self.configuration = converter.configuration
         self.input = converter.output
-        if portcullis.output.input:
+        if portcullis.merger.input["beds"]:
             self.input["junctions"] = portcullis.junctions
         self.input["fai"] = masker.fai
         self.input["genome"] = self.masked_genome

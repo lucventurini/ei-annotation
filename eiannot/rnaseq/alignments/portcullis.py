@@ -36,7 +36,8 @@ class PortcullisWrapper(EIWrapper):
 
         filters = []
         juncs = []
-        if self.execute and short_alignments.bams:
+        self.__bams = short_alignments.bams
+        if self.execute:
             preps = []
             filters = []
             refprep = PortcullisPrepRef(self.configuration, outdir=self.outdir)
@@ -89,7 +90,7 @@ class PortcullisWrapper(EIWrapper):
 
     @property
     def execute(self):
-        return self.configuration["programs"].get("portcullis", dict()).get("execute", True)
+        return self.__bams and self.configuration["programs"].get("portcullis", dict()).get("execute", True)
 
     # @property
     # def failed_junctions(self):
