@@ -139,6 +139,10 @@ class CollapseGTH(AtomicOperation):
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "proteins", "output")
 
+    @property
+    def threads(self):
+        return 1
+
 
 class FilterGTH(AtomicOperation):
 
@@ -183,6 +187,10 @@ class FilterGTH(AtomicOperation):
     @property
     def coverage(self):
         return self.configuration["homology"]["coverage"]
+
+    @property
+    def threads(self):
+        return 1
 
     @property
     def cmd(self):
