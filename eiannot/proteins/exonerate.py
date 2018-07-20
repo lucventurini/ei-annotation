@@ -1,5 +1,5 @@
-from ..abstract import EIWrapper, AtomicOperation
-from .abstract import ProteinChunkAligner
+from ..abstract import AtomicOperation
+from .abstract import ProteinChunkAligner, FilterAlignments, ProteinWrapper, _get_value
 import functools
 from .chunking import ChunkProteins
 from ..repeats import RepeatMasking
@@ -31,8 +31,10 @@ class Exonerate(ProteinChunkAligner):
                  masked: RepeatMasking
                  ):
         super().__init__(chunks, chunk, masked)
-        self.output["txt"] = os.path.join(self.outdir, "{chunk}.exonerate.txt").format(chunk=self.chunk)
-        self.log = os.path.join(self.logdir, "exonerate.{}.log".format(self.chunk))
+        self.output["txt"] = os.path.join(self.outdir, "{dbname}_{chunk}.exonerate.txt").format(
+            chunk=self.chunk, dbname=self.dbname)
+        self.log = os.path.join(self.logdir, "exonerate.{dbname}_{chunk}.log".format(
+            dbname=self.dbname, chunk=self.chunk))
 
     @property
     def loader(self):
@@ -73,9 +75,11 @@ class CollapseExonerate(AtomicOperation):
 
     def __init__(self, runs: [Exonerate]):
         super().__init__()
+        assert len(set(_.dbname for _ in runs)) == 1
+        self.dbname = runs[0].dbname
         self.configuration = runs[0].configuration
         self.input["chunks"] = [run.output["txt"] for run in runs]
-        self.output["collapsed"] = os.path.join(self.outdir, "exonerate.txt")
+        self.output["collapsed"] = os.path.join(self.outdir, "{dbname}.exonerate.txt".format(dbname=self.dbname))
 
     @property
     def loader(self):
@@ -83,13 +87,14 @@ class CollapseExonerate(AtomicOperation):
 
     @property
     def rulename(self):
-        return "collapse_exonerate"
+        return "collapse_exonerate_{dbname}".format(dbname=self.dbname)
 
     @property
     def cmd(self):
         inputs = " ".join(self.input["chunks"])
         output = self.output
-        return "cat {inputs} > {output[collapsed]}".format(**locals())
+        outdir = self.outdir
+        return "mkdir -p {outdir} && cat {inputs} > {output[collapsed]}".format(**locals())
 
     @property
     def outdir(self):
@@ -101,12 +106,14 @@ class ConvertExonerate(AtomicOperation):
     def __init__(self, collapsed: CollapseExonerate, fai: FaidxProtein):
 
         super().__init__()
+        self.dbname = collapsed.dbname
+        assert collapsed.dbname == fai.dbname  # Sanity check
         self.configuration = collapsed.configuration
         self.input = collapsed.output
         self.input["proteins"] = fai.input["db"]
         self.input["fai"] = fai.output['fai']
-        self.output = {'gff3': os.path.join(self.outdir, "exonerate.gff3")}
-        self.log = os.path.join(self.outdir, "convert.log")
+        self.output = {'gff3': os.path.join(self.outdir, "{dbname}.exonerate.gff3".format(dbname=self.dbname))}
+        self.log = os.path.join(self.outdir, "{dbname}.convert.log".format(dbname=self.dbname))
 
     @property
     def loader(self):
@@ -114,15 +121,29 @@ class ConvertExonerate(AtomicOperation):
 
     @property
     def rulename(self):
-        return "exonerate_to_gff3"
+        return "exonerate_to_gff3_{}".format(self.dbname)
 
     @property
-    def identity(self):
-        return self.configuration["homology"]["identity"]
+    def _identity_value(self):
+        return _get_value(self.configuration, self.dbname, "identity")
+
+    @property
+    def _coverage_value(self):
+        return _get_value(self.configuration, self.dbname, "coverage")
 
     @property
     def coverage(self):
-        return self.configuration["homology"]["coverage"]
+        if self._coverage_value:
+            return "--minCoverage {coverage}".format(coverage=self._coverage_value)
+        else:
+            return ""
+
+    @property
+    def identity(self):
+        if self._identity_value:
+            return "--minIdentity {identity}".format(identity=self._identity_value)
+        else:
+            return ""
 
     @property
     def cmd(self):
@@ -130,8 +151,8 @@ class ConvertExonerate(AtomicOperation):
         identity, coverage = self.identity, self.coverage
         input, output, log = self.input, self.output, self.log
 
-        cmd = "exonerate2gff.pl --in {input[collapsed]} --minIdentity {identity} --minCoverage {coverage} "
-        cmd += "--fasta {input[proteins]} > {output[gff3]} 2> {log}"
+        cmd = "exonerate2gff.pl --in {input[collapsed]} {identity} {coverage} "
+        cmd += " --fasta {input[proteins]} > {output[gff3]} 2> {log}"
         cmd = cmd.format(**locals())
 
         return cmd
@@ -141,117 +162,29 @@ class ConvertExonerate(AtomicOperation):
         return os.path.join(self.configuration["outdir"], "proteins", "alignments")
 
 
-class FilterExonerate(AtomicOperation):
-
-    __rulename__ = "filter_exonerate_alignments"
-
-    def __init__(self, converter: ConvertExonerate, portcullis: PortcullisWrapper, masker: RepeatMasking):
-
-        super().__init__()
-        self.configuration = converter.configuration
-        self.input = converter.output
-        if portcullis.merger.input["beds"]:
-            self.input["junctions"] = portcullis.junctions
-        self.input["fai"] = masker.fai
-        self.input["genome"] = self.masked_genome
-        self.log = os.path.join(os.path.dirname(self.outdir), "logs", "filter_exonerate.log")
-        self.output["gff3"] = os.path.join(self.outdir, "exonerate.filtered.gff3")
-
-    @property
-    def rulename(self):
-        return self.__rulename__
-
-    @property
-    def loader(self):
-        return ["mikado", "ei-annotation"]  # TODO: this will need to be updated with the proper details
-
-    @property
-    def min_intron(self):
-        return self.configuration["homology"]["min_intron"]
-
-    @property
-    def max_intron_middle(self):
-        return self.configuration["homology"]["max_intron_middle"]
-
-    @property
-    def max_intron_ends(self):
-        return self.configuration["homology"]["max_intron_ends"]
-
-    @property
-    def identity(self):
-        return self.configuration["homology"]["identity"]
-
-    @property
-    def coverage(self):
-        return self.configuration["homology"]["coverage"]
-
-    @property
-    def cmd(self):
-
-        load = self.load
-        mini = self.min_intron
-        maxe, maxm = self.max_intron_ends, self.max_intron_middle
-        genome = self.masked_genome
-        outdir = self.outdir
-        logdir = os.path.dirname(self.log)
-        min_coverage, min_identity = self.coverage, self.identity
-        input, output, log = self.input, self.output, self.log
-        if "junctions" in self.input:
-            junctions = "-j {input[junctions]}".format(**locals())
-        else:
-            junctions = ""
-
-        cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
-        cmd += " filter_exonerate.py -minI {mini} -maxE {maxe} -maxM {maxm} {junctions} -g {genome} "
-        cmd += " -minid {min_identity} -mincov {min_coverage} {input[gff3]} {output[gff3]} 2> {log} > {log}"
-
-        cmd = cmd.format(**locals())
-        return cmd
-
-    @property
-    def outdir(self):
-        return os.path.join(self.configuration["outdir"], "proteins", "output")
-
-
-class ExonerateProteinWrapper(EIWrapper):
-
-    __final_rulename__ = "proteins_done"
+class ExonerateProteinWrapper(ProteinWrapper):
 
     def __init__(self,
                  masker: RepeatMasking, portcullis: PortcullisWrapper):
 
-        super().__init__()
-        self.configuration = masker.configuration
-        sanitised = SanitizeProteinBlastDB(self.configuration)
+        super().__init__(masker, portcullis)
 
-        if sanitised.protein_dbs and self.execute and self.use_exonerate:
-            faidx = FaidxProtein(sanitised)
-            self.add_edge(sanitised, faidx)
-            chunk_proteins = ChunkProteins(sanitised)
-            chunks = [Exonerate(chunk_proteins, chunk, masker) for chunk in range(1, chunk_proteins.chunks + 1)]
-            self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
-            self.add_edges_from([(masker, chunk) for chunk in chunks])
-            collapsed = CollapseExonerate(chunks)
-            self.add_edges_from([(chunk, collapsed) for chunk in chunks])
-            convert = ConvertExonerate(collapsed, faidx)
-            self.add_edge(faidx, convert)
-            self.add_edge(collapsed, convert)
-            filterer = FilterExonerate(converter=convert, portcullis=portcullis,
-                                       masker=masker)
-            self.add_edge(masker, filterer)
-            self.add_edge(portcullis, filterer)
-            self.add_edge(convert, filterer)
-            self.add_final_flag()
-            assert self.exit
-
-    @property
-    def flag_name(self):
-        return os.path.join(self.exit.outdir, "proteins.done")
-
-    @property
-    def execute(self):
-        return self.configuration["homology"].get("execute", True)
-
-    @property
-    def use_exonerate(self):
-        return self.configuration["homology"].get("use_exonerate", False)
+    def execute_protein(self, db):
+        sanitised = SanitizeProteinBlastDB(self.configuration, db)
+        faidx = FaidxProtein(sanitised)
+        self.add_edge(sanitised, faidx)
+        chunk_proteins = ChunkProteins(sanitised)
+        chunks = [Exonerate(chunk_proteins, chunk, self.masker) for chunk in range(1, chunk_proteins.chunks + 1)]
+        self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
+        self.add_edges_from([(self.masker, chunk) for chunk in chunks])
+        collapsed = CollapseExonerate(chunks)
+        self.add_edges_from([(chunk, collapsed) for chunk in chunks])
+        convert = ConvertExonerate(collapsed, faidx)
+        self.add_edge(faidx, convert)
+        self.add_edge(collapsed, convert)
+        filterer = FilterAlignments(collapse=convert,
+                                    portcullis=self.portcullis,
+                                    masker=self.masker)
+        self.add_edge(self.masker, filterer)
+        self.add_edge(self.portcullis, filterer)
+        self.add_edge(convert, filterer)

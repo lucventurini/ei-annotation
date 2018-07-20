@@ -67,7 +67,7 @@ def evaluate(transcript: Transcript, args, verified_introns: set):
     t_introns = sorted(check_transcript.introns, key=operator.itemgetter(0))
     minI, maxE, maxM = args.minI, args.maxE, args.maxM
 
-    num = len(check_transcript.canonical_junctions)
+    # num = len(check_transcript.canonical_junctions)
     if len(t_introns) == 1:
         if not _is_intron_valid(t_introns[0], 0, minI, maxM, verified_introns, check_transcript.canonical_junctions):
             exon_lengths = dict((_[1] - _[0] + 1, _) for _ in transcript.exons)
@@ -139,6 +139,8 @@ def main():
         for bed in args.junctions:
             introns.add((bed.chrom, bed.thick_start, bed.thick_end))
 
+    print("##gff-version\t3", file=args.out)
+
     for line in args.gff:
         if line.header is True:
             continue
@@ -147,6 +149,7 @@ def main():
                 current = evaluate(current, args, introns)
                 if current:
                     print(current, file=args.out)
+                    print("###", file=args.out)
             current = Transcript(line, intron_range=[args.minI, max(args.maxE, args.maxM)])
         elif line.feature == "match_part":
             current.add_exon(line)

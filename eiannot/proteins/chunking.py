@@ -10,10 +10,13 @@ class ChunkProteins(AtomicOperation):
         super().__init__()
         self.configuration = sanitised.configuration
         self.input = sanitised.output  # input[db] is our file
-        self.output["flag"] = os.path.join(os.path.dirname(self.outdir), "chunking.done")
-        self.output["chunks"] = [os.path.join(self.outdir, "chunk_{}.fasta".format(
-            str(chunk).zfill(3))) for chunk in range(1, self.chunks + 1)]
-        self.log = os.path.join(os.path.dirname(self.outdir), "logs", "chunking.log")
+        self.dbname = sanitised.dbname
+        self.output["flag"] = os.path.join(os.path.dirname(self.outdir),
+                                           "{dbname}_chunking.done".format(dbname=self.dbname))
+        self.output["chunks"] = [os.path.join(self.outdir, "{dbname}_{cid}.fasta".format(
+            cid=str(chunk).zfill(3), dbname=sanitised.dbname)) for chunk in range(1, self.chunks + 1)]
+        self.log = os.path.join(os.path.dirname(self.outdir), "logs",
+                                "{dbname}_chunking.log".format(dbname=self.dbname))
 
     @property
     def outdir(self):
@@ -23,7 +26,7 @@ class ChunkProteins(AtomicOperation):
 
     @property
     def rulename(self):
-        return "chunk_proteins_for_alignment"
+        return "chunk_proteins_for_alignment_{dbname}".format(dbname=self.dbname)
 
     @property
     def loader(self):
@@ -37,8 +40,9 @@ class ChunkProteins(AtomicOperation):
         chunks = self.chunks
         input, output, log = self.input, self.output, self.log
         logdir = os.path.dirname(self.log)
+        dbname = self.dbname
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
-        cmd += " split_fasta.py -m {chunks} {input[db]} {outdir}/chunk 2> {log} > {log}"
+        cmd += " split_fasta.py -m {chunks} {input[db]} {outdir}/{dbname} 2> {log} > {log}"
         cmd += " && touch {output[flag]}"
         cmd = cmd.format(**locals())
         return cmd

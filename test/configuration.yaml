@@ -87,14 +87,21 @@ mikado_homology:
   evalue: 0.000001
   max_target_seqs: 10
 homology:
-  prot_db: *prot_db
+  prot_db:
+    sprot:
+      fastas: ["subset.sprot.fasta", "subset2.sprot.fasta"]
+      coverage: 80
+    sprot2:
+      fastas: ["subset3.sprot.fasta"]
+      identity: 70
+      coverage: 90
   protein_chunks: 3
   identity: 40
   coverage: 70
   min_intron: 20
   max_intron_ends: 500
   max_intron_middle: 1000
-  use_exonerate: false
+  use_exonerate: true
 mikado:
   pick:
     mode: 'permissive'

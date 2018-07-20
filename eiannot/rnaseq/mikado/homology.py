@@ -208,7 +208,7 @@ class MikadoHomologyWrapper(EIWrapper):
         super().__init__()
         self.configuration = preparer.configuration
         self.outdir = preparer.outdir
-        self.sanitizer = SanitizeProteinBlastDB(self.configuration)
+        self.sanitizer = SanitizeProteinBlastDB(self.configuration, dbs=self.dbs)
         if self.execute is True:
             split = SplitMikadoPrepareFasta(preparer)
             if self.program == "blastx":
@@ -232,6 +232,10 @@ class MikadoHomologyWrapper(EIWrapper):
             self.add_edges_from([(exe, self.flag) for exe in executers])
         if preparer.is_long:
             self.__final_rulename__ += "_long"
+
+    @property
+    def dbs(self):
+        return self.configuration["mikado_homology"]["prot_dbs"]
 
     @property
     def flag_name(self):

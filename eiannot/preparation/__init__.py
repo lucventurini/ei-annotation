@@ -75,12 +75,27 @@ class FaidxGenome(AtomicOperation):
 
 class SanitizeProteinBlastDB(AtomicOperation):
 
-    def __init__(self, configuration):
+    def __init__(self, configuration, db=None, dbs=None):
         super().__init__()
+        self.__dbname = db
+        self.__dbs = dbs
         self.configuration = configuration
         self.input["db"] = self.protein_dbs
-        self.output["db"] = os.path.join(self.outdir, "homologyDB.fa")
+        self.output["db"] = os.path.join(self.outdir, "{dbname}.fa".format(dbname=self.dbname))
         self.log = os.path.join(os.path.dirname(self.output["db"]), "sanitize.log")
+
+    @property
+    def dbname(self):
+        if self.__dbname is not None:
+            return self.__dbname
+        else:
+            return "homologyDB"
+
+    @dbname.setter
+    def dbname(self, dbname):
+        if not isinstance(dbname, str):
+            raise TypeError(type(dbname))
+        self.__dbname = dbname
 
     @property
     def loader(self):
@@ -106,11 +121,16 @@ class SanitizeProteinBlastDB(AtomicOperation):
 
     @property
     def protein_dbs(self):
-        return self.configuration["homology"]["prot_db"]
+        if self.__dbs is not None:
+            return self.__dbs
+        else:
+            assert self.dbname in self.configuration["homology"]["prot_db"]
+            assert 'fastas' in self.configuration["homology"]["prot_db"][self.dbname]
+            return self.configuration["homology"]["prot_db"][self.dbname]['fastas']
 
     @property
     def rulename(self):
-        return "sanitize_protein_db"
+        return "sanitize_{dbname}_protein_db".format(dbname=self.dbname)
 
     @property
     def threads(self):
@@ -119,11 +139,11 @@ class SanitizeProteinBlastDB(AtomicOperation):
 
 class FaidxProtein(AtomicOperation):
 
-
     def __init__(self, sanitised: SanitizeProteinBlastDB):
 
         super().__init__()
         self.configuration = sanitised.configuration
+        self.dbname = sanitised.dbname
         self.input = sanitised.output
         self.output["fai"] = sanitised.output["db"] + ".fai"
 
@@ -137,7 +157,7 @@ class FaidxProtein(AtomicOperation):
 
     @property
     def rulename(self):
-        return "faidx_proteins"
+        return "faidx_proteins_{dbname}".format(dbname=self.dbname)
 
     @property
     def cmd(self):

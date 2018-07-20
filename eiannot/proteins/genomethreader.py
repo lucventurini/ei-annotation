@@ -1,6 +1,6 @@
 from .chunking import ChunkProteins
 from ..abstract import AtomicOperation, EIWrapper
-from .abstract import ProteinChunkAligner
+from .abstract import ProteinChunkAligner, FilterAlignments, _get_value, ProteinWrapper
 from ..repeats import RepeatMasking
 from ..preparation import FaidxProtein, SanitizeProteinBlastDB
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
@@ -15,9 +15,9 @@ class MKVTreeIndex(AtomicOperation):
         self.configuration = masked.configuration
         self.masked = masked
         self.input["genome"] = self.masked_genome
-        self.output["indices"] = [self.masked_genome + "." + suff for suff in
-                                  ["ssp", "tis", "ois", "des", "sds", "lcp", "llv",
-                                   "bck", "suf", "sti1", "bwt", "prj", "al1", "skp"]]
+        self.output["flag"] = os.path.join(self.outdir, "vtree_index.done")
+        self.touch = True
+        self.log = os.path.join(self.outdir, "mkvtree.log")
 
     @property
     def loader(self):
@@ -32,11 +32,21 @@ class MKVTreeIndex(AtomicOperation):
         return 1
 
     @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "indices", "vmatch")
+
+    @property
     def cmd(self):
-        outdir = os.path.dirname(self.masked_genome)
+
+        outdir = self.outdir
         load = self.load
         masked = os.path.basename(self.masked_genome)
-        cmd = "{load} cd {outdir} && mkvtree -v -dna -allout -pl -db {masked}".format(**locals())
+        link_src = os.path.relpath(self.masked_genome, start=self.outdir)
+        log = os.path.relpath(self.log, start=self.outdir)
+        cmd = "{load} mkdir -p {outdir} && cd {outdir} && "
+        cmd += "ln -sf {link_src} {masked} && "
+        cmd += "mkvtree -v -dna -allout -pl -db {masked} > {log} 2> {log}"
+        cmd = cmd.format(**locals())
         return cmd
 
 
@@ -47,10 +57,10 @@ class GTH(ProteinChunkAligner):
     def __init__(self, chunks: ChunkProteins, chunk, vtree: MKVTreeIndex):
         super().__init__(chunks, chunk, vtree.masked)
         self.input.update(vtree.output)
-        self.output["gff3"] = os.path.join(self.outdir, "{chunk}.{tool}.gff3").format(chunk=self.chunk,
-                                                                                     tool=self.toolname)
-        self.log = os.path.join(self.logdir, "{tool}.{chunk}.log".format(tool=self.toolname,
-                                                                         chunk=self.chunk))
+        self.output["gff3"] = os.path.join(self.outdir, "{tool}.{dbname}_{chunk}.gff3").format(
+            chunk=self.chunk, tool=self.toolname, dbname=self.dbname)
+        self.log = os.path.join(self.logdir, "{tool}.{dbname}_{chunk}.log".format(
+            dbname=self.dbname, tool=self.toolname, chunk=self.chunk))
 
     @property
     def loader(self):
@@ -74,7 +84,7 @@ class GTH(ProteinChunkAligner):
 
     @property
     def coverage(self):
-        if "coverage" in self.configuration["homology"]:
+        if self._coverage_value:
             return " -gcmincoverage {} ".format(self.configuration["homology"]["coverage"])
         else:
             return " "
@@ -85,7 +95,7 @@ class GTH(ProteinChunkAligner):
 
     @property
     def gcintron(self):
-        return "-gcmaxgapwidth {}".format(self.max_intron)
+        return "-gcmaxgapwidth {}".format(_get_value(self.configuration, self.dbname, "max_intron_ends"))
 
     @property
     def cmd(self):
@@ -102,7 +112,8 @@ class GTH(ProteinChunkAligner):
         extra = self.extra
         cmd += " {species} -gff3out {coverage} {extra} -paralogs "
         input, output = self.input, self.output
-        cmd += " -genomic {input[genome]} -protein {input[fasta]} "
+        logdir, log = os.path.dirname(self.log), self.log
+        cmd += " -genomic {input[genome]} -protein {input[fasta]} 2> {log} "
         cmd += """ | awk -F "\\t" '{{OFS="\\t"; if ($3=="gene") {{$3="match"}} else {{if ($3=="exon") {{$3="match_part"}} }}; print $0}}' """
         cmd += " > {output[gff3]}"
 
@@ -115,8 +126,11 @@ class CollapseGTH(AtomicOperation):
     def __init__(self, runs: [GTH]):
         super().__init__()
         self.configuration = runs[0].configuration
+        assert len(set([_.dbname for _ in runs])) == 1
+        self.dbname = runs[0].dbname
         self.input["chunks"] = [run.output["gff3"] for run in runs]
-        self.output["gff3"] = os.path.join(self.outdir, "{tool}.gff3").format(tool="gth")
+        self.output["gff3"] = os.path.join(self.outdir, "{tool}.{dbname}.gff3").format(tool="gth", dbname=self.dbname)
+        self.log = os.path.join(self.logdir, "collapse_{dbname}.log".format(dbname=self.dbname))
 
     @property
     def loader(self):
@@ -124,14 +138,15 @@ class CollapseGTH(AtomicOperation):
 
     @property
     def rulename(self):
-        return "collapse_gth"
+        return "collapse_gth_{}".format(self.dbname)
 
     @property
     def cmd(self):
         inputs = " ".join(self.input["chunks"])
         output = self.output
+        log = self.log
         cmd = "gt gff3 -sort -tidy -addids no -retainids -o {output[gff3]}"
-        cmd += " -force {inputs}"
+        cmd += " -force {inputs} 2> {log} > {log}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -140,125 +155,37 @@ class CollapseGTH(AtomicOperation):
         return os.path.join(self.configuration["outdir"], "proteins", "output")
 
     @property
-    def threads(self):
-        return 1
-
-
-class FilterGTH(AtomicOperation):
-
-    __rulename__ = "filter_gth_alignments"
-
-    def __init__(self, collapse: CollapseGTH, portcullis: PortcullisWrapper, masker: RepeatMasking):
-
-        super().__init__()
-        self.configuration = collapse.configuration
-        self.input = collapse.output
-        if portcullis.merger.input["beds"]:
-            self.input["junctions"] = portcullis.junctions
-        self.input["fai"] = masker.fai
-        self.input["genome"] = self.masked_genome
-        self.log = os.path.join(os.path.dirname(self.outdir), "logs", "filter_gth.log")
-        self.output["gff3"] = os.path.join(self.outdir, "gth.filtered.gff3")
-
-    @property
-    def rulename(self):
-        return self.__rulename__
-
-    @property
-    def loader(self):
-        return ["mikado", "ei-annotation"]  # TODO: this will need to be updated with the proper details
-
-    @property
-    def min_intron(self):
-        return self.configuration["homology"]["min_intron"]
-
-    @property
-    def max_intron_middle(self):
-        return self.configuration["homology"]["max_intron_middle"]
-
-    @property
-    def max_intron_ends(self):
-        return self.configuration["homology"]["max_intron_ends"]
-
-    @property
-    def identity(self):
-        return self.configuration["homology"]["identity"]
-
-    @property
-    def coverage(self):
-        return self.configuration["homology"]["coverage"]
+    def logdir(self):
+        return os.path.join(self.configuration["outdir"], "proteins", "logs")
 
     @property
     def threads(self):
         return 1
 
-    @property
-    def cmd(self):
 
-        load = self.load
-        mini = self.min_intron
-        maxe, maxm = self.max_intron_ends, self.max_intron_middle
-        genome = self.masked_genome
-        outdir = self.outdir
-        logdir = os.path.dirname(self.log)
-        min_coverage, min_identity = self.coverage, self.identity
-        input, output, log = self.input, self.output, self.log
-        if "junctions" in self.input:
-            junctions = "-j {input[junctions]}".format(**locals())
-        else:
-            junctions = ""
-
-        cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
-        cmd += " filter_exonerate.py -minI {mini} -maxE {maxe} -maxM {maxm} {junctions} -g {genome} "
-        cmd += " -minid {min_identity} -mincov {min_coverage} {input[gff3]} {output[gff3]} 2> {log} > {log}"
-
-        cmd = cmd.format(**locals())
-        return cmd
-
-    @property
-    def outdir(self):
-        return os.path.join(self.configuration["outdir"], "proteins", "output")
-
-
-class GTHProteinWrapper(EIWrapper):
-
-    __final_rulename__ = "proteins_done"
+class GTHProteinWrapper(ProteinWrapper):
 
     def __init__(self,
                  masker: RepeatMasking, portcullis: PortcullisWrapper):
 
-        super().__init__()
-        self.configuration = masker.configuration
-        sanitised = SanitizeProteinBlastDB(self.configuration)
+        super().__init__(masker, portcullis)
 
-        if sanitised.protein_dbs and self.execute and self.use_gth:
-            faidx = FaidxProtein(sanitised)
-            self.add_edge(sanitised, faidx)
-            chunk_proteins = ChunkProteins(sanitised)
-            self.add_edge(faidx, chunk_proteins)
-            vtree = MKVTreeIndex(masker)
-            self.add_edge(masker, vtree)
-            chunks = [GTH(chunk_proteins, chunk, vtree) for chunk in range(1, chunk_proteins.chunks + 1)]
-            self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
-            self.add_edges_from([(vtree, chunk) for chunk in chunks])
-            collapsed = CollapseGTH(chunks)
-            self.add_edges_from([(chunk, collapsed) for chunk in chunks])
-            filterer = FilterGTH(collapse=collapsed, portcullis=portcullis,
-                                 masker=masker)
-            self.add_edge(masker, filterer)
-            self.add_edge(portcullis, filterer)
-            self.add_edge(collapsed, filterer)
-            self.add_final_flag()
-            assert self.exit
-
-    @property
-    def flag_name(self):
-        return os.path.join(self.exit.outdir, "proteins.done")
-
-    @property
-    def execute(self):
-        return self.configuration["homology"].get("execute", True)
-
-    @property
-    def use_gth(self):
-        return not self.configuration["homology"].get("use_exonerate", False)
+    def execute_protein(self, db):
+        vtree = MKVTreeIndex(self.masker)
+        sanitised = SanitizeProteinBlastDB(self.configuration, db)
+        faidx = FaidxProtein(sanitised)
+        self.add_edge(sanitised, faidx)
+        chunk_proteins = ChunkProteins(sanitised)
+        self.add_edge(faidx, chunk_proteins)
+        self.add_edge(self.masker, vtree)
+        chunks = [GTH(chunk_proteins, chunk, vtree) for chunk in range(1, chunk_proteins.chunks + 1)]
+        self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
+        self.add_edges_from([(vtree, chunk) for chunk in chunks])
+        collapsed = CollapseGTH(chunks)
+        self.add_edges_from([(chunk, collapsed) for chunk in chunks])
+        filterer = FilterAlignments(collapse=collapsed,
+                                    portcullis=self.portcullis,
+                                    masker=self.masker)
+        self.add_edge(self.masker, filterer)
+        self.add_edge(self.portcullis, filterer)
+        self.add_edge(collapsed, filterer)
