@@ -112,7 +112,7 @@ class SanitizeProteinBlastDB(AtomicOperation):
 
         # We have to use a temporary file because otherwise gt will pollute the folder
         cmd = "{load} sanitize_blast_db.py {dbs} 2> {log} > {out_tmp} && "
-        cmd += " gt seqtransform -addstopaminos -width 60 > {output[db]} 2> {log} && "
+        cmd += " gt seqtransform -addstopaminos -width 60 {out_tmp} > {output[db]} 2> {log} && "
         cmd += " rm {out_tmp}*"
         cmd = cmd.format(**locals())
 
