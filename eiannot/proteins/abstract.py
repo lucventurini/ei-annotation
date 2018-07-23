@@ -2,17 +2,8 @@ from ..abstract import AtomicOperation, EIWrapper
 import abc
 import os
 from ..repeats import RepeatMasking
-from .chunking import ChunkProteins
+from .chunking import ChunkProteins, _get_value
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
-
-
-def _get_value(conf, dbname, value):
-    if value in conf["homology"]["prot_dbs"].get(dbname, {}):
-        return conf["homology"]["prot_dbs"][dbname][value]
-    elif value in conf["homology"]:
-        return conf["homology"][value]
-    else:
-        return None
 
 
 class ProteinChunkAligner(AtomicOperation, metaclass=abc.ABCMeta):

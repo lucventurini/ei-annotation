@@ -1,7 +1,15 @@
 from ..abstract import AtomicOperation
 from ..preparation import SanitizeProteinBlastDB
-from .abstract import _get_value
 import os
+
+
+def _get_value(conf, dbname, value):
+    if value in conf["homology"]["prot_dbs"].get(dbname, {}):
+        return conf["homology"]["prot_dbs"][dbname][value]
+    elif value in conf["homology"]:
+        return conf["homology"][value]
+    else:
+        return None
 
 
 class ChunkProteins(AtomicOperation):
