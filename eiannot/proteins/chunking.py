@@ -1,5 +1,6 @@
 from ..abstract import AtomicOperation
 from ..preparation import SanitizeProteinBlastDB
+from .abstract import _get_value
 import os
 
 
@@ -53,4 +54,7 @@ class ChunkProteins(AtomicOperation):
 
     @property
     def chunks(self):
-        return self.configuration["homology"]["protein_chunks"]
+        if not _get_value(self.configuration, self.dbname, "chunks"):
+            return self.configuration["homology"]["protein_chunks"]
+        else:
+            return _get_value(self.configuration, self.dbname, "chunks")

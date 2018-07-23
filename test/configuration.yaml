@@ -79,7 +79,7 @@ programs:
 outdir: "eitest" # "Eiannot"  # "eitest" 
 name: "eitest"
 mikado_homology:
-  prot_db: &prot_db
+  prot_dbs: &prot_db
   - "subset.sprot.fasta"
   execute: true
   program: 'diamond'
@@ -87,7 +87,7 @@ mikado_homology:
   evalue: 0.000001
   max_target_seqs: 10
 homology:
-  prot_db:
+  prot_dbs:
     sprot:
       fastas: ["subset.sprot.fasta", "subset2.sprot.fasta"]
       coverage: 80
@@ -101,7 +101,7 @@ homology:
   min_intron: 20
   max_intron_ends: 500
   max_intron_middle: 1000
-  use_exonerate: true
+  use_exonerate: false
 mikado:
   pick:
     mode: 'permissive'

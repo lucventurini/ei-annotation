@@ -124,9 +124,9 @@ class SanitizeProteinBlastDB(AtomicOperation):
         if self.__dbs is not None:
             return self.__dbs
         else:
-            assert self.dbname in self.configuration["homology"]["prot_db"]
-            assert 'fastas' in self.configuration["homology"]["prot_db"][self.dbname]
-            return self.configuration["homology"]["prot_db"][self.dbname]['fastas']
+            assert self.dbname in self.configuration["homology"]["prot_dbs"]
+            assert 'fastas' in self.configuration["homology"]["prot_dbs"][self.dbname]
+            return self.configuration["homology"]["prot_dbs"][self.dbname]['fastas']
 
     @property
     def rulename(self):

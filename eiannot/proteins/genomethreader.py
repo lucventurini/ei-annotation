@@ -64,7 +64,7 @@ class GTH(ProteinChunkAligner):
 
     @property
     def loader(self):
-        return ["gth"]
+        return ["gth", "eiannotation"]
 
     @property
     def threads(self):
@@ -101,6 +101,26 @@ class GTH(ProteinChunkAligner):
             return " "
 
     @property
+    def _identity_value(self):
+        """In GenomeThreader, we have to specify the maximum hamming distance. This
+        is roughly equivalent to the complement of the global identity of the protein match."""
+        val = _get_value(self.configuration, self.dbname, "identity")
+        if val and isinstance(val, (int, float)) and 0 <= val <= 100:
+            return 100 - val
+        elif val:
+            raise TypeError("Invalid identity: {}".format(val))
+        else:
+            return None
+
+    @property
+    def hamming(self):
+        id_val = self._identity_value
+        if not id_val:
+            return " "
+        else:
+            return " -prhdist {}".format(self._identity_value)
+
+    @property
     def cmd(self):
 
         # gth -intermediate  -introncutout -first 10 -species rice -gff3out -gcmincoverage 50 -paralogs
@@ -108,18 +128,17 @@ class GTH(ProteinChunkAligner):
         # -genomic eitest/inputs/reference/genome.fa -protein eitest/proteins/chunks/chunk_003.stops.fasta
 
         load = self.load
-        gcintron = self.gcintron
-        coverage = self.coverage
+        gcintron = self.gcintron  # Max intron length
         cmd = "{load} gth -intermediate  -introncutout {gcintron} "
+        coverage = self.coverage
+        identity = self.hamming
         species = self.species
         extra = self.extra
-        cmd += " {species} -gff3out {coverage} {extra} -paralogs "
+        cmd += " {species} -gff3out {coverage} {identity} {extra} -paralogs "
         input, output = self.input, self.output
         logdir, log = os.path.dirname(self.log), self.log
         cmd += " -genomic {input[genome]} -protein {input[fasta]} 2> {log} "
-        cmd += """ | awk -F "\\t" '{{OFS="\\t"; if ($3=="gene") {{$3="match"}} else {{if ($3=="exon") {{$3="match_part"}} }}; print $0}}' """
-        cmd += " > {output[gff3]}"
-
+        cmd += """ | gth_correct.py > {output[gff3]}"""
         cmd = cmd.format(**locals())
         return cmd
 

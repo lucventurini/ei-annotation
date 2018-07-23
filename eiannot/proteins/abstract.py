@@ -7,8 +7,8 @@ from ..rnaseq.alignments.portcullis import PortcullisWrapper
 
 
 def _get_value(conf, dbname, value):
-    if value in conf["homology"]["prot_db"].get(dbname, {}):
-        return conf["homology"]["prot_db"][dbname][value]
+    if value in conf["homology"]["prot_dbs"].get(dbname, {}):
+        return conf["homology"]["prot_dbs"][dbname][value]
     elif value in conf["homology"]:
         return conf["homology"][value]
     else:
@@ -183,7 +183,7 @@ class ProteinWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     @property
     def dbs(self):
-        return self.configuration["homology"]["prot_db"]
+        return self.configuration["homology"]["prot_dbs"]
 
     @property
     def outdir(self):
