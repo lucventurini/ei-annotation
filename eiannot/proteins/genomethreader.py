@@ -15,6 +15,7 @@ class MKVTreeIndex(AtomicOperation):
         self.configuration = masked.configuration
         self.masked = masked
         self.input["genome"] = self.masked_genome
+        self.output["genome"] = os.path.join(self.outdir, os.path.basename(self.masked_genome))
         self.output["flag"] = os.path.join(self.outdir, "vtree_index.done")
         self.touch = True
         self.log = os.path.join(self.outdir, "mkvtree.log")
