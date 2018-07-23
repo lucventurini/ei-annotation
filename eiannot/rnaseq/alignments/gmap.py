@@ -236,7 +236,7 @@ class GsnapAligner(ShortAligner):
 
     @property
     def loader(self):
-        return ["gmap", "samtools", "eiannot"]
+        return ["gmap", "samtools", "ei-annotation"]
 
     __toolname__ = "gsnap"
 
@@ -277,7 +277,7 @@ class GmapLongReads(LongAligner):
 
     @property
     def loader(self):
-        return ["gmap", "eiannot"]
+        return ["gmap", "ei-annotation"]
 
     __toolname__ = "gmap"
 

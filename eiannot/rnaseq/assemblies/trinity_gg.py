@@ -188,7 +188,7 @@ class TrinityGmap(ShortAssembler):
 
     @property
     def loader(self):
-        return ["gmap", "eiannot"]
+        return ["gmap", "ei-annotation"]
 
     @property
     def coverage(self):

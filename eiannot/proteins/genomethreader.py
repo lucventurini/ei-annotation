@@ -64,7 +64,7 @@ class GTH(ProteinChunkAligner):
 
     @property
     def loader(self):
-        return ["gth", "eiannotation"]
+        return ["gth", "ei-annotation"]
 
     @property
     def threads(self):

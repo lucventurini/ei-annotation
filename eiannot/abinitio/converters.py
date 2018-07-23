@@ -280,7 +280,7 @@ class ConvertJunctions(AtomicOperation):
 
     @property
     def loader(self):
-        return ["eiannot"]
+        return ["ei-annotation"]
 
     @property
     def priority(self):
