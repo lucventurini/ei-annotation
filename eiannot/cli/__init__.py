@@ -112,6 +112,7 @@ def main():
                             help="Print out the shell commands that will be executed.")
     snakeparse.add_argument("--nolock", action="store_true", default=False,
                             help="Do not lock the working directory. Use with caution!")
+    snakeparse.add_argument("--stats", default="eiannot_stats", help="Prefix of the statistics file")
     args = parser.parse_args()
 
     args.configuration = yaml.load(open(args.configuration))
@@ -151,6 +152,7 @@ Please use the \"-nd\" flag to run the Ei-Annot pipeline if you do not plan to u
     if args.write_only:
         return
 
+
     snakemake.snakemake(out.name,
                         dryrun=args.dryrun,
                         printdag=args.dag,
@@ -163,7 +165,7 @@ Please use the \"-nd\" flag to run the Ei-Annot pipeline if you do not plan to u
                         drmaa=drmaa_var,
                         printshellcmds=args.printshellcmds,
                         snakemakepath=shutil.which("snakemake"),
-                        stats="daijin_tr_" + str(time.ctime()) + ".stats",
+                        stats=args.stats.rstrip("_") + "_" + str(time.ctime()) + ".stats",
                         force_incomplete=args.rerun_incomplete,
                         detailed_summary=args.detailed_summary,
                         list_resources=args.list,
