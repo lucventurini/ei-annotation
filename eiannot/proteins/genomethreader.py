@@ -42,11 +42,12 @@ class MKVTreeIndex(AtomicOperation):
         outdir = self.outdir
         load = self.load
         masked = os.path.basename(self.masked_genome)
+        link_dna_dest = "{}.dna".format(os.path.basename(self.masked_genome))
         link_src = os.path.relpath(self.masked_genome, start=self.outdir)
         log = os.path.relpath(self.log, start=self.outdir)
         cmd = "{load} mkdir -p {outdir} && cd {outdir} && "
-        cmd += "ln -sf {link_src} {masked} && "
-        cmd += "mkvtree -v -dna -allout -pl -db {masked} > {log} 2> {log}"
+        cmd += "ln -sf {link_src} {masked} && ln -sf {link_src} {link_dna_dest} && "
+        cmd += "mkvtree -v -dna -allout -pl -db {link_dna_dest} > {log} 2> {log}"
         cmd = cmd.format(**locals())
         return cmd
 
