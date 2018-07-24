@@ -211,9 +211,9 @@ class RepeatMasking(EIWrapper):
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "repeats", "output")
 
-    @property
-    def output(self):
-        return
+    # @property
+    # def output(self):
+    #     return
 
     @property
     def model(self):

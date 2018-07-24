@@ -101,7 +101,7 @@ homology:
   min_intron: 20
   max_intron_ends: 500
   max_intron_middle: 1000
-  use_exonerate: false
+  use_exonerate: true
 mikado:
   pick:
     mode: 'permissive'

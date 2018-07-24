@@ -21,6 +21,45 @@ def exonerate_multithread(loader):
     return True
 
 
+class Fasta2Esi(AtomicOperation):
+
+    def __init__(self, masked: RepeatMasking):
+
+        super().__init__()
+        self.masked = masked
+        self.configuration = masked.configuration
+        self.input.update(masked.output)
+        self.input["genome"] = self.masked_genome
+        self.output["genome"] = os.path.join(self.outdir, "genome.masked.esi")
+        self.log = os.path.join(self.outdir, "fasta2esi.log")
+
+    @property
+    def loader(self):
+        return ["exonerate"]
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], "indices", "exonerate")
+
+    @property
+    def cmd(self):
+
+        esd = os.path.join(os.path.dirname(self.output["genome"]),
+                           "genome.masked.esd")
+        load = self.load
+        outdir = self.outdir
+        input, output, log = self.input, self.output, self.log
+        memory = self.resources["memory"]
+        cmd = "{load} mkdir -p {outdir} && fasta2esd --softmask yes {input[genome]} {esd} 2> {log} > {log} && "
+        cmd += " esd2esi --translate yes --memorylimit {memory}  {esd} {output[genome]} >> {log} 2>> {log}"
+        cmd = cmd.format(**locals())
+        return cmd
+
+    @property
+    def rulename(self):
+        return "fasta_to_esi"
+
+
 class Exonerate(ProteinChunkAligner):
 
     __toolname__ = "exonerate"
@@ -28,9 +67,10 @@ class Exonerate(ProteinChunkAligner):
     def __init__(self,
                  chunks: ChunkProteins,
                  chunk,
-                 masked: RepeatMasking
+                 esi: Fasta2Esi
                  ):
-        super().__init__(chunks, chunk, masked)
+        super().__init__(chunks, chunk, esi.masked)
+        self.input["genome"] = esi.output["genome"]
         self.output["txt"] = os.path.join(self.outdir, "{dbname}_{chunk}.exonerate.txt").format(
             chunk=self.chunk, dbname=self.dbname)
         self.log = os.path.join(self.logdir, "exonerate.{dbname}_{chunk}.log".format(
@@ -38,14 +78,7 @@ class Exonerate(ProteinChunkAligner):
 
     @property
     def loader(self):
-        return ['exonerate']
-
-    @property
-    def threads(self):
-        if exonerate_multithread(self.load):
-            return self.threads
-        else:
-            return 1
+        return ['exonerate', "ei-annotation"]
 
     @property
     def min_intron_cli(self):
@@ -62,25 +95,29 @@ class Exonerate(ProteinChunkAligner):
             return self.max_intron
 
     @property
+    def geneseed(self):
+        return _get_value(self.configuration, self.dbname, "geneseed") or 250
+
+    @property
     def cmd(self):
 
         load = self.load
-        cmd = "{load} mkdir -p {logdir} && mkdir -p {outdir} && "
-        logdir = self.logdir
-        outdir = self.outdir
-        fasta = self.input["fasta"]
-        if exonerate_multithread(self.load):
-            threads = " -c {threads} ".format(threads=self.threads)
-        else:
-            threads = ""
-        cmd += " exonerate --model protein2genome {threads} --showtargetgff yes --showvulgar yes "
+        outdir, logdir = self.outdir, self.logdir
+        cmd = "{load} mkdir -p {logdir} && mkdir -p {outdir} && set +u && "
+        # Now get the port and get the server
         min_intron, max_intron = self.min_intron_cli, self.max_intron_cli
-        cmd += " --softmaskquery yes --softmasktarget yes --bestn 10  --minintron {min_intron} "
-        cmd += " --maxintron {max_intron} --percent 30 --score 50 --geneseed 50 --showalignment no "
-        cmd += " --query {input[fasta]} --target {input[genome]} "
+        identity = self._identity_value
+        threads = self.threads
+        cmd += " exonerate_wrapper.py -ir {min_intron} {max_intron} --identity {identity} -t {threads}"
+        memory = self.resources["memory"]
+        geneseed = self.geneseed
+        cmd += " -M {memory} --geneseed {geneseed} "
         input, output, log = self.input, self.output, self.log
-        cmd += " --ryo '>%qi\\\\tlength=%ql\\\\talnlen=%qal\\\\tscore=%s\\\\tpercentage=%pi\\\\nTarget>%ti\\\\tlength=%tl\\\\talnlen=%tal\\\\n' "
-        cmd += " > {output[txt]} 2> {log}"
+        server_log = os.path.join(self.logdir,
+                                  "exonerate.{dbname}_{chunk}.server.log".format(
+                                      dbname=self.dbname, chunk=self.chunk)
+                                  )
+        cmd += "  --serverlog {server_log} --log {log} {input[genome]} {input[fasta]} {output[txt]} >> {log} 2>> {log}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -188,9 +225,11 @@ class ExonerateProteinWrapper(ProteinWrapper):
         faidx = FaidxProtein(sanitised)
         self.add_edge(sanitised, faidx)
         chunk_proteins = ChunkProteins(sanitised)
-        chunks = [Exonerate(chunk_proteins, chunk, self.masker) for chunk in range(1, chunk_proteins.chunks + 1)]
+        fasta2esi = Fasta2Esi(masked=self.masker)
+        self.add_edge(self.masker, fasta2esi)
+        chunks = [Exonerate(chunk_proteins, chunk, fasta2esi) for chunk in range(1, chunk_proteins.chunks + 1)]
         self.add_edges_from([(chunk_proteins, chunk) for chunk in chunks])
-        self.add_edges_from([(self.masker, chunk) for chunk in chunks])
+        self.add_edges_from([(fasta2esi, chunk) for chunk in chunks])
         collapsed = CollapseExonerate(chunks)
         self.add_edges_from([(chunk, collapsed) for chunk in chunks])
         convert = ConvertExonerate(collapsed, faidx)

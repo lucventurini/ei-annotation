@@ -251,6 +251,10 @@ while (<XNT>) {
 			#for (my $i=0;$i<$#pre_transcript+1;$i++) {
 				my @f = split /\t/,$pre_transcript[$i];
 				my $type=$f[2];
+				if (!defined $type) {
+					next;
+				}
+
 				if ($type eq "match") {
 					print "$pre_transcript[$i];Note=$note\n";
 
