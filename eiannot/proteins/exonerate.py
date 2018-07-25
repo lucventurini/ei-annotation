@@ -112,7 +112,7 @@ class Exonerate(ProteinChunkAligner):
         min_intron, max_intron = self.min_intron_cli, self.max_intron_cli
         # identity = self._identity_value
         hspfilter = self.hspfilter
-        # threads = self.threads
+        threads = self.threads
         cmd += " exonerate_wrapper.py -ir {min_intron} {max_intron} -t {threads}"
         memory = max(self.resources["memory"] * 0.95, self.resources["memory"] - 500)   # Do not give all memory
         geneseed = self.geneseed
