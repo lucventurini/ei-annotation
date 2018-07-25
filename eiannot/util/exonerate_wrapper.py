@@ -86,8 +86,9 @@ def main():
     parser.add_argument("-M", "--memory", default=2000, type=float)
     parser.add_argument("-g", "--geneseed", default=250, type=pos)
     parser.add_argument("--bestn", default=10, type=pos)
-    parser.add_argument("--hspfilter", default=100, type=pos)
-    # parser.add_argument("--identity", required=True, type=percent)
+    parser.add_argument("--hspfilter", default=100, type=int)
+    parser.add_argument("--percent", type=percent, default=30)
+    parser.add_argument("--score", type=percent, default=50)
     parser.add_argument("--serverlog", required=True)
     parser.add_argument("--log", required=True)
     parser.add_argument("-ir", "--intron-range", dest="intron_range", nargs=2, type=pos, required=True)
@@ -97,6 +98,7 @@ def main():
     args = parser.parse_args()
 
     args.memory = abs(int(round(args.memory, 0)))
+    args.hspfilter = abs(args.hspfilter)
 
     if not args.genome.endswith(".esi"):
         raise ValueError("This wrapper requires a compiled genome!")
@@ -145,7 +147,7 @@ def main():
         cmd += " --softmaskquery yes --softmasktarget yes --bestn {args.bestn} --minintron {min_intron} "
         cmd += " --maxintron {max_intron} --showalignment no "
         # These options have to be TAILORED, otherwise it will take forever!
-        cmd += " --geneseed {args.geneseed} "
+        cmd += " --geneseed {args.geneseed} --percent {args.percent} --score {args.score} "
         cmd += " --query {args.query} --target localhost:{port} "
         cmd += " --ryo \">%qi\\tlength=%ql\\talnlen=%qal\\tscore=%s\\tpercentage=%pi\\nTarget>%ti\\tlength=%tl\\talnlen=%tal\\n\" "
         cmd = cmd.format(**locals())

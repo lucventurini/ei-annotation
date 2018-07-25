@@ -111,6 +111,22 @@ class Exonerate(ProteinChunkAligner):
             return 100
 
     @property
+    def score(self):
+        score = _get_value(self.configuration, self.dbname, "exonerate_score")
+        if score is not None:
+            return score
+        else:
+            return 50
+
+    @property
+    def percent(self):
+        score = _get_value(self.configuration, self.dbname, "exonerate_percent")
+        if score is not None:
+            return score
+        else:
+            return 30
+
+    @property
     def cmd(self):
 
         load = self.load
@@ -124,7 +140,9 @@ class Exonerate(ProteinChunkAligner):
         cmd += " exonerate_wrapper.py -ir {min_intron} {max_intron} -t {threads}"
         memory = max(self.resources["memory"] * 0.95, self.resources["memory"] - 500)   # Do not give all memory
         geneseed = self.geneseed
-        cmd += " -M {memory} --geneseed {geneseed} --hspfilter {hspfilter} "
+        percent = self.percent
+        score = self.score
+        cmd += " -M {memory} --geneseed {geneseed} --hspfilter {hspfilter} --score {score} --percent {percent} "
         input, output, log = self.input, self.output, self.log
         server_log = os.path.join(self.logdir,
                                   "exonerate.{dbname}_{chunk}.server.log".format(
