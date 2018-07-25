@@ -99,6 +99,10 @@ class Exonerate(ProteinChunkAligner):
         return _get_value(self.configuration, self.dbname, "geneseed") or 250
 
     @property
+    def hspfilter(self):
+        return _get_value(self.configuration, self.dbname, "hspfilter") or 100
+
+    @property
     def cmd(self):
 
         load = self.load
@@ -106,12 +110,13 @@ class Exonerate(ProteinChunkAligner):
         cmd = "{load} mkdir -p {logdir} && mkdir -p {outdir} && set +u && "
         # Now get the port and get the server
         min_intron, max_intron = self.min_intron_cli, self.max_intron_cli
-        identity = self._identity_value
-        threads = self.threads
-        cmd += " exonerate_wrapper.py -ir {min_intron} {max_intron} --identity {identity} -t {threads}"
+        # identity = self._identity_value
+        hspfilter = self.hspfilter
+        # threads = self.threads
+        cmd += " exonerate_wrapper.py -ir {min_intron} {max_intron} -t {threads}"
         memory = max(self.resources["memory"] * 0.95, self.resources["memory"] - 500)   # Do not give all memory
         geneseed = self.geneseed
-        cmd += " -M {memory} --geneseed {geneseed} "
+        cmd += " -M {memory} --geneseed {geneseed} --hspfilter {hspfilter} "
         input, output, log = self.input, self.output, self.log
         server_log = os.path.join(self.logdir,
                                   "exonerate.{dbname}_{chunk}.server.log".format(

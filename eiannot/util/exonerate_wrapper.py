@@ -86,7 +86,8 @@ def main():
     parser.add_argument("-M", "--memory", default=2000, type=float)
     parser.add_argument("-g", "--geneseed", default=250, type=pos)
     parser.add_argument("--bestn", default=10, type=pos)
-    parser.add_argument("--identity", required=True, type=percent)
+    parser.add_argument("--hspfilter", default=100, type=pos)
+    # parser.add_argument("--identity", required=True, type=percent)
     parser.add_argument("--serverlog", required=True)
     parser.add_argument("--log", required=True)
     parser.add_argument("-ir", "--intron-range", dest="intron_range", nargs=2, type=pos, required=True)
@@ -133,18 +134,18 @@ def main():
         logs.append(log)
         outputs.append(output)
         memory = args.memory / args.threads
-        cmd = "exonerate --model protein2genome --showtargetgff yes --showvulgar no "
+        cmd = "exonerate --model protein2genome --showtargetgff yes --showvulgar yes "
         # Specify the chunk number
         cmd += " --querychunkid {thread} --querychunktotal {threads} "
         min_intron, max_intron = args.intron_range
         # INCREASE THE MEMORY!
         cmd += " -M {memory} -D {memory}"
         # Experimental
-        # cmd += " --hspfilter 100 "
+        cmd += " --hspfilter {args.hspfilter} "
         cmd += " --softmaskquery yes --softmasktarget yes --bestn {args.bestn} --minintron {min_intron} "
         cmd += " --maxintron {max_intron} --showalignment no "
         # These options have to be TAILORED, otherwise it will take forever!
-        cmd += " --percent {args.identity} --geneseed {args.geneseed} "
+        cmd += " --geneseed {args.geneseed} "
         cmd += " --query {args.query} --target localhost:{port} "
         cmd += " --ryo \">%qi\\tlength=%ql\\talnlen=%qal\\tscore=%s\\tpercentage=%pi\\nTarget>%ti\\tlength=%tl\\talnlen=%tal\\n\" "
         cmd = cmd.format(**locals())
