@@ -8,6 +8,7 @@ from Mikado.transcripts import TranscriptChecker, Transcript
 import pyfaidx
 import operator
 from Mikado.exceptions import IncorrectStrandError
+import re
 
 
 __doc__ = """Script to filter exonerate GFFs, by doing the following:
@@ -35,9 +36,17 @@ def evaluate(transcript: Transcript, args, verified_introns: set):
         return None
 
     transcript.finalize()
-    if "note" in transcript.attributes:
+    if "Note" in transcript.attributes and "note" not in transcript.attributes:
+        transcript.attributes["note"] = transcript.attributes["Note"]
+        del transcript.attributes["Note"]
 
-        transcript.note = dict((_[0], _[1]) for _ in transcript.attributes["note"])
+    if "note" in transcript.attributes or "Note" in transcript.attributes:
+        note = transcript.attributes["note"].split("|")
+        transcript.note = dict((re.search("^([^:]*):(.*)", no).groups()) for no in note)
+        # try:
+        #     transcript.note = dict((_[0], _[1]) for _ in transcript.attributes["note"])
+        # except IndexError:
+        #     raise IndexError(transcript.attributes["note"])
         if not ("cov" in transcript.note and "id" in transcript.note):
             # No coverage and identity!
             print("No cov/iden for {}".format(transcript.id))

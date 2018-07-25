@@ -221,6 +221,10 @@ while (<XNT>) {
 		push (@pre_transcript,"$name\talnLen:$alnlen|len:$len|cov:$coverage|id:$percent|score:$score");
    }
 
+	if (/Hostname/ | /Command line/ | /^]/) {
+		next;
+	}
+
    if(eof(XNT)) {
 		# The array is in the format
 		# name region
@@ -247,11 +251,12 @@ while (<XNT>) {
 		# Only printing the alignments that are over the cutoff
 		if ($curr_cov >= $minCoverage && $curr_id >= $minIdentity) {
 			# NOT printing the first and last element of array
-			for (my $i=1;$i<$#pre_transcript;$i++) {
+			for (my $i=0;$i<$#pre_transcript;$i++) {
 			#for (my $i=0;$i<$#pre_transcript+1;$i++) {
 				my @f = split /\t/,$pre_transcript[$i];
 				my $type=$f[2];
-				if (!defined $type) {
+				if (!defined($type)) {
+					# print STDERR "Undefined type\t$pre_transcript[$i]\n";
 					next;
 				}
 

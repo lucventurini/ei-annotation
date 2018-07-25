@@ -95,7 +95,7 @@ homology:
       fastas: ["subset3.sprot.fasta"]
       identity: 70
       coverage: 90
-  protein_chunks: 3
+  protein_chunks: 1
   identity: 40
   coverage: 70
   min_intron: 20

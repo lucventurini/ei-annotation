@@ -125,8 +125,8 @@ def main():
     outputs = []
     for thread in range(1, threads + 1):
 
-        output = tempfile.NamedTemporaryFile(mode="wt", suffix=".txt", delete=True)
-        log = tempfile.NamedTemporaryFile(mode="wt", suffix=".log", delete=True)
+        output = tempfile.NamedTemporaryFile(mode="wt", suffix=".txt", delete=False)
+        log = tempfile.NamedTemporaryFile(mode="wt", suffix=".log", delete=False)
         print(output.name, file=sys.stderr)
         logs.append(log)
         outputs.append(output)
@@ -144,8 +144,11 @@ def main():
         # These options have to be TAILORED, otherwise it will take forever!
         cmd += " --percent {args.identity} --geneseed {args.geneseed} "
         cmd += " --query {args.query} --target localhost:{port} "
-        cmd += " --ryo \">%qi\tlength=%ql\talnlen=%qal\tscore=%s\tpercentage=%pi\nTarget>%ti\tlength=%tl\talnlen=%tal\n\" "
+        cmd += " --ryo \">%qi\\tlength=%ql\\talnlen=%qal\\tscore=%s\\tpercentage=%pi\\nTarget>%ti\\tlength=%tl\\talnlen=%tal\\n\" "
+        cmd += " | grep -v \"\-\- completed exonerate analysis\" | grep -v \"^Hostname: \[\" | grep -v \"^\]\" "
+        # cmd += " | grep -v \"^Command line:\" "
         cmd = cmd.format(**locals())
+        print(cmd, file=sys.stderr)
         child = sp.Popen(cmd, shell=True, stdout=output, stderr=log)
         children.append(child)
 
