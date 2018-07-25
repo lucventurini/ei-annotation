@@ -71,6 +71,6 @@ class AnnotationWorklow(EIWorfkflow):
 
     @property
     def use_exonerate(self):
-        return self.configuration["homology"].get("use_exonerate", False)
+        return self.configuration["homology"].get("use_exonerate", True)
 
     __final_rulename__ = "all"
