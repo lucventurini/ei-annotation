@@ -143,7 +143,9 @@ def main():
         # INCREASE THE MEMORY!
         cmd += " -M {memory} -D {memory}"
         # Experimental
-        cmd += " --hspfilter {args.hspfilter} "
+        if args.hspfilter:
+            cmd += " --hspfilter {args.hspfilter} "
+
         cmd += " --softmaskquery yes --softmasktarget yes --bestn {args.bestn} --minintron {min_intron} "
         cmd += " --maxintron {max_intron} --showalignment no "
         # These options have to be TAILORED, otherwise it will take forever!
