@@ -96,11 +96,19 @@ class Exonerate(ProteinChunkAligner):
 
     @property
     def geneseed(self):
-        return _get_value(self.configuration, self.dbname, "geneseed") or 250
+        gs = _get_value(self.configuration, self.dbname, "geneseed")
+        if gs is not None:
+            return gs
+        else:
+            return 250
 
     @property
     def hspfilter(self):
-        return _get_value(self.configuration, self.dbname, "hspfilter") or 100
+        filt = _get_value(self.configuration, self.dbname, "hspfilter")
+        if filt is not None:
+            return filt
+        else:
+            return 100
 
     @property
     def cmd(self):
