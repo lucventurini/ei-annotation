@@ -83,7 +83,7 @@ def main():
 
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("-t", "--threads", default=mp.cpu_count(), type=int)
-    parser.add_argument("-M", "--memory", default=2000, type=int)
+    parser.add_argument("-M", "--memory", default=2000, type=float)
     parser.add_argument("-g", "--geneseed", default=250, type=pos)
     parser.add_argument("--bestn", default=10, type=pos)
     parser.add_argument("--identity", required=True, type=percent)
@@ -94,6 +94,8 @@ def main():
     parser.add_argument("query")
     parser.add_argument("outfile")
     args = parser.parse_args()
+
+    args.memory = abs(int(round(args.memory, 0)))
 
     if not args.genome.endswith(".esi"):
         raise ValueError("This wrapper requires a compiled genome!")
@@ -125,8 +127,8 @@ def main():
     outputs = []
     for thread in range(1, threads + 1):
 
-        output = tempfile.NamedTemporaryFile(mode="wt", suffix=".txt", delete=False)
-        log = tempfile.NamedTemporaryFile(mode="wt", suffix=".log", delete=False)
+        output = tempfile.NamedTemporaryFile(mode="wt", suffix=".txt", delete=True)
+        log = tempfile.NamedTemporaryFile(mode="wt", suffix=".log", delete=True)
         print(output.name, file=sys.stderr)
         logs.append(log)
         outputs.append(output)
@@ -138,15 +140,13 @@ def main():
         # INCREASE THE MEMORY!
         cmd += " -M {memory} -D {memory}"
         # Experimental
-        cmd += " --hspfilter 100 "
+        # cmd += " --hspfilter 100 "
         cmd += " --softmaskquery yes --softmasktarget yes --bestn {args.bestn} --minintron {min_intron} "
         cmd += " --maxintron {max_intron} --showalignment no "
         # These options have to be TAILORED, otherwise it will take forever!
         cmd += " --percent {args.identity} --geneseed {args.geneseed} "
         cmd += " --query {args.query} --target localhost:{port} "
         cmd += " --ryo \">%qi\\tlength=%ql\\talnlen=%qal\\tscore=%s\\tpercentage=%pi\\nTarget>%ti\\tlength=%tl\\talnlen=%tal\\n\" "
-        cmd += " | grep -v \"\-\- completed exonerate analysis\" | grep -v \"^Hostname: \[\" | grep -v \"^\]\" "
-        # cmd += " | grep -v \"^Command line:\" "
         cmd = cmd.format(**locals())
         print(cmd, file=sys.stderr)
         child = sp.Popen(cmd, shell=True, stdout=output, stderr=log)
@@ -163,8 +163,9 @@ def main():
 
     # Merge log files
     [log.flush() for log in logs]
-    with open(args.log, "wt") as final_log:
+    with open(args.log, "at") as final_log:
         sp.call(["cat"] + [log.name for log in logs], stdout=final_log)
+        final_log.flush()
     [log.close() for log in logs]
 
     if any(_ != 0 for _ in statuses):
