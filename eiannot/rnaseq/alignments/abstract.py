@@ -546,7 +546,7 @@ class LongAlignerStats(AtomicOperation):
         self.input = aligner.output
         self.outdir = aligner.outdir
         try:
-            self.output = {"stats": os.path.splitext(self.input["link"])[0] + "stats"}
+            self.output = {"stats": os.path.splitext(self.input["link"])[0] + ".stats"}
         except KeyError:
             raise KeyError(type(aligner), aligner.rulename)
         self.message = "Calculating statistics for: {input[link]}".format(input=self.input)
