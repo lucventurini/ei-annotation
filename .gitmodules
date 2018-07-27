@@ -1,3 +1,6 @@
 [submodule "deps"]
 	path = deps
 	url = https://github.com/maplesond/eicore.git
+[submodule "eicore"]
+	path = eicore
+	url = https://github.com/maplesond/eicore
