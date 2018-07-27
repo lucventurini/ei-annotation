@@ -68,6 +68,8 @@ class LibraryCreator(AtomicOperation):
             self.input["retrieved"] = retriever.output["libraries"]
         if modeler is not None:
             self.input["modeled"] = modeler.output["families"]
+        if self.custom is not None:
+            self.input["custom"] = self.custom
         self.output = {"libraries": os.path.join(self.outdir, "rm_library.fa")}
 
     @property
@@ -79,6 +81,10 @@ class LibraryCreator(AtomicOperation):
         return []
 
     @property
+    def custom(self):
+        return self.configuration["repeats"].get("custom", None)
+
+    @property
     def rulename(self):
         return "create_rm_library"
 
@@ -86,8 +92,9 @@ class LibraryCreator(AtomicOperation):
     def cmd(self):
         retrieved = self.input.get("retrieved", " ")
         modeled = self.input.get("modeled", " ")
+        custom = self.input.get("custom", " ")
         output = self.output
-        cmd = "cat {retrieved} {modeled} > {output[libraries]}".format(**locals())
+        cmd = "cat {retrieved} {modeled} {custom} > {output[libraries]}".format(**locals())
         return cmd
 
 
@@ -174,7 +181,12 @@ class RepeatMasking(EIWrapper):
         self.configuration = sanitised.configuration
 
         if self.execute is True:
-            proteins = SanitizeProteinBlastDB(self.configuration)
+            # sanitize proteins if they are present
+
+            if self.safe_proteins:
+                proteins = SanitizeProteinBlastDB(self.configuration, self.safe_proteins)
+            else:
+                proteins = None
 
             if self.model is True:
                 modeler = ModelerWorkflow(sanitised)
@@ -214,6 +226,10 @@ class RepeatMasking(EIWrapper):
     # @property
     # def output(self):
     #     return
+
+    @property
+    def safe_proteins(self):
+        return self.configuration["repeats"].get("safe_proteins", None)
 
     @property
     def model(self):

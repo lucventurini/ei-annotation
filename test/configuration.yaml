@@ -107,7 +107,7 @@ mikado:
     mode: 'permissive'
     scoring_file: "athaliana_scoring.yaml"
 repeats:
-  execute: false
-  model: true
+  execute: true
+  model: false
   species: "arabidopsis thaliana"
   # safe_proteins: []
