@@ -1,6 +1,7 @@
 from .abstract import LongAligner, LongWrapper
 import os
 import itertools
+import re
 
 
 class MiniMap2Wrapper(LongWrapper):
@@ -38,12 +39,15 @@ class MiniMap2(LongAligner):
         super().__init__(indexer=indexer, sample=sample, run=run)
         self.input["genome"] = self.genome
         self.output = {"link": self.link,
-                       "gf": self.bed12}
+                       "gf": self.bed12,
+                       "paf": os.path.join(
+                           os.path.dirname(self.bed12),
+                           re.sub("\.bed12", "", os.path.basename(self.bed12)) + ".paf.gz")}
         self.log = os.path.join(os.path.dirname(self.bed12), "minimap.log")
 
     @property
     def loader(self):
-        return ["minimap2"]
+        return ["minimap2", "ei-annotation"]
 
     @property
     def cmd(self):
@@ -54,10 +58,13 @@ class MiniMap2(LongAligner):
         type_args = self.type_args
         outdir = self.outdir
         log = self.log
+        paf = re.sub("\.gz$", "", self.output["paf"])
 
         cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra} {type_args}"
-        cmd += " -C 5 {input[genome]} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
-        cmd += " k8 $(which paftools.js) splice2bed -m - > {output[gf]} "
+        cmd += " -C 5 {input[genome]} {input[read1]} 2> {log} > {paf} "  # -C 5 :> cost for non-canonical splicing site
+        cmd += " && k8 $(which paftools.js) splice2bed -m {paf} | "
+        # Needed to correct for the fact that minimap2 BED12
+        cmd += " correct_bed12_mappings.py > {output[gf]} && gzip {paf}"
         # Now link
         link_dir = os.path.dirname(self.link)
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
