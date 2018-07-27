@@ -1,8 +1,8 @@
 from ..abstract import EIWrapper, AtomicOperation, Linker, Toucher
 from ..preparation import PrepareWrapper, SanitizeProteinBlastDB, FaidxGenome
-from .modeler import ModelerWorkflow
+from .modeller import ModellerWorkflow
 import os
-# from .modeler import
+# from .modeller import
 
 
 class RetrieveLibraries(AtomicOperation):
@@ -57,17 +57,17 @@ class LibraryCreator(AtomicOperation):
     def __init__(self,
                  sanitiser: PrepareWrapper,
                  retriever: RetrieveLibraries,
-                 modeler: ModelerWorkflow
+                 modeller: ModellerWorkflow
                  ):
-        if retriever is None and modeler is None:
+        if retriever is None and modeller is None:
             raise ValueError("No input libraries!")
         super().__init__()
         self.configuration = sanitiser.configuration
 
         if retriever is not None:
             self.input["retrieved"] = retriever.output["libraries"]
-        if modeler is not None:
-            self.input["modeled"] = modeler.output["families"]
+        if modeller is not None:
+            self.input["modeled"] = modeller.output["families"]
         if self.custom is not None:
             self.input["custom"] = self.custom
         self.output = {"libraries": os.path.join(self.outdir, "rm_library.fa")}
@@ -183,25 +183,18 @@ class RepeatMasking(EIWrapper):
         if self.execute is True:
             # sanitize proteins if they are present
 
-            if self.safe_proteins:
-                proteins = SanitizeProteinBlastDB(self.configuration,
-                                                  db="repeatsafe",
-                                                  dbs=self.safe_proteins)
-            else:
-                proteins = None
-
             if self.model is True:
-                modeler = ModelerWorkflow(sanitised)
-                self.add_edges_from([(sanitised, modeler), (proteins, modeler)])
+                modeller = ModellerWorkflow(sanitised)
+                self.add_edges_from([(sanitised, modeller)])
             else:
-                modeler = None
+                modeller = None
             if self.retrieve_known is True:
                 retriever = RetrieveLibraries(self.configuration)
                 self.add_edge(sanitised, retriever)
             else:
                 retriever = None
-            library_creator = LibraryCreator(sanitiser=sanitised, retriever=retriever, modeler=modeler)
-            [self.add_edge(_, library_creator) for _ in (retriever, modeler) if _ is not None]
+            library_creator = LibraryCreator(sanitiser=sanitised, retriever=retriever, modeller=modeller)
+            [self.add_edge(_, library_creator) for _ in (retriever, modeller) if _ is not None]
             masker = Masker(sanitised, library_creator)
             self.add_edge(library_creator, masker)
             faidx = FaidxMaskedGenome(masker)
@@ -228,10 +221,6 @@ class RepeatMasking(EIWrapper):
     # @property
     # def output(self):
     #     return
-
-    @property
-    def safe_proteins(self):
-        return self.configuration["repeats"].get("safe_proteins", None)
 
     @property
     def model(self):

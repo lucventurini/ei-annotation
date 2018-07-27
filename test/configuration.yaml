@@ -108,6 +108,6 @@ mikado:
     scoring_file: "athaliana_scoring.yaml"
 repeats:
   execute: true
-  model: false
+  model: true
   species: "arabidopsis thaliana"
-  # safe_proteins: []
+  safe_proteins: ["uniprot_sprot_plants.fasta"]
