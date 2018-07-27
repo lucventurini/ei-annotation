@@ -36,7 +36,7 @@ class MiniMap2Wrapper(LongWrapper):
 
 class MiniMap2SpliceIndexer(IndexBuilder):
 
-    __toolname__ = "minimap2_splice"
+    __toolname__ = "minimap2"
 
     def __init__(self, configuration, prepare_flag: PrepareWrapper):
 

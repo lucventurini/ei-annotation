@@ -469,7 +469,6 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
     def __retrieve_resource_from_programs(self, resource):
 
-
         if (hasattr(self, "toolname") and
                     self.toolname in self.configuration["programs"] and
                     resource in self.configuration["programs"][self.toolname]):
