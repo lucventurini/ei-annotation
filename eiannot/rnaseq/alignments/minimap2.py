@@ -43,6 +43,7 @@ class MiniMap2SpliceIndexer(IndexBuilder):
         self.configuration = configuration
         super().__init__(configuration, self.outdir)
         self.input["genome"] = self.genome
+        self.__threads = self.resources["threads"]
         self.input["fai"] = prepare_flag.fai.output["fai"]
         self.output["index"] = os.path.join(self.outdir, "genome.idx")
         self.log = os.path.join(self.outdir, "index.log")
