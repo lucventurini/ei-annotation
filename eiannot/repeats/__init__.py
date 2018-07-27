@@ -184,7 +184,9 @@ class RepeatMasking(EIWrapper):
             # sanitize proteins if they are present
 
             if self.safe_proteins:
-                proteins = SanitizeProteinBlastDB(self.configuration, self.safe_proteins)
+                proteins = SanitizeProteinBlastDB(self.configuration,
+                                                  db="repeatsafe",
+                                                  dbs=self.safe_proteins)
             else:
                 proteins = None
 
