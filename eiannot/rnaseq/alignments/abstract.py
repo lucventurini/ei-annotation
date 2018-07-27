@@ -575,6 +575,10 @@ class LongAlignerStats(AtomicOperation):
         return os.path.dirname(self.input["gf"])
 
     @property
+    def threads(self):
+        return 1
+
+    @property
     def cmd(self):
         # if self._null_cmd is True:
         #     return ""
