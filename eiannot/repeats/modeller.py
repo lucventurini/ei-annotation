@@ -84,6 +84,8 @@ class RepeatModeller(AtomicOperation):
         load = self.load
         threads = self.threads
         outdir = self.outdir
+        # We have to take into account we will be in another folder
+        dbname = os.path.relpath(dbname, start=outdir)
         log = os.path.abspath(self.log)
         logdir = os.path.dirname(self.log)
         outfile = os.path.basename(self.output["families"])
@@ -92,8 +94,8 @@ class RepeatModeller(AtomicOperation):
         #     os.remove(el)
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && cd {outdir} && "
-        cmd += "(RepeatModeller -engine ncbi -pa {threads} -database {dbname} 2> {log} > {log} && "
-        cmd += " cp RM*/{outfile} . && rm -rf RM*) || touch {outfile})"
+        cmd += "(RepeatModeler -engine ncbi -pa {threads} -database {dbname} 2> {log} > {log} && "
+        cmd += " cp RM*/{outfile} . && rm -rf RM* || touch {outfile})"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -131,13 +133,12 @@ class PolishRepeats(AtomicOperation):
     def cmd(self):
 
         load = self.load
-        cmd = "{load}"
         maskdir = self.masked_dir
         outdir = os.path.relpath(self.outdir, start=self.masked_dir)
         rm_library = os.path.abspath(self.input["db"])
         link_src = os.path.relpath(self.output["families"], start=self.masked_dir)
         threads = self.threads
-        families = self.input["families"]
+        families = os.path.abspath(self.input["families"])
         link_dest = self.outfile
         log = self.log
 
