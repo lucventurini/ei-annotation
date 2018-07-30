@@ -152,7 +152,8 @@ class PolishRepeats(AtomicOperation):
         maskdir = self.masked_dir
         outdir = os.path.relpath(self.outdir, start=self.masked_dir)
         rm_library = os.path.abspath(self.input["db"])
-        link_src = os.path.relpath(self.output["families"], start=outdir)
+        link_src = os.path.relpath(os.path.abspath(self.output["families"]),
+                                   start=os.path.abspath(self.outdir))
         threads = self.threads
         families = os.path.abspath(self.input["families"])
         link_dest = os.path.basename(self.outfile)

@@ -141,7 +141,7 @@ class Masker(AtomicOperation):
         gff_link_dest = os.path.basename(self.output["table"])
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {maskdir} && cd {maskdir} && "
-        cmd += "RepeatMasker -nolow -xsmall -dir -gff . -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
+        cmd += "RepeatMasker -nolow -xsmall -dir . -gff -lib {rm_library} -pa {threads} {genome} 2> {log} > {log} && "
         cmd += "rm -rf RM_* && cd {outdir} && ln -s {link_src} {link_dest} && touch -h {link_dest} && "
         cmd += " ln -s {gff_link_src} {gff_link_dest} && touch -h {gff_link_dest}"
 
