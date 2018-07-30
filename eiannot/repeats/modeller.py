@@ -136,11 +136,11 @@ class PolishRepeats(AtomicOperation):
         maskdir = self.masked_dir
         outdir = os.path.relpath(self.outdir, start=self.masked_dir)
         rm_library = os.path.abspath(self.input["db"])
-        link_src = os.path.relpath(self.output["families"], start=self.masked_dir)
+        link_src = os.path.relpath(self.output["families"], start=outdir)
         threads = self.threads
         families = os.path.abspath(self.input["families"])
-        link_dest = self.outfile
-        log = self.log
+        link_dest = os.path.basename(self.outfile)
+        log = os.path.relpath(self.log, start=maskdir)
 
         cmd = "{load} mkdir -p {maskdir} && cd {maskdir} && "
         cmd += "RepeatMasker  -s –no_is –nolow -x -dir . -lib {rm_library} "
