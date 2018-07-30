@@ -100,6 +100,8 @@ class LibraryCreator(AtomicOperation):
 
 class Masker(AtomicOperation):
 
+    __toolname__ = "repeatmasker"
+
     def __init__(self,
                  sanitised: PrepareWrapper,
                  library_creator: [None]  # Modeller

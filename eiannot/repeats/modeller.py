@@ -105,6 +105,7 @@ class PolishRepeats(AtomicOperation):
     masked_file = RepeatModeller.outfile + ".masked"
     outfile = "modelled_repeats.fa"
     __rulename__ = "polish_modeller_repeats"
+    __toolname__ = "repeatmasker"
 
     def __init__(self, modeller: RepeatModeller, proteins: SanitizeProteinBlastDB):
 
