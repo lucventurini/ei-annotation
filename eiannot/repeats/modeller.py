@@ -5,6 +5,8 @@ import os
 
 class BuildModellerDB(AtomicOperation):
 
+    __toolname__ = "repeatmodeller"
+
     def __init__(self, sanitiser: PrepareWrapper):
 
         super().__init__()
@@ -16,7 +18,11 @@ class BuildModellerDB(AtomicOperation):
 
     @property
     def loader(self):
-        return ["repeatmodeller"]
+        return [self.__toolname__]
+
+    @property
+    def toolname(self):
+        return self.__toolname__
 
     @property
     def rulename(self):
@@ -53,6 +59,7 @@ class BuildModellerDB(AtomicOperation):
 class RepeatModeller(AtomicOperation):
 
     outfile = "consensi.fa.classified"
+    __toolname__ = "repeatmodeller"
 
     def __init__(self, builder: BuildModellerDB):
         super().__init__()
@@ -75,7 +82,11 @@ class RepeatModeller(AtomicOperation):
 
     @property
     def loader(self):
-        return ["repeatmodeller"]
+        return [self.toolname]
+
+    @property
+    def toolname(self):
+        return self.__toolname__
 
     @property
     def cmd(self):
@@ -125,6 +136,10 @@ class PolishRepeats(AtomicOperation):
     @property
     def loader(self):
         return ["repeatmasker"]
+
+    @property
+    def toolname(self):
+        return self.__toolname__
 
     @property
     def rulename(self):

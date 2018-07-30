@@ -150,6 +150,10 @@ class Masker(AtomicOperation):
         return cmd
 
     @property
+    def toolname(self):
+        return self.__toolname__
+
+    @property
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "repeats", "output")
 
