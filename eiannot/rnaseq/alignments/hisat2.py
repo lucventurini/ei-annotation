@@ -194,7 +194,8 @@ class HisatExtractSplices(AtomicOperation):
             cmd += "mikado util convert -of gtf {input[ref_trans]} | "
         else:
             cmd += "cat {input[ref_trans]} | "
-        cmd += "hisat2_extract_splice_sites.py - > {output[splices]}".format(**locals())
+        cmd += "hisat2_extract_splice_sites.py - > {output[splices]}"
+        cmd = cmd.format(**locals())
         return cmd
 
     @property
