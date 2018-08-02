@@ -50,7 +50,7 @@ def get_sub_commands(SCHEDULER, prefix, additional, log_folder):
 def main():
 
     steps = {
-        "mikado": [Mikado.__final_rulename__],
+        "mikado": [Mikado.__final_rulename__, Mikado.__final_long_rulename__],
         "align": [
                 LongAlignmentsWrapper.__final_rulename__,
                 ShortAlignmentsWrapper.__final_rulename__,
@@ -124,7 +124,7 @@ def main():
         print(workflow, file=out)
 
     if args.steps:
-        execute = list(chain.from_iterable(steps[step] for step in args.steps))
+        execute = list(chain.from_iterable(steps[step] for step in args.steps if step in workflow))
     else:
         execute = []
 
@@ -151,7 +151,6 @@ Please use the \"-nd\" flag to run the Ei-Annot pipeline if you do not plan to u
 
     if args.write_only:
         return
-
 
     snakemake.snakemake(out.name,
                         dryrun=args.dryrun,

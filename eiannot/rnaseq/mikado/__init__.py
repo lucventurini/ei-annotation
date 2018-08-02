@@ -18,6 +18,7 @@ import networkx as nx
 class Mikado(EIWrapper):
 
     __final_rulename__ = "mikado_done"
+    __final_long_rulename__ = "mikado_done_long"
 
     def __init__(self,
                  assemblies,  #: AssemblyWrapper,
@@ -81,7 +82,7 @@ class Mikado(EIWrapper):
             self.add_edge(self.indexer, self.__stats)
 
         if only_long:
-            self.__final_rulename__ = "mikado_done_long"
+            self.__final_rulename__ = self.__final_long_rulename__
 
         self.add_final_flag()
 
