@@ -174,11 +174,12 @@ class HisatExtractSplices(AtomicOperation):
 
         super().__init__()
         self._outdir = outdir
-        self.input = {"ref_trans": configuration.get("reference", dict()).get("transcriptome", "")}
         self.configuration = configuration
-        if self.input["ref_trans"]:
+        if self.transcriptome:
+            self.input = {"transcriptome": self.transcriptome}
             self.output = {"splices":  os.path.join(outdir, "index", "splice_sites.txt")}
         else:
+            self.input = dict()
             self.output = dict()
 
     @property
@@ -189,12 +190,7 @@ class HisatExtractSplices(AtomicOperation):
         input = self.input
         output = self.output
 
-        cmd = "{load} "
-        if not self.input["ref_trans"].endswith("gtf"):
-            cmd += "mikado util convert -of gtf {input[ref_trans]} | "
-        else:
-            cmd += "cat {input[ref_trans]} | "
-        cmd += "hisat2_extract_splice_sites.py - > {output[splices]}"
+        cmd = "{load} hisat2_extract_splice_sites.py {input[transcriptome]} > {output[splices]}"
         cmd = cmd.format(**locals())
         return cmd
 

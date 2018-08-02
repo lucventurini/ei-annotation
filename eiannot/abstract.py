@@ -456,6 +456,17 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         return os.path.join(self.configuration["outdir"], "inputs", "reference", "genome.fa")
 
     @property
+    def transcriptome(self):
+        if self._raw_transcriptome:
+            return os.path.join(self.configuration["outdir"], "inputs", "reference", "transcriptome.gtf")
+        else:
+            return None
+
+    @property
+    def _raw_transcriptome(self):
+        return self.configuration.get("reference", {}).get("transcriptome", None)
+
+    @property
     def masked_genome(self):
         return os.path.join(self.configuration["outdir"], "repeats", "output", "genome.masked.fa")
 

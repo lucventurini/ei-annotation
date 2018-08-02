@@ -1,5 +1,36 @@
-from ..abstract import AtomicOperation, EIWrapper
+from ..abstract import AtomicOperation, EIWrapper, Linker
 import os
+
+
+class PrepareWrapper(EIWrapper):
+
+    __final_rulename__ = "prepare_flag"
+
+    def __init__(self, configuration, genome):
+        super().__init__(configuration)
+        self.sanitizer = SanitizeGenome(configuration, genome)
+        self.faidx = FaidxGenome(self.sanitizer)
+        self.add_edge(self.sanitizer, self.faidx)
+        if self.sanitizer._raw_transcriptome is not None:
+            if self.sanitizer._raw_transcriptome.endswith("gtf"):
+                prepare_transcriptome = Linker(self.sanitizer._raw_transcriptome,
+                                               self.sanitizer.transcriptome,
+                                               "transcriptome",
+                                               "transcriptome",
+                                               "link_transcriptome_annotation",
+                                               configuration
+                                               )
+            else:
+                prepare_transcriptome = ConvertTranscriptome(configuration)
+            self.add_node(prepare_transcriptome)
+
+    @property
+    def fai(self):
+        return self.faidx
+
+    @property
+    def flag_name(self):
+        return os.path.join(os.path.dirname(self.faidx.output["fai"]), "prepare.done")
 
 
 class SanitizeGenome(AtomicOperation):
@@ -33,6 +64,33 @@ class SanitizeGenome(AtomicOperation):
         log = self.log
 
         cmd = "{load} sanitize_blast_db.py -o {output[genome]} {input[genome]} 2> {log} > {log}"
+        cmd = cmd.format(**locals())
+        return cmd
+
+
+class ConvertTranscriptome(AtomicOperation):
+
+    def __init__(self, configuration):
+
+        super().__init__()
+        self.configuration = configuration
+        self.input["transcriptome"] = self._raw_transcriptome
+        self.output["transcriptome"] = self.transcriptome
+
+    @property
+    def loader(self):
+        return ["mikado"]
+
+    @property
+    def rulename(self):
+        return "prepare_transcriptome_annotation"
+
+    @property
+    def cmd(self):
+
+        load, input, output = self.load, self.input, self.output
+
+        cmd = "{load} mikado util convert -of gtf {input[transcriptome]} {output[transcriptome]}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -169,25 +227,6 @@ class FaidxProtein(AtomicOperation):
         input = self.input
 
         return "{load} samtools faidx {input[db]}".format(**locals())
-
-
-class PrepareWrapper(EIWrapper):
-
-    __final_rulename__ = "prepare_flag"
-
-    def __init__(self, configuration, genome):
-        super().__init__(configuration)
-        self.sanitizer = SanitizeGenome(configuration, genome)
-        self.faidx = FaidxGenome(self.sanitizer)
-        self.add_edge(self.sanitizer, self.faidx)
-
-    @property
-    def fai(self):
-        return self.faidx
-
-    @property
-    def flag_name(self):
-        return os.path.join(os.path.dirname(self.faidx.output["fai"]), "prepare.done")
 
 
 class DiamondIndex(AtomicOperation):
