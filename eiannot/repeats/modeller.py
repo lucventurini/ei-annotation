@@ -171,7 +171,7 @@ class PolishRepeats(AtomicOperation):
 
     @property
     def polishing_models(self):
-        return self.configuration.get("repeats", dict()).get("safe_pro", None)
+        return self.configuration.get("repeats", dict()).get("safe_cds_sequences", None)
 
 
 class ModellerWorkflow(EIWrapper):
@@ -187,10 +187,10 @@ class ModellerWorkflow(EIWrapper):
             modeller = RepeatModeller(builder)
             # polisher = PolishRepeats(modeller)
             self.add_edges_from([(sanitiser, builder), (builder, modeller)])
-            if len(self.safe_proteins) > 0:
+            if len(self.safe_cds_sequences) > 0:
                 proteins = SanitizeProteinBlastDB(self.configuration,
                                                   db="repeatsafe",
-                                                  dbs=self.safe_proteins)
+                                                  dbs=self.safe_cds_sequences)
                 self.polisher = PolishRepeats(modeller, proteins)
                 self.add_edge(proteins, self.polisher)
             else:
@@ -214,5 +214,5 @@ class ModellerWorkflow(EIWrapper):
         return self.polisher.output["link"]
 
     @property
-    def safe_proteins(self):
-        return self.configuration["repeats"].get("safe_proteins", [])
+    def safe_cds_sequences(self):
+        return self.configuration["repeats"].get("safe_cds_sequence", [])
