@@ -6,6 +6,7 @@ from frozendict import frozendict
 import re
 import copy
 import subprocess as sp
+from collections import Counter
 
 
 class Sample(metaclass=abc.ABCMeta):
@@ -640,7 +641,18 @@ class EIWorfkflow(metaclass=abc.ABCMeta):
         """This method will check that the graph is valid, before printing."""
 
         # TODO: implement
-        pass
+        keys = Counter([_.rulename for _ in self])
+        while keys.most_common()[0][1] > 1:
+            vals = [_ for _ in self if _.rulename == keys.most_common()[0][0]]
+            first = vals[0]
+            for val in vals[1:]:
+                for attr in ["input", "output", "cmd", "load"]:
+                    if getattr(val, attr) != getattr(first, attr):
+                        raise ValueError("{} input:\n{}\n{}".format(first.rulename,
+                                                                    getattr(first, attr),
+                                                                    getattr(val, attr)))
+                self.remove_node(vals[0])
+            keys = Counter([_.rulename for _ in self])
 
     def add_node(self, node: AtomicOperation):
 
@@ -924,7 +936,7 @@ class EIWrapper(EIWorfkflow, metaclass=abc.ABCMeta):
         self.add_edges_from([(flag, entry) for entry in self.entries])
         if isinstance(flag, EIWrapper):
             flag = flag.exit
-        assert key in flag.output
+        assert key in flag.output, (key, flag.output)
         preds = nx.ancestors(self.graph, flag)
         for edge in self.edges:
             if edge[0] == flag and edge[1] not in preds:

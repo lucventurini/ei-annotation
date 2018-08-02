@@ -26,11 +26,11 @@ class GsnapWrapper(ShortWrapper):
 
     __toolname__ = "gsnap"
 
-    def __init__(self, configuration, prepare_flag):
+    def __init__(self, configuration, prepare_wrapper):
 
         # First, we have to build the index
 
-        super().__init__(configuration, prepare_flag=prepare_flag)
+        super().__init__(configuration, prepare_wrapper=prepare_wrapper)
 
         # Then we have to do all the alignments
         # Retrieve the running parameters
@@ -354,11 +354,11 @@ class GmapLongReads(LongAligner):
 
 class GmapLongWrapper(LongWrapper):
 
-    def __init__(self, prepare_flag):
+    def __init__(self, prepare_wrapper):
 
         # First, we have to build the index
 
-        super().__init__(prepare_flag)
+        super().__init__(prepare_wrapper)
 
         # Then we have to do all the alignments
         # Retrieve the running parameters

@@ -61,9 +61,10 @@ class StarIndex(IndexBuilder):
         align_dir = os.path.abspath(os.path.dirname(self.output["index"]))
         if not os.path.exists(align_dir):
             os.makedirs(align_dir)
-        if "ref_transcriptome" in self.input:
-            ref_transcriptome = os.path.relpath(self.input["ref_transcriptome"],
-                                                start=align_dir)
+        if self.transcriptome is not None:
+            ref_transcriptome = os.path.relpath(
+                self.input["transcriptome"],
+                start=align_dir)
             trans = "--sjdbGTFfile {ref_transcriptome}"
         else:
             trans = ""

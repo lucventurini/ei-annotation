@@ -1,6 +1,7 @@
 reference:
   min_intron: 20
   max_intron: 10000
+  transcriptome: "chr5.gff3"
 programs:
   gth:
     species: 'arabidopsis'

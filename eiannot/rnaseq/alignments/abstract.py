@@ -20,9 +20,8 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
         super(IndexBuilder, self).__init__()
         self.configuration = configuration
         self.input = {"genome": self.genome}
-
-        if self.configuration.get("reference", dict()).get("transcriptome", ""):
-            self.input["ref_transcriptome"] = os.path.abspath(self.configuration["reference"]["transcriptome"])
+        if self.transcriptome is not None:
+            self.input["transcriptome"] = os.path.abspath(self.transcriptome)
         self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
         self.__threads = 1
 
@@ -370,11 +369,11 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
         cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
         super().__init_subclass__()
 
-    def __init__(self, configuration, prepare_flag):
+    def __init__(self, configuration, prepare_wrapper):
         self.__finalised = False
-        self.__prepare_flag = prepare_flag
+        self.__prepare_wrapper = prepare_wrapper
         super().__init__()
-        self.add_node(prepare_flag.exit)
+        self.add_node(prepare_wrapper.exit)
         self.__bam_rules = set()
         self.configuration = configuration
         self.__stats = []
@@ -438,10 +437,10 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     def __add_flag_to_inputs(self):
         for rule in self.nodes:
-            if rule == self.__prepare_flag.exit:
+            if rule == self.__prepare_wrapper.exit:
                 continue
-            rule.input["prep_flag"] = self.__prepare_flag.output["fai"]
-            self.add_edge(self.__prepare_flag.exit, rule)
+            rule.input["prepare_flag"] = self.__prepare_wrapper.exit.output["flag"]
+            self.add_edge(self.__prepare_wrapper.exit, rule)
 
     @property
     @abc.abstractmethod
@@ -467,11 +466,11 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
         super().__init_subclass__()
 
-    def __init__(self, prepare_flag):
-        self.__prepare_flag = prepare_flag
+    def __init__(self, prepare_wrapper):
+        self.__prepare_wrapper = prepare_wrapper
         super().__init__()
         self.__gf_rules = set()
-        self.configuration = prepare_flag.configuration
+        self.configuration = prepare_wrapper.configuration
         self.__finalised = False
 
     def finalise(self):
@@ -486,7 +485,7 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
             new_gfs.add(stats)
 
         self.__gf_rules = new_gfs
-        self.add_flag_to_inputs(self.__prepare_flag, "prep_flag", "fai")
+        self.add_flag_to_inputs(self.__prepare_wrapper.exit, "prepare_flag", "flag")
         self.add_final_flag()
         self.__finalised = True
 

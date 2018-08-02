@@ -81,7 +81,7 @@ class LongAlignmentsWrapper(EIWrapper):
         self.add_final_flag()
 
         # print(flag.input)
-        self.add_flag_to_inputs(prepare_wrapper, "prep_flag", "fai")
+        self.add_flag_to_inputs(prepare_wrapper, "prepare_flag", "flag")
 
     __final_rulename__ = "long_aln_all"
 
