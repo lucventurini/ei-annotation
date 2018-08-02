@@ -28,12 +28,13 @@ class HisatWrapper(ShortWrapper):
             self.add_node(indexer)
             assert len(indexer.output) == 1, indexer.output
             # Optionally build the reference splice catalogue
-            splices = HisatExtractSplices(configuration, self.outdir)
+
+            splices = HisatExtractSplices(configuration, indexer.outdir)
             splice_out = splices.output.get("splices", None)
             if splice_out:
                 self.add_node(splices)
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                hisat_run = HisatAligner(indexer, sample, run)
+                hisat_run = HisatAligner(indexer, sample, run, splices=splices)
                 # hisat_runs.append(hisat_run)
                 self.add_to_bams(hisat_run)
             self.add_edges_from([(indexer, run) for run in self.bams])
@@ -93,9 +94,22 @@ class HisatAligner(ShortAligner):
 
     __toolname__ = "hisat2"
 
-    def __init__(self, indexer, sample: ShortSample, run: int):
+    def __init__(self,
+                 indexer,
+                 sample: ShortSample,
+                 run: int,
+                 splices=None):
 
-        super().__init__(indexer=indexer, sample=sample, run=run)
+        super().__init__(
+            indexer=indexer,
+            sample=sample,
+            run=run,
+            )
+        if splices is not None:
+            assert isinstance(splices, HisatExtractSplices)
+        if splices.output.get("splices", None) is not None:
+            self.input["transcriptome"] = splices.output["splices"]
+
         self.output = {"bam": os.path.join(self.bamdir,
                                            "hisat.bam"),
                        "link": self.link}
@@ -175,12 +189,17 @@ class HisatExtractSplices(AtomicOperation):
         input = self.input
         output = self.output
 
-        cmd = "{load} hisat2_extract_splice_sites.py {input[ref_trans]} > {output[splices]}".format(**locals())
+        cmd = "{load} "
+        if not self.input["ref_trans"].endswith("gtf"):
+            cmd += "mikado util convert -of gtf {input[ref_trans]} | "
+        else:
+            cmd += "cat {input[ref_trans]} | "
+        cmd += "hisat2_extract_splice_sites.py - > {output[splices]}".format(**locals())
         return cmd
 
     @property
     def loader(self):
-        return ["hisat2"]
+        return ["hisat2", "mikado"]
 
     @property
     def rulename(self):
