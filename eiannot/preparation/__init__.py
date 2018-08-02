@@ -23,6 +23,7 @@ class PrepareWrapper(EIWrapper):
             else:
                 prepare_transcriptome = ConvertTranscriptome(configuration)
             self.add_node(prepare_transcriptome)
+        self.add_final_flag()
 
     @property
     def fai(self):
