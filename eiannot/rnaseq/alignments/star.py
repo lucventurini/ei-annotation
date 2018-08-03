@@ -65,9 +65,9 @@ class StarIndex(IndexBuilder):
         if self.transcriptome is not None:
             ref_transcriptome = os.path.abspath(
                 self.input["transcriptome"])
-            trans = "--sjdbGTFfile {ref_transcriptome}"
+            trans = " --sjdbGTFfile {ref_transcriptome} ".format(ref_transcriptome=ref_transcriptome)
         else:
-            trans = ""
+            trans = " "
         genome = os.path.relpath(self.input["genome"],
                                  start=align_dir)
         log = os.path.relpath(self.log, start=align_dir)

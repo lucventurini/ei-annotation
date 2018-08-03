@@ -1,5 +1,4 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
-from ...abstract import AtomicOperation
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats, FilterGF
 import os
 import itertools
 import subprocess
@@ -18,24 +17,30 @@ def get_class_location(load):
 class Class2Wrapper(ShortAssemblerWrapper):
 
     __toolname__ = "class2"
+    __tag__ = "Abundance"
 
     def __init__(self, aln_wrapper):
 
         super().__init__(aln_wrapper)
         if len(self.runs) > 0 and len(self.bams) > 0:
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
-                class2 = Class2(bam, run)
-                stat = AsmStats(class2)
-                self.add_edge(class2, stat)
+                class2 = Class2(bam, run, create_link=False)
+                class_filter = FilterGF(class2,
+                                        tag=self.tag,
+                                        monoexonic_threshold=self.mono_threshold,
+                                        multiexonic_threshold=self.multi_threshold)
+                self.add_edge(class2, class_filter)
+                stat = AsmStats(class_filter)
+                self.add_edge(class_filter, stat)
                 self.add_to_gf(stat)
                 continue
 
 
 class Class2(ShortAssembler):
 
-    def __init__(self, bam, run):
+    def __init__(self, bam, run, create_link=True):
 
-        super().__init__(bam, run)
+        super().__init__(bam, run, create_link=create_link)
 
     __toolname__ = "class2"
 
@@ -68,8 +73,9 @@ class Class2(ShortAssembler):
         output = self.output
         log = self.log
         gtf = os.path.join(self.gfdir, "transcripts.gtf")
-        cmd += "{program} --clean --force {extra} -p {threads} {input[bam]} > {output[gf]} 2> {log} &&"
-        cmd += " ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        cmd += "{program} --clean --force {extra} -p {threads} {input[bam]} > {output[gf]} 2> {log} "
+        if self._create_link:
+            cmd += " ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
 

@@ -24,6 +24,7 @@ def trinity_version(loader):
 class TrinityGGWrapper(ShortAssemblerWrapper):
 
     __toolname__ = "trinity"
+    __tag__ = None  # We are not going to use it here
 
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
@@ -67,7 +68,7 @@ class TrinityGG(ShortAssembler):
     __toolname__ = "trinity"
 
     def __init__(self, bam, run):
-        super().__init__(bam, run)
+        super().__init__(bam, run, create_link=False)
         self.align_run = bam.align_run
         self.input["reference"] = self.genome
 
@@ -167,7 +168,7 @@ class TrinityGmap(ShortAssembler):
 
     def __init__(self, trinitygg: TrinityGG, index: GmapIndex, iit=None):
 
-        super().__init__(bam=trinitygg, run=trinitygg.run)
+        super().__init__(bam=trinitygg, run=trinitygg.run, create_link=True)
         self.input['transcripts'] = trinitygg.output["transcripts"]
         self.input["fai"] = index.input["fai"]
         if iit is not None:

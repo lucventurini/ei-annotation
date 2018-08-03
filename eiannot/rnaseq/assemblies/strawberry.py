@@ -1,4 +1,4 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats, FilterGF
 import os
 import itertools
 
@@ -6,17 +6,21 @@ import itertools
 class StrawberryWrapper(ShortAssemblerWrapper):
 
     __toolname__ = "strawberry"
+    __tag__ = "TPM"
 
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
 
         if len(self.bams) > 0 and len(self.runs) > 0:
-            strawberries = []
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
-                berry = Strawberry(bam, run)
-                strawberries.append(berry)
-                stat = AsmStats(berry)
-                self.add_edge(berry, stat)
+                berry = Strawberry(bam, run, create_link=False)
+                straw_filter = FilterGF(berry,
+                                        tag=self.tag,
+                                        monoexonic_threshold=self.mono_threshold,
+                                        multiexonic_threshold=self.multi_threshold)
+                stat = AsmStats(straw_filter)
+                self.add_edge(berry, straw_filter)
+                self.add_edge(straw_filter, stat)
                 self.add_to_gf(stat)
             return
 
@@ -25,9 +29,9 @@ class Strawberry(ShortAssembler):
 
     __toolname__ = "strawberry"
 
-    def __init__(self, bam, run):
+    def __init__(self, bam, run, create_link=False):
 
-        super().__init__(bam, run)
+        super().__init__(bam, run, create_link=create_link)
         self.output["gf"] = os.path.join(self.gfdir, "assembled_transcripts.gtf")
 
     @property
@@ -61,8 +65,9 @@ class Strawberry(ShortAssembler):
         alrun = self.alrun
         strand = self.strand
         cmd += " strawberry {extra} {trans} -o {gfdir} -j {min_intron} -J {max_intron} {strand} "
-        cmd += " -p {threads} {input[bam]} > {log} 2>&1 && "
-        cmd += "ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        cmd += " -p {threads} {input[bam]} > {log} 2>&1 "
+        if self._create_link is True:
+            cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
 

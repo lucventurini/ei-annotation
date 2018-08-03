@@ -76,6 +76,10 @@ class BamIndex(AtomicOperation):
 
         return cmd
 
+    @property
+    def is_small(self):
+        return True
+
 
 class BamStats(AtomicOperation):
 

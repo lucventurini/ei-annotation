@@ -1,5 +1,4 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
-from ...abstract import AtomicOperation, EIWrapper, ShortSample
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats, FilterGF
 import os
 import itertools
 import re
@@ -8,6 +7,7 @@ import re
 class StringtieWrapper(ShortAssemblerWrapper):
 
     __toolname__ = "stringtie"
+    __tag__ = "TPM"
 
     def __init__(self, aln_wrapper):
         super().__init__(aln_wrapper)
@@ -15,14 +15,16 @@ class StringtieWrapper(ShortAssemblerWrapper):
         if len(self.bams) > 0 and len(self.runs) > 0:
             stringties = []
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
-                stringtie = Stringtie(bam, run)
+                stringtie = Stringtie(bam, run, create_link=False)
                 stringties.append(stringtie)
-                stat = AsmStats(stringtie)
-                self.add_edge(stringtie, stat)
+                stringtie_filter = FilterGF(stringtie,
+                                            tag=self.tag,
+                                            monoexonic_threshold=self.mono_threshold,
+                                            multiexonic_threshold=self.multi_threshold)
+                stat = AsmStats(stringtie_filter)
+                self.add_edge(stringtie, stringtie_filter)
+                self.add_edge(stringtie_filter, stat)
                 self.add_to_gf(stat)
-            # flag = StringtieFlag(stringties, self.outdir)
-            # self.add_node(flag)
-            # self.add_edges_from([(stringtie, flag) for stringtie in stringties])
             return
 
     @property
@@ -34,9 +36,9 @@ class Stringtie(ShortAssembler):
 
     __toolname__ = "stringtie"
 
-    def __init__(self, bam, run):
+    def __init__(self, bam, run, create_link=True):
 
-        super().__init__(bam, run)
+        super().__init__(bam, run, create_link)
 
     @property
     def loader(self):
@@ -66,8 +68,10 @@ class Stringtie(ShortAssembler):
             trans = " "
         alrun = self.alrun
         cmd += " stringtie {input[bam]} -l Stringtie_{alrun} {extra} "
-        cmd += " {trans} -o {output[gf]} -p {threads} > {log} 2>&1 && "
-        cmd += "ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        cmd += " {trans} -o {output[gf]} -p {threads} > {log} 2>&1 "
+        if self._create_link is True:
+            cmd += "ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+
         cmd = cmd.format(**locals())
         return cmd
 

@@ -15,10 +15,12 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
         cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
         super().__init_subclass__()
 
-    def __init__(self, bam: BamStats, run, ref_transcriptome=None):
+    def __init__(self, bam: BamStats, run, create_link=True, ref_transcriptome=None):
 
         super(ShortAssembler, self).__init__()
         self.__sample, self.__run = None, None
+        assert create_link in (True, False)  # This must be boolean
+        self._create_link = create_link
         self.configuration = bam.configuration
         self.sample = bam.sample
         self.run = run
@@ -31,13 +33,9 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
             toolname=self.toolname, sample=self.sample.label, run=self.run,
             alrun=self.alrun
         ))
-        self.output["link"] = os.path.join(
-          self.outdir, "output", "{toolname}-{sample}-{run}-{alrun}.{suffix}".format(
-                toolname=self.toolname, sample=self.sample, run=self.run,
-                suffix=self.suffix, alrun=self.alrun
-            )
-        )
-        self.output["gf"] = os.path.join(self.gfdir, os.path.basename(self.output["link"]))
+        if self._create_link is True:
+            self.output["link"] = self.link
+        self.output["gf"] = os.path.join(self.gfdir, os.path.basename(self.link))
 
         self.message = "Using {toolname} to assemble (run: {run}): {input[bam]}".format(
             input=self.input, run=run, toolname=self.toolname)
@@ -54,9 +52,10 @@ class ShortAssembler(AtomicOperation, metaclass=abc.ABCMeta):
 
     @property
     def link(self):
-        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}-".format(
-            toolname=self.toolname, sample=self.sample.label, run=self.run)
-        )
+        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}-{alrun}.{suffix}".format(
+            toolname=self.toolname, sample=self.sample.label, run=self.run,
+            suffix=self.suffix, alrun=self.alrun
+        ))
 
     @property
     def sample(self):
@@ -155,6 +154,9 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
         if not hasattr(cls, "__toolname__"):
             raise NotImplementedError("Wrapper {} does not have a defined toolname!".format(cls.__name__))
+        if not hasattr(cls, "__tag__"):
+            raise NotImplementedError("Wrapper {} does not have a defined abundance tag!".format(cls.__name__))
+
         cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
         super().__init_subclass__()
 
@@ -204,10 +206,102 @@ class ShortAssemblerWrapper(EIWrapper, metaclass=abc.ABCMeta):
     def flag_name(self):
         return os.path.join(self.outdir, "{toolname}.done".format(toolname=self.toolname))
 
+    @property
+    def mono_threshold(self):
+
+        return self.configuration["programs"].get(
+            self.__toolname__, {}).get("monoexonic_abundance_threshold", 1)
+
+    @property
+    def multi_threshold(self):
+
+        return self.configuration["programs"].get(
+            self.__toolname__, {}).get("multiexonic_abundance_threshold", 0)
+
+    @property
+    def tag(self):
+        if "abundance_tag" in self.configuration["programs"].get(
+                self.__toolname__, {}):
+            return self.configuration["programs"][self.__toolname__]["abundance_tag"]
+        else:
+            return self.__tag__
+
+
+class FilterGF(AtomicOperation):
+
+    """This atomic operation will remove low-abundance fragments using the filter_assemblies_by_quant script."""
+
+    def __init_subclass__(cls, **kwargs):
+
+        pass
+
+    def __init__(self,
+                 asm_run: ShortAssembler,
+                 tag, monoexonic_threshold, multiexonic_threshold
+                 ):
+        super().__init__()
+        self.configuration = asm_run.configuration
+        self.input["gf"] = asm_run.output["gf"]
+        # Get some parameters from the parent node ...
+        self.toolname = asm_run.toolname
+        self.sample = asm_run.sample
+        self.run, self.alrun, self.suffix = asm_run.run, asm_run.alrun, asm_run.suffix
+        self.label = asm_run.label
+        # Now that we have the parameters, define the rest ...
+        self.output["gf"] = os.path.splitext(self.input["gf"])[0] + ".filtered" + os.path.splitext(self.input["gf"])[1]
+        self.output["link"] = self.link
+
+        self.message = "Filtering low-abundance transcripts for: {input[gf]}".format(input=self.input)
+        self.tag, self.mono, self.multi = tag, monoexonic_threshold, multiexonic_threshold
+
+    @property
+    def rulename(self):
+        return "abundance_filter_{label}_{toolname}_{run}_{alrun}".format(
+            toolname=self.toolname, run=self.run, alrun=self.alrun, label=self.sample.label)
+
+    @property
+    def loader(self):
+        return ["mikado", "ei-annotation"]  # The script is dependent on Mikado
+
+    @property
+    def is_small(self):
+        return True
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def cmd(self):
+
+        load, tag, mono, multi, input, output = self.load, self.tag, self.mono, self.multi, self.input, self.output
+        cmd = "{load} filter_assemblies_by_quant.py -q {tag} -m {mono} -mu {multi} {input[gf]} {output[gf]} "
+        link_src = self.link_src
+        cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        cmd = cmd.format(**locals())
+        return cmd
+
+    @property
+    def link_src(self):
+        return os.path.join("..", self.toolname,
+                            "{sample}-{run}-{alrun}".format(sample=self.sample.label, run=self.run, alrun=self.alrun),
+                            os.path.basename(self.output["gf"]))
+
+    @property
+    def outdir(self):
+        return os.path.join(os.path.join(self.configuration["outdir"], "rnaseq", "2-assemblies"))
+
+    @property
+    def link(self):
+        return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}-{alrun}.{suffix}".format(
+            toolname=self.toolname, sample=self.sample.label, run=self.run,
+            suffix=self.suffix, alrun=self.alrun
+        ))
+
 
 class AsmStats(AtomicOperation):
 
-    def __init__(self, asm_run: ShortAssembler):
+    def __init__(self, asm_run: [ShortAssembler, FilterGF]):
 
         super().__init__()
         self.configuration = asm_run.configuration

@@ -6,7 +6,7 @@ programs:
   gth:
     species: 'arabidopsis'
   default:
-    threads: 20
+    threads: 2
     memory: 10000
     queue: 'ei-medium,TempProject2'
   default_small:
@@ -24,16 +24,11 @@ programs:
   hisat2:
     load: ''
     runs: ['']
-    index:
-      index_name: 'eiannot'
-      index_folder: 'Eiannot/indices/hisat2'
   star: &star
     load: ''
     runs: ['']  # ['']
     index:
       threads: 5
-      index_folder: 'Eiannot/indices/'
-      index_name: 'star'
   samtools:
     load: ''
   portcullis:
@@ -48,7 +43,7 @@ programs:
       # index_folder: 'Eiannot/indices/gmap/'
   gsnap:
     <<: *gmap
-    runs: ['']
+    runs: []
   gmap_long:
     <<: *gmap
     runs: []
@@ -57,20 +52,17 @@ programs:
     runs: ['']
     threads: 1
   cufflinks:
-    runs: []
+    runs: ['']
     load: ''
   strawberry:
-    runs: []  # ['']
+    runs: ['']  # ['']
     load: ''
   tophat2:
     load: ''
+    runs: []
+  scallop:
     runs: ['']
-    index:
-      index_name: 'eiannot'
-      index_folder: 'Eiannot/indices/tophat2/'
-#  scallop:
-#    runs: ['']
-#    load: ''
+    load: ''
 #  trinity:
 #    runs: ['']
 #    load: ''
@@ -82,7 +74,7 @@ programs:
     execute: true  # unused as of yet
     taxon: "plants"
     dbs: "tpn"
-outdir: "eitest" # "Eiannot"  # "eitest" 
+outdir: "Eiannot"  # "eitest" 
 name: "eitest"
 mikado_homology:
   prot_dbs: &prot_db

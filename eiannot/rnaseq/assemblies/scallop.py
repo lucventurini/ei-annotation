@@ -1,26 +1,28 @@
-from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats
-from ...abstract import AtomicOperation, EIWrapper, ShortSample
-import os
+from .abstract import ShortAssembler, ShortAssemblerWrapper, AsmStats, FilterGF
 import itertools
 
 
 class ScallopWrapper(ShortAssemblerWrapper):
 
     __toolname__ = "scallop"
+    __tag__ = "RPKM"  # We are not going to use it here
 
     def __init__(self, aln_wrapper):
 
         super().__init__(aln_wrapper)
 
         if len(self.runs) > 0 and len(self.bams) > 0:
-            scallops = []
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
-                scallop = Scallop(bam, run)
-                stat = AsmStats(scallop)
+                scallop = Scallop(bam, run, create_link=False)
+                scallop_filter = FilterGF(scallop,
+                                          tag=self.tag,
+                                          monoexonic_threshold=self.mono_threshold,
+                                          multiexonic_threshold=self.multi_threshold)
+                self.add_edge(scallop, scallop_filter)
+                stat = AsmStats(scallop_filter)
                 self.add_edge(aln_wrapper, scallop)
-                self.add_edge(scallop, stat)
+                self.add_edge(scallop_filter, stat)
                 self.add_to_gf(stat)
-                scallops.append(stat)
                 continue
 
 
@@ -28,9 +30,9 @@ class Scallop(ShortAssembler):
 
     __toolname__ = "scallop"
 
-    def __init__(self, bam, run):
+    def __init__(self, bam, run, create_link):
 
-        super().__init__(bam, run)
+        super().__init__(bam, run, create_link=create_link)
 
     @property
     def loader(self):
@@ -65,7 +67,8 @@ class Scallop(ShortAssembler):
         strand = self.strand
         log = self.log
         cmd += "scallop -i {input[bam]} -o {output[gf]} {strand} {extra} > {log} 2>&1"
-        cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
+        if self._create_link is True:
+            cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
 
