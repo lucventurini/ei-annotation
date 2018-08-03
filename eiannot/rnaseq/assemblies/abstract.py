@@ -338,3 +338,7 @@ class AsmStats(AtomicOperation):
     @property
     def label(self):
         return self.__asm_run.label
+
+    @property
+    def is_small(self):
+        return True

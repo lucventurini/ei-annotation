@@ -270,6 +270,14 @@ class PortcullisFilter(AtomicOperation):
             self.input["refbed"] = portcullis_prep_ref.output["refbed"]
 
     @property
+    def is_small(self):
+        return True
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
     def rulename(self):
         return "portcullis_filter_{}".format(self.alrun)
 
@@ -353,6 +361,10 @@ class PortcullisMerge(AtomicOperation):
 
         self.message = "Taking the union of portcullis results"
         self.log = os.path.join(self.outdir, "logs", "portcullis.merge.log")
+
+    @property
+    def is_small(self):
+        return True
 
     @property
     def loader(self):
