@@ -148,6 +148,10 @@ class FilterAlignments(AtomicOperation):
     def outdir(self):
         return os.path.join(self.configuration["outdir"], "proteins", "output")
 
+    @property
+    def is_small(self):
+        return True
+
 
 class ProteinWrapper(EIWrapper, metaclass=abc.ABCMeta):
 

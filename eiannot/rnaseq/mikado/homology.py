@@ -60,6 +60,10 @@ class SplitMikadoPrepareFasta(MikadoOp):
     def fasta_dir(self):
         return os.path.join(self.mikado_dir, "mikado_homology", "fastas")
 
+    @property
+    def is_small(self):
+        return True
+
 
 class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
 
@@ -189,6 +193,10 @@ class MikadoHomologyFlag(MikadoOp):
         self.touch = True
         self.input = {"xmls": [homology.output["xml"] for homology in homologies]}
         self.output = {"flag": os.path.join(self.outdir, "mikado_homology", "homology.done")}
+
+    @property
+    def local(self):
+        return True
 
     @property
     def loader(self):

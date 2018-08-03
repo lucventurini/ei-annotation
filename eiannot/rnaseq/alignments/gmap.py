@@ -185,6 +185,10 @@ class GmapLink(IndexLinker):
     def index(self):
         return self.dbname
 
+    @property
+    def is_small(self):
+        return True
+
 
 class GsnapIntronsIIT(AtomicOperation):
 
@@ -221,6 +225,10 @@ class GsnapIntronsIIT(AtomicOperation):
         cmd += "cat {input[transcriptome]} | gtf_splicesites | iit_store -o {output[iit]}"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def is_small(self):
+        return True
 
 
 class GsnapAligner(ShortAligner):
@@ -346,6 +354,14 @@ class GmapExonsIIT(AtomicOperation):
         cmd += "cat {input[transcriptome]} | gtf_genes | iit_store -o {output[iit]}"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def is_small(self):
+        return True
 
 
 class GmapLongReads(LongAligner):

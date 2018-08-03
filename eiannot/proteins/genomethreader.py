@@ -186,6 +186,10 @@ class CollapseGTH(AtomicOperation):
     def threads(self):
         return 1
 
+    @property
+    def is_small(self):
+        return True
+
 
 class GTHProteinWrapper(ProteinWrapper):
 

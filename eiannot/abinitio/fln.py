@@ -115,6 +115,10 @@ class MikadoSequenceExtractor(FLNOp):
     def _rulename(self):
         return "extract_mikado_fasta"
 
+    @property
+    def is_small(self):
+        return True
+
 
 class MikadoSequenceIndexer(FLNOp):
 
@@ -143,6 +147,10 @@ class MikadoSequenceIndexer(FLNOp):
         cmd = "{load} samtools faidx {input[transcripts]} > {log} 2>&1".format(**locals())
 
         return cmd
+
+    @property
+    def is_small(self):
+        return True
 
 
 class SplitMikadoFasta(FLNOp):
@@ -195,6 +203,10 @@ class SplitMikadoFasta(FLNOp):
     @property
     def outprefix(self):
         return os.path.join(self.outdir, "chunk")
+
+    @property
+    def is_small(self):
+        return True
 
 
 @functools.lru_cache(typed=True, maxsize=4)
@@ -332,6 +344,10 @@ class ConcatenateFLN(FLNOp):
     def outdir(self):
         return os.path.join(self.configuration["outdir"], self.flndir, "output")
 
+    @property
+    def is_small(self):
+        return True
+
 
 class ConvertMikadoToBed12(MikadoOp):
 
@@ -364,6 +380,10 @@ class ConvertMikadoToBed12(MikadoOp):
         cmd = "{load} mikado util convert -of bed12 {input[loci]} {output[bed12]} 2> {log} > {log}"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def is_small(self):
+        return True
 
 
 class FilterFLN(FLNOp):
@@ -408,6 +428,10 @@ class FilterFLN(FLNOp):
         cmd = cmd.format(**locals())
 
         return cmd
+
+    @property
+    def is_small(self):
+        return True
 
 
 class ExtractFLNClass(FLNOp):
@@ -462,3 +486,7 @@ class ExtractFLNClass(FLNOp):
     @property
     def threads(self):
         return 1
+
+    @property
+    def is_small(self):
+        return True

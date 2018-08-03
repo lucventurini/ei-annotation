@@ -66,3 +66,7 @@ class ChunkProteins(AtomicOperation):
             return self.configuration["homology"]["protein_chunks"]
         else:
             return _get_value(self.configuration, self.dbname, "chunks")
+
+    @property
+    def is_small(self):
+        return True

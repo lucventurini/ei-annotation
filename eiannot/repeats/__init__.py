@@ -51,6 +51,14 @@ class RetrieveLibraries(AtomicOperation):
 
         return os.path.join(self.configuration["outdir"], "repeats", "masker")
 
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def is_small(self):
+        return True
+
 
 class LibraryCreator(AtomicOperation):
 
@@ -96,6 +104,14 @@ class LibraryCreator(AtomicOperation):
         output = self.output
         cmd = "cat {retrieved} {modeled} {custom} > {output[libraries]}".format(**locals())
         return cmd
+
+    @property
+    def is_small(self):
+        return True
+
+    @property
+    def threads(self):
+        return 1
 
 
 class Masker(AtomicOperation):

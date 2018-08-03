@@ -117,6 +117,10 @@ class MikadoConfig(MikadoOp):
         # TODO: implement
         return ""
 
+    @property
+    def local(self):
+        return True
+
 
 class MikadoPrepare(MikadoOp):
 

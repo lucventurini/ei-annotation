@@ -481,7 +481,11 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
     def __retrieve_resource_from_programs(self, resource):
 
-        if (hasattr(self, "toolname") and
+        if (self.is_small and "default_small" in self.configuration["programs"] and
+                resource in self.configuration["programs"]["default_small"]):
+            res = self.configuration["programs"]["default_small"][resource]
+
+        elif (hasattr(self, "toolname") and
                     self.toolname in self.configuration["programs"] and
                     resource in self.configuration["programs"][self.toolname]):
             res = self.configuration["programs"][self.toolname][resource]
@@ -516,6 +520,12 @@ class AtomicOperation(metaclass=abc.ABCMeta):
 
     @property
     def local(self):
+        return False
+
+    @property
+    def is_small(self):
+        if self.local is True:
+            return True
         return False
 
 

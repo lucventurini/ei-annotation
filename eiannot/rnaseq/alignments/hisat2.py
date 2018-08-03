@@ -89,6 +89,10 @@ class HisatLinker(IndexLinker):
     def loader(self):
         return []
 
+    @property
+    def is_small(self):
+        return True
+
 
 class HisatAligner(ShortAligner):
 
@@ -201,6 +205,10 @@ class HisatExtractSplices(AtomicOperation):
     @property
     def rulename(self):
         return self.__name__
+
+    @property
+    def is_small(self):
+        return True
 
 
 class HisatBuild(IndexBuilder):

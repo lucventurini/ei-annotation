@@ -133,6 +133,10 @@ class FaidxGenome(AtomicOperation):
                                                                           log=self.log)
         return cmd
 
+    @property
+    def is_small(self):
+        return True
+
 
 class SanitizeProteinBlastDB(AtomicOperation):
 
@@ -201,6 +205,10 @@ class SanitizeProteinBlastDB(AtomicOperation):
     def threads(self):
         return 1
 
+    @property
+    def is_small(self):
+        return True
+
 
 class FaidxProtein(AtomicOperation):
 
@@ -230,6 +238,10 @@ class FaidxProtein(AtomicOperation):
         input = self.input
 
         return "{load} samtools faidx {input[db]}".format(**locals())
+
+    @property
+    def is_small(self):
+        return True
 
 
 class DiamondIndex(AtomicOperation):

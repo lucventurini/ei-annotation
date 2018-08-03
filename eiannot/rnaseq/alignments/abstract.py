@@ -145,6 +145,10 @@ class IndexLinker(AtomicOperation, metaclass=abc.ABCMeta):
     def threads(self):
         return 1
 
+    @property
+    def is_small(self):
+        return True
+
 
 class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
 

@@ -9,6 +9,10 @@ programs:
     threads: 20
     memory: 10000
     queue: 'ei-medium,TempProject2'
+  default_small:
+    threads: 1
+    memory: 4000
+    queue: 
   minimap2:
     load: ''
     runs: ['']
