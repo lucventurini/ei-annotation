@@ -187,6 +187,10 @@ class PortcullisPrepRef(AtomicOperation):
         cmd = cmd.format(**locals())
         return cmd
 
+    @property
+    def is_small(self):
+        return True
+
 
 class PortcullisJunc(AtomicOperation):
 
