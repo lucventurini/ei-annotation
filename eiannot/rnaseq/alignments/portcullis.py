@@ -166,7 +166,7 @@ class PortcullisPrepRef(AtomicOperation):
             return
         self._outdir = outdir
         self.output = {"refbed": os.path.join(self._outdir, "ref_juncs.bed")}
-        self.log = "Converting reference transcriptome to "
+        self.log = "Converting reference transcriptome to BED file"
 
     @property
     def rulename(self):

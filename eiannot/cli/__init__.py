@@ -124,7 +124,8 @@ def main():
         print(workflow, file=out)
 
     if args.steps:
-        execute = [name for name in list(chain.from_iterable(steps[step] for step in args.steps)) if name in workflow]
+        rulenames = set([_.rulename for _ in workflow])
+        execute = [name for name in list(chain.from_iterable(steps[step] for step in args.steps)) if name in rulenames]
     else:
         execute = []
 
