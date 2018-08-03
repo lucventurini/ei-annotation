@@ -165,7 +165,7 @@ class TrinityGmap(ShortAssembler):
 
     __toolname__ = "trinity"
 
-    def __init__(self, trinitygg: TrinityGG, index: GmapIndex, iit=None [None|GmapExonsIIT]):
+    def __init__(self, trinitygg: TrinityGG, index: GmapIndex, iit=None):
 
         super().__init__(bam=trinitygg, run=trinitygg.run)
         self.input['transcripts'] = trinitygg.output["transcripts"]
