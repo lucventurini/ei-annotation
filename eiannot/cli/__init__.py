@@ -125,7 +125,8 @@ def main():
 
     if args.steps:
         rulenames = set([_.rulename for _ in workflow])
-        execute = [name for name in list(chain.from_iterable(steps[step] for step in args.steps)) if name in rulenames]
+        _raw_execute = set([name for name in list(chain.from_iterable(steps[step] for step in args.steps))])
+        execute = set.intersection(rulenames, _raw_execute)
     else:
         execute = []
 
@@ -172,7 +173,8 @@ Please use the \"-nd\" flag to run the Ei-Annot pipeline if you do not plan to u
                         latency_wait=60 if args.scheduler else 1,
                         forceall=args.dag,
                         forcerun=args.forcerun,
-                        lock=(not args.nolock)
+                        lock=(not args.nolock),
+                        printreason=True
                         )
 
 
