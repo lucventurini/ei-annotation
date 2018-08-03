@@ -37,6 +37,7 @@ class StarIndexLink(IndexLinker):
     def index(self):
         return self.output["index"]
 
+
 class StarIndex(IndexBuilder):
 
     __toolname__ = "star"
@@ -62,9 +63,8 @@ class StarIndex(IndexBuilder):
         if not os.path.exists(align_dir):
             os.makedirs(align_dir)
         if self.transcriptome is not None:
-            ref_transcriptome = os.path.relpath(
-                self.input["transcriptome"],
-                start=align_dir)
+            ref_transcriptome = os.path.abspath(
+                self.input["transcriptome"])
             trans = "--sjdbGTFfile {ref_transcriptome}"
         else:
             trans = ""
@@ -128,8 +128,8 @@ class StarAligner(ShortAligner):
         cmd += " --outSAMstrandField intronMotif"
         min_intron, max_intron = self.min_intron, self.max_intron
         cmd += " --alignIntronMin {min_intron} --alignIntronMax {max_intron} --alignMatesGapMax {max_intron}"
-        if self.ref_transcriptome:
-            ref_transcriptome = self.ref_transcriptome
+        if self.transcriptome:
+            ref_transcriptome = os.path.abspath(self.transcriptome)
             cmd += " --sjdbGTFfile {ref_transcriptome}"
         extra = self.extra
         # bamdir = self.bamdir
@@ -154,22 +154,6 @@ class StarAligner(ShortAligner):
     def strand(self):
         """STAR does not accept specifying the strand of reads, so this property returns an empty string."""
         return ""
-
-#
-# class StarFlag(AtomicOperation):
-#
-#     # rule hisat_all:
-#     # 	input: expand(ALIGN_DIR+"/output/hisat-{sample}-{run}.bam", sample=SAMPLES, run=HISAT_RUNS)
-#     # 	output: ALIGN_DIR+"/hisat.done"
-#     # 	shell: "touch {output}"
-#
-#     def __init__(self, outdir, runs=[]):
-#
-#         super().__init__()
-#         for number, run in enumerate(runs):
-#             self.input["run{}".format(number)] = run
-#         self.output["flag"] = os.path.join(outdir, "star.done")
-#         self.touch = True
 
 
 class StarWrapper(ShortWrapper):

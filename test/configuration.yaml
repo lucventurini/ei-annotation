@@ -37,10 +37,11 @@ programs:
     load: ''
   gmap: &gmap
     load: ''
+    runs: ['']
     index:
       threads: 3
       index_name: 'eiannot'
-      index_folder: 'Eiannot/indices/gmap/'
+      # index_folder: 'Eiannot/indices/gmap/'
   gsnap:
     <<: *gmap
     runs: ['']

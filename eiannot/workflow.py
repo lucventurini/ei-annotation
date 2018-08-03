@@ -20,14 +20,20 @@ class AnnotationWorklow(EIWorfkflow):
         super().__init__(self.configuration)
         self.prepare = PrepareWrapper(self.configuration, genome)
         self.merge([self.prepare])
+        faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
+        assert list(faid.input.keys()) == ["genome"], faid.input
         # Second thing: prepare the genome
         self.short_wrapper = ShortAlignmentsWrapper(self.prepare)
 
+        faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
+        assert list(faid.input.keys()) == ["genome"], faid.input
         self.portcullis = PortcullisWrapper(self.short_wrapper)
         self.assemblies = AssemblyWrapper(self.short_wrapper)
         self.merge([self.short_wrapper, self.portcullis, self.assemblies])
 
         self.long_wrapper = LongAlignmentsWrapper(self.prepare)
+        faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
+        assert list(faid.input.keys()) == ["genome"], faid.input
         if self.long_wrapper.gfs:
             self.mikado_long = Mikado(assemblies=self.assemblies,
                                       long_alignments=self.long_wrapper,
@@ -54,6 +60,8 @@ class AnnotationWorklow(EIWorfkflow):
                 self.merge([self.fln])
                 self.add_edge(self.mikado, self.fln)
 
+        faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
+        assert list(faid.input.keys()) == ["genome"], faid.input
         self.repeats = RepeatMasking(self.prepare)
 
         if self.use_exonerate:
@@ -64,6 +72,8 @@ class AnnotationWorklow(EIWorfkflow):
         self.merge([self.repeats, self.protein_alignments])
 
         self.add_final_flag()
+        faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
+        assert list(faid.input.keys()) == ["genome"], faid.input
 
     @property
     def flag_name(self):

@@ -20,11 +20,13 @@ class ShortAlignmentsWrapper(EIWrapper):
         self.__bams = []
         self.configuration = prepare_wrapper.configuration
         self.__prepare_flag = prepare_wrapper
+
         instances = []
         flags = []
         for tool, wrapper in self.wrappers.items():
             instance = wrapper(self.configuration, self.__prepare_flag)
             instance.finalise()
+
             # print(tool, instance.bams)
             if len(instance.bams) > 0:
                 instances.append(instance)
@@ -32,6 +34,7 @@ class ShortAlignmentsWrapper(EIWrapper):
                 self.merge([instance])
                 self.__bams.extend(instance.bams)
 
+        self.add_flag_to_inputs(prepare_wrapper, "prepare_flag", "flag")
         self.add_final_flag()
 
     __final_rulename__ = "short_aln_all"

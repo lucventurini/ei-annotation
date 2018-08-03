@@ -7,7 +7,7 @@ from .serialise import MikadoSerialise
 from .homology import MikadoHomologyWrapper
 from .pick import MikadoPick, IndexMikado, MikadoStats
 from .orfs import Prodigal, TransdecoderLongOrf, TransdecoderPred
-from ...preparation import FaidxGenome
+# from ...preparation import FaidxGenome
 import os
 import networkx as nx
 
@@ -65,13 +65,14 @@ class Mikado(EIWrapper):
             else:
                 self.add_edge(self.preparer, self.homologies)
 
-            self.faidx_genome = FaidxGenome(None, self.configuration)
+            # self.faidx_genome = FaidxGenome(None, self.configuration)
             self.serialiser = MikadoSerialise(prepare=self.preparer,
                                               homology=self.homologies,
                                               orfs=self.orfs,
-                                              faidx=self.faidx_genome,
+                                              # faidx=self.faidx_genome,
                                               portcullis=self.portcullis)
-            self.add_edges_from([_, self.serialiser] for _ in [self.faidx_genome, self.preparer,
+            self.add_edges_from([_, self.serialiser] for _ in [  # self.faidx_genome,
+                                                               self.preparer,
                                                                self.homologies, self.orfs] if _ is not None)
 
             self.picker = MikadoPick(self.serialiser)

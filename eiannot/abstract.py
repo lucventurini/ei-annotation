@@ -832,7 +832,10 @@ class EIWorfkflow(metaclass=abc.ABCMeta):
         finals["inputs"] = list(set(finals["inputs"]))
         flag = FinalFlag(finals, self.flag_name, configuration=self.configuration, rulename=self.final_rule)
         self.add_node(flag)
-        self.add_edges_from([(node, flag) for node in nodes])
+        try:
+            self.add_edges_from([(node, flag) for node in nodes])
+        except ValueError as exc:
+            raise ValueError((self.flag_name, exc))
         # assert flag in self.nodes
 
     @property
@@ -940,5 +943,15 @@ class EIWrapper(EIWorfkflow, metaclass=abc.ABCMeta):
         preds = nx.ancestors(self.graph, flag)
         for edge in self.edges:
             if edge[0] == flag and edge[1] not in preds:
-                if flag.output[key] not in edge[1].input.values():
+                found = False
+                for val in edge[1].input.values():
+                    if not isinstance(val, str):
+                        found = (flag.output[key] in val)
+                    else:
+                        found = (flag.output[key] == val)
+                    if found:
+                        break
+                if found:
+                    continue
+                else:
                     edge[1].input[flag_name] = flag.output[key]

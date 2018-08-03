@@ -1,4 +1,5 @@
 from .abstract import IndexBuilder, ShortAligner, ShortWrapper, LongWrapper, LongAligner, IndexLinker
+from ...abstract import AtomicOperation
 import os
 import itertools
 import functools
@@ -39,14 +40,24 @@ class GsnapWrapper(ShortWrapper):
             # Optionally build the reference splice catalogue
             gsnap_runs = []
             indexer = self.indexer(self.configuration, self.outdir)
-            self.add_node(indexer)
+            # self.add_node(indexer)
+            self.add_edge(prepare_wrapper, indexer)
+            if indexer.transcriptome is not None:
+                iit = GsnapIntronsIIT(indexer)
+                self.add_edge(indexer, iit)
+            else:
+                iit = None
+
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
                 gsnap_run = GsnapAligner(indexer=indexer,
                                          sample=sample,
-                                         run=run)
+                                         run=run, iit=iit)
                 self.add_to_bams(gsnap_run)
                 gsnap_runs.append(gsnap_run)
+
             self.add_edges_from([(indexer, run) for run in gsnap_runs])
+            if iit:
+                self.add_edges_from([(iit, run) for run in gsnap_runs])
 
     @property
     def indexer(self):
@@ -175,18 +186,57 @@ class GmapLink(IndexLinker):
         return self.dbname
 
 
+class GsnapIntronsIIT(AtomicOperation):
+
+    def __init__(self, indexer: [GmapIndex, GmapLink]):
+
+        super().__init__()
+        self.indexer = indexer
+        self.configuration = indexer.configuration
+        if self.transcriptome is None:
+            return
+        self.input = indexer.output
+        self.input["transcriptome"] = self.transcriptome
+        self.output = {"iit": os.path.join(self.outdir, "introns.iit")}
+
+    @property
+    def outdir(self):
+        return os.path.join(self.indexer.outdir,
+                            self.indexer.index,
+                            "{}.maps".format(self.indexer.index))
+
+    @property
+    def loader(self):
+        return ["gmap"]
+
+    @property
+    def rulename(self):
+        return "gmap_introns_iit"
+
+    @property
+    def cmd(self):
+        load, input, output = self.load, self.input, self.output
+
+        cmd = "{load} "
+        cmd += "cat {input[transcriptome]} | gtf_splicesites | iit_store -o {output[iit]}"
+        cmd = cmd.format(**locals())
+        return cmd
+
+
 class GsnapAligner(ShortAligner):
     # infiles = lambda wildcards: tophatInput(wildcards.sample)  # Can use tophat function safely here
 
     def __init__(self,
                  indexer,
                  sample,
-                 run):
+                 run,
+                 iit: [None, GsnapIntronsIIT]):
 
         super().__init__(indexer=indexer, sample=sample, run=run)
         self.output["link"] = self.link
         self.output["bam"] = os.path.join(self.bamdir, "gsnap.bam")
-        # self.index = indexer.index
+        if iit is not None:
+            self.input["iit"] = iit.output["iit"]
 
     @property
     def compression_option(self):
@@ -224,6 +274,9 @@ class GsnapAligner(ShortAligner):
         bamdir = self.bamdir
         log = self.log
         compression = self.compression
+        if "iit" in self.input:
+            base = os.path.basename(self.input["iit"])
+            cmd += " -s {base} "
         cmd += " {compression} --localsplicedist={max_intron} --nthreads={threads} --format=sam --npaths=20 "
         infiles = self.input_reads
         cmd += " {infiles} 2> {log}"
@@ -259,12 +312,52 @@ class GsnapAligner(ShortAligner):
             return ""
 
 
+class GmapExonsIIT(AtomicOperation):
+
+    def __init__(self, indexer: [GmapIndex, GmapLink]):
+
+        super().__init__()
+        self.indexer = indexer
+        self.configuration = indexer.configuration
+        if self.transcriptome is None:
+            return
+        self.input = indexer.output
+        self.input["transcriptome"] = self.transcriptome
+        self.output = {"iit": os.path.join(self.outdir, "exons.iit")}
+
+    @property
+    def outdir(self):
+        return os.path.join(self.indexer.outdir,
+                            self.indexer.index,
+                            "{}.maps".format(self.indexer.index))
+
+    @property
+    def loader(self):
+        return ["gmap"]
+
+    @property
+    def rulename(self):
+        return "gmap_exons_iit"
+
+    @property
+    def cmd(self):
+        load, input, output = self.load, self.input, self.output
+        cmd = "{load} "
+        cmd += "cat {input[transcriptome]} | gtf_genes | iit_store -o {output[iit]}"
+        cmd = cmd.format(**locals())
+        return cmd
+
+
 class GmapLongReads(LongAligner):
 
-    def __init__(self, indexer: GmapIndex, sample, run):
+    def __init__(self, indexer: GmapIndex, sample, run,
+                 iit: [None, GmapExonsIIT]):
 
         super().__init__(indexer=indexer,
                          sample=sample, run=run)
+
+        if iit is not None:
+            self.input.update(iit.output)
 
         self.output = {
             "link": self.link,
@@ -302,6 +395,9 @@ class GmapLongReads(LongAligner):
 
         cmd = "{load} $(determine_gmap.py {genome}) --dir={index} --db {dbname} "
         cmd += " --min-intronlength={min_intron} {max_intron} "
+        if "iit" in self.input:
+            base = os.path.basename(self.input["iit"])
+            cmd += " -m {base} "
         input, output, log = self.input, self.output, self.log
         coverage, identity, cross, strand = self.coverage, self.identity, self.cross_species, self.strand
         cmd += " {coverage} {identity} {cross} {strand}"
@@ -366,13 +462,21 @@ class GmapLongWrapper(LongWrapper):
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
             indexer = self.indexer(self.configuration, self.outdir)
-            self.add_node(indexer)
+            self.add_edge(prepare_wrapper, indexer)
+            if indexer.transcriptome is not None:
+                iit = GmapExonsIIT(indexer)
+                self.add_edge(indexer, iit)
+            else:
+                iit = None
             # Optionally build the reference splice catalogue
             gmap_runs = []
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                gmap_run = GmapLongReads(indexer=indexer, sample=sample, run=run)
+                gmap_run = GmapLongReads(indexer=indexer, sample=sample, run=run,
+                                         iit=iit)
                 gmap_runs.append(gmap_run)
                 self.add_edge(indexer, gmap_run)
+                if iit:
+                    self.add_edge(iit, gmap_run)
                 self.add_to_gfs(gmap_run)
 
     __toolname__ = "gmap"

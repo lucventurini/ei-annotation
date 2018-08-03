@@ -2,7 +2,7 @@ import abc
 from ...abstract import ShortSample, LongSample, AtomicOperation, EIWrapper
 import os
 from .bam import BamIndex, BamSort, BamStats
-import glob
+import networkx as nx
 
 
 class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
@@ -21,7 +21,7 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
         self.configuration = configuration
         self.input = {"genome": self.genome}
         if self.transcriptome is not None:
-            self.input["transcriptome"] = os.path.abspath(self.transcriptome)
+            self.input["transcriptome"] = self.transcriptome
         self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
         self.__threads = 1
 
@@ -227,10 +227,6 @@ class ShortAligner(AtomicOperation, metaclass=abc.ABCMeta):
             raise TypeError(self.configuration["programs"][self.toolname])
 
     @property
-    def ref_transcriptome(self):
-        return self.configuration.get("reference", dict()).get("transcriptome", "")
-
-    @property
     def index(self):
         return self.indexer.index
 
@@ -388,7 +384,8 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
 
     def finalise(self):
 
-        if self.__finalised:
+        if self.__finalised or len(self.bams) == 0:
+            self.__finalised = True
             return
         new_bams = set()
 
@@ -402,7 +399,6 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
             new_bams.add(stater)
             self.__stats.append(stater)
         self.__bam_rules = new_bams
-        self.__add_flag_to_inputs()
         self.add_final_flag()
         self.__finalised = True
 
@@ -435,12 +431,15 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
     def runs(self):
         return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
 
-    def __add_flag_to_inputs(self):
-        for rule in self.nodes:
-            if rule == self.__prepare_wrapper.exit:
-                continue
-            rule.input["prepare_flag"] = self.__prepare_wrapper.exit.output["flag"]
-            self.add_edge(self.__prepare_wrapper.exit, rule)
+    # def __add_flag_to_inputs(self):
+    #     preds = nx.ancestors(self.graph, flag)
+    #     for rule in self.nodes:
+    #         if rule == self.__prepare_wrapper.exit:
+    #             continue
+    #         elif
+    #
+    #         rule.input["prepare_flag"] = self.__prepare_wrapper.exit.output["flag"]
+    #         self.add_edge(self.__prepare_wrapper.exit, rule)
 
     @property
     @abc.abstractmethod

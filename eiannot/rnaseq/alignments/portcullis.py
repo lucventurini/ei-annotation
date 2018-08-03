@@ -160,7 +160,7 @@ class PortcullisPrepRef(AtomicOperation):
     def __init__(self, configuration, outdir):
         super().__init__()
         self.configuration = configuration
-        self.input = {"reference": self.configuration["reference"].get("ref_transcriptome", "")}
+        self.input = {"reference": self.transcriptome}
         if not self.input["reference"]:
             self.output = {"refbed": ""}
             return
@@ -183,7 +183,7 @@ class PortcullisPrepRef(AtomicOperation):
         cmd = "{load}"
         input = self.input
         output = self.output
-        cmd += "junctools convert -if gtf -of ebed {input[reference]} > {output[refbed]}"
+        cmd += "junctools convert -if gtf -of ebed -o {output[refbed]} {input[reference]}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -296,11 +296,11 @@ class PortcullisFilter(AtomicOperation):
         cmd += " (portcullis filter -o {outdir} --canonical={canonical} "
         max_intron = self.max_intron
         if "refbed" in self.input:
-            trans = "--reference {input[refbed]}"
+            cmd += " --reference {input[refbed]} "
         else:
-            trans = ""
+            cmd += " "
         prepdir = os.path.join(self.sample_dir, "1-prep").format(alrun=self.alrun)
-        cmd += " --max_length={max_intron} {trans} --threads={threads} {prepdir} "
+        cmd += " --max_length={max_intron} --threads={threads} {prepdir} "
         input = self.input
         log = self.log
         cmd += " {input[tab]} > {log} 2>&1"

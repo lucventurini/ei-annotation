@@ -13,7 +13,7 @@ class MikadoSerialise(MikadoOp):
                  prepare: MikadoPrepare,
                  homology: MikadoHomologyWrapper,
                  orfs: OrfCaller,
-                 faidx: FaidxGenome,
+                 # faidx: FaidxGenome,
                  portcullis: PortcullisWrapper):
 
         super().__init__(is_long=prepare.is_long)
@@ -27,7 +27,7 @@ class MikadoSerialise(MikadoOp):
             self.input.update(self.homology.output)
         if self.portcullis:
             self.input.update(self.portcullis.output)
-        self.input.update(faidx.output)
+        # self.input.update(faidx.output)
         self.input["cfg"] = prepare.config
         self.configuration = prepare.configuration
         self.outdir = prepare.outdir
@@ -89,8 +89,9 @@ class MikadoSerialise(MikadoOp):
         junctions = self.junctions
         input = self.input
         orfs = self.orfs_cli
+        fai = self.genome + ".fai"
         cmd += "mikado serialise {blast_xmls} {blast_targets} {junctions} {orfs} --transcripts={input[fa]} "
-        cmd += "--genome_fai={input[fai]} --json-conf={input[cfg]} --force --start-method=spawn "
+        cmd += "--genome_fai={fai} --json-conf={input[cfg]} --force --start-method=spawn "
         outdir = self.outdir
         threads = self.threads
         log = self.log
