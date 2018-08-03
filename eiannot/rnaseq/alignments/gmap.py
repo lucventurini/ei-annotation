@@ -463,7 +463,7 @@ class GmapLongWrapper(LongWrapper):
             # Start creating the parameters necessary for the run
             indexer = self.indexer(self.configuration, self.outdir)
             self.add_edge(prepare_wrapper, indexer)
-            if indexer.transcriptome is not None:
+            if self._use_iit and indexer.transcriptome is not None:
                 iit = GmapExonsIIT(indexer)
                 self.add_edge(indexer, iit)
             else:
@@ -487,3 +487,7 @@ class GmapLongWrapper(LongWrapper):
             return GmapLink
         else:
             return GmapIndex
+
+    @property
+    def _use_iit(self):
+        return self.configuration['programs'].get('gmap', {}).get('use_iit', False)

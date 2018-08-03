@@ -1,6 +1,6 @@
 from .abstract import ShortAssembler, ShortAssemblerWrapper
 from ...abstract import AtomicOperation, ShortSample
-from ..alignments.gmap import GmapIndex, GmapLink, gmap_intron_lengths
+from ..alignments.gmap import GmapIndex, GmapLink, GmapExonsIIT, gmap_intron_lengths
 import functools
 import subprocess as sp
 import re
@@ -30,12 +30,20 @@ class TrinityGGWrapper(ShortAssemblerWrapper):
 
         if len(self.runs) > 0 and len(self.bams) > 0:
             indexer = None
+            iit = None
+            has_transcriptome = (aln_wrapper.exit.transcriptome is not None and self._use_iit)
             for node in aln_wrapper:
                 if isinstance(node, (GmapIndex, GmapLink)):
                     indexer = node
+                elif has_transcriptome and isinstance(node, GmapExonsIIT):
+                    iit = node
+                if indexer and (not has_transcriptome or (iit and has_transcriptome)):
                     break
+
             if indexer is None:
                 indexer = GmapIndex(aln_wrapper.configuration, self.outdir)
+            if iit is None and has_transcriptome:
+                iit = GmapExonsIIT(indexer)
 
             trinities = []
             mappers = []
@@ -43,11 +51,15 @@ class TrinityGGWrapper(ShortAssemblerWrapper):
             for bam, run in itertools.product(self.bams, range(len(self.runs))):
                 trinity = TrinityGG(bam, run)
                 trinities.append(trinity)
-                mapper = TrinityGmap(trinity, indexer)
+                mapper = TrinityGmap(trinity, indexer, iit=iit)
                 self.add_edge(trinity, mapper)
                 self.add_edge(indexer, mapper)
                 mappers.append(mapper)
                 self.add_to_gf(mapper)
+
+    @property
+    def _use_iit(self):
+        return self.configuration['programs'].get('gmap', {}).get('use_iit', False)
 
 
 class TrinityGG(ShortAssembler):
@@ -153,11 +165,13 @@ class TrinityGmap(ShortAssembler):
 
     __toolname__ = "trinity"
 
-    def __init__(self, trinitygg: TrinityGG, index: GmapIndex):
+    def __init__(self, trinitygg: TrinityGG, index: GmapIndex, iit=None [None|GmapExonsIIT]):
 
         super().__init__(bam=trinitygg, run=trinitygg.run)
         self.input['transcripts'] = trinitygg.output["transcripts"]
         self.input["fai"] = index.input["fai"]
+        if iit is not None:
+            self.input["iit"] = iit.output['iit']
         self.input.update(index.output)
         self.message = "Mapping trinity transcripts to the genome: {input[transcripts]}".format(
             input=self.input
@@ -218,6 +232,9 @@ class TrinityGmap(ShortAssembler):
         genome = self.genome
         cmd += "$(determine_gmap.py {genome}) --dir={index_dir} {strand} --db {db} --min-intronlength={min_intron} "
         cmd += "{max_intron} "
+        if self.input.get('iit', None):
+            base = os.path.basename(self.input['iit'])
+            cmd += " -m {base} "
         identity = self.identity
         coverage = self.coverage
         paths = self.paths
