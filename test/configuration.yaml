@@ -73,12 +73,13 @@ programs:
     load: 'export BLASTDB=/Users/venturil/FLNDBs/'
     execute: true  # unused as of yet
     taxon: "plants"
-    dbs: "tpn"
+    dbs: "p"
 outdir: "Eiannot"  # "eitest" 
 name: "eitest"
 mikado_homology:
   prot_dbs: &prot_db
-  - "subset.sprot.fasta"
+  - "uniprot_sprot_plants.fasta"
+  - "chr5.pep.fasta"
   execute: true
   program: 'diamond'
   chunks: 2
@@ -87,10 +88,10 @@ mikado_homology:
 homology:
   prot_dbs:
     sprot:
-      fastas: ["subset.sprot.fasta", "subset2.sprot.fasta"]
+      fastas: ["subset.sprot.fasta", "subset3.sprot.fasta"]
       coverage: 80
     sprot2:
-      fastas: ["subset3.sprot.fasta"]
+      fastas: ["subset2.sprot.fasta"]
       identity: 70
       coverage: 90
   protein_chunks: 1

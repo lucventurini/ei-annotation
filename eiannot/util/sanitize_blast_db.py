@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import Bio.SeqIO
+import Bio.Seq
 import sys
 import argparse
 from collections import Counter
@@ -43,6 +44,8 @@ def main():
 
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("-o", "--out", default=sys.stdout, type=argparse.FileType("wt"))
+    parser.add_argument("-cstop", "--correct-stops", default=False, action="store_true",
+                        help="Transform plain '.' characters into '*' in protein sequences.")
     parser.add_argument("fasta", nargs="+", type=argparse.FileType("rt"))
     args = parser.parse_args()
 
@@ -62,6 +65,9 @@ def main():
                     found_ids[record.id], "s" if found_ids[record.id] > 1 else ""))
             record.id = "{}{}".format(prefix, re.sub("\|", "_", record.id))
             record.description = ""
+            if '.' in record.seq:
+                record.seq = Bio.Seq.Seq(re.sub('\.', '*', str(record.seq)))
+
             Bio.SeqIO.write(record, args.out, "fasta")
 
     args.out.close()

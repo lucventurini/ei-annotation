@@ -176,7 +176,7 @@ class SanitizeProteinBlastDB(AtomicOperation):
                                "{}.temp".format(os.path.basename(output["db"])))
 
         # We have to use a temporary file because otherwise gt will pollute the folder
-        cmd = "{load} sanitize_blast_db.py {dbs} 2> {log} > {out_tmp} && "
+        cmd = "{load} sanitize_blast_db.py -cstop {dbs} 2> {log} > {out_tmp} && "
         cmd += " gt seqtransform -addstopaminos -width 60 {out_tmp} > {output[db]} 2> {log} && "
         cmd += " rm {out_tmp}*"
         cmd = cmd.format(**locals())
@@ -302,5 +302,5 @@ class BlastxIndex(AtomicOperation):
         load = self.load
         db = os.path.splitext(self.output["db"])[0]
         log, input = self.log, self.input
-        cmd = "{load} makeblastb -in {input[db]} -out {db} -dbtype prot -parse_seqids > {log} 2>&1".format(**locals())
+        cmd = "{load} makeblastdb -in {input[db]} -out {db} -dbtype prot -parse_seqids > {log} 2>&1".format(**locals())
         return cmd

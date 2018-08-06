@@ -2,7 +2,8 @@ from ..abstract import EIWrapper, AtomicOperation
 from ..rnaseq.mikado.pick import MikadoStats
 from ..rnaseq.mikado import Mikado
 from ..rnaseq.mikado.abstract import MikadoOp
-from ..repeats.__init__ import RepeatMasking
+from ..preparation import SanitizeProteinBlastDB, BlastxIndex
+# from ..repeats.__init__ import RepeatMasking
 import os
 import abc
 import functools
@@ -19,14 +20,24 @@ class FlnWrapper(EIWrapper):
         if mikado.stats:
             # Start extracting the data ...
             self.configuration = mikado.configuration
+            if self.dbs:
+                self.sanitizer = SanitizeProteinBlastDB(self.configuration, dbs=self.dbs)
+                self.blast_index = BlastxIndex(self.sanitizer)
+                self.add_edge(self.sanitizer, self.blast_index)
+            else:
+                self.blast_index = None
             sequence_extractor = MikadoSequenceExtractor(mikado.stats)
             self.add_edge(mikado, sequence_extractor)
             indexer = MikadoSequenceIndexer(sequence_extractor)
             self.add_edge(sequence_extractor, indexer)
             splitter = SplitMikadoFasta(indexer)
             self.add_edge(indexer, splitter)
-            fln_chunks = [FLN(splitter, chunk) for chunk in range(1, splitter.chunks + 1)]
+            fln_chunks = [FLN(splitter, chunk, self.blast_index) for chunk in range(1, splitter.chunks + 1)]
+
             self.add_edges_from([(splitter, chunk) for chunk in fln_chunks])
+            if self.blast_index:
+                self.add_edges_from([(self.blast_index, chunk) for chunk in fln_chunks])
+
             concat = ConcatenateFLN(fln_chunks)
             self.add_edges_from([(chunk, concat) for chunk in fln_chunks])
             convert_mikado = ConvertMikadoToBed12(mikado.stats)
@@ -50,6 +61,10 @@ class FlnWrapper(EIWrapper):
     @property
     def flag_name(self):
         return os.path.join(self.categories["Gold"].outdir, "fln.done")
+
+    @property
+    def dbs(self):
+        return self.configuration["mikado_homology"]["prot_dbs"]
 
 
 class FLNOp(AtomicOperation, metaclass=abc.ABCMeta):
@@ -212,22 +227,27 @@ class SplitMikadoFasta(FLNOp):
 @functools.lru_cache(typed=True, maxsize=4)
 def get_fln_version(loader):
 
-    return False
+    return True
 
 
 class FLN(FLNOp):
 
-    def __init__(self, mikado_split: SplitMikadoFasta, chunk):
+    def __init__(self,
+                 mikado_split: SplitMikadoFasta,
+                 chunk,
+                 blastx_index: BlastxIndex=None):
 
         super().__init__(mikado_split)
         self.__chunk = None
         self.__split = mikado_split
         self.chunk = chunk
         # self.input["fasta_chunk"] = self.fasta_chunk
-        self.output = {"dbannotated": os.path.join(self.outdir, "fln_results", "dbannotated.txt"),
+        self.output = {"dbannotated": os.path.join(self.outdir, "fln_results", "pt_seqs"),
                        "flag": os.path.join(self.outdir, "fln.done")}
         self.touch = False
         self.log = os.path.join(self.outdir, "fln.log")
+        if blastx_index is not None:
+            self.input["fln_user"] = blastx_index.output["db"]
 
     @property
     def chunk(self):
@@ -242,6 +262,15 @@ class FLN(FLNOp):
                 not in self.input["chunks"]):
             raise ValueError("{} not found among inputs!")
         self.__chunk = chunk
+
+    @property
+    def user_db(self):
+        if self.input.get("fln_user", None):
+            prefix = os.path.splitext(self.input.get("fln_user", None))[0]
+            loc = os.path.relpath(prefix, start=self.outdir)
+            return " -u {loc} ".format(**locals())
+        else:
+            return " "
 
     @property
     def fasta_chunk(self):
@@ -273,10 +302,11 @@ class FLN(FLNOp):
         flag = os.path.basename(self.output["flag"])
 
         dbs = "-a {dbs}".format(**locals()) if get_fln_version(self.load) else ""
+        user_db = self.user_db
 
         cmd = "{load} mkdir -p {outdir} && cd {outdir} &&"
         cmd += " if [[ ! -e chunk.fasta ]]; then ln -s {fasta_link_src} chunk.fasta; fi && "
-        cmd += "full_lengther_next -w {threads} --taxon_group={taxon} {dbs} -f chunk.fasta 2>&1 > {log}"
+        cmd += "full_lengther_next {user_db} -w {threads} --taxon_group={taxon} {dbs} -f chunk.fasta 2>&1 > {log}"
         cmd += " && [[ -s {db_verify} ]] && touch {flag}"
         cmd = cmd.format(**locals())
         return cmd
