@@ -22,11 +22,13 @@ class MikadoSerialise(MikadoOp):
         self.orfs = orfs
         self.portcullis = portcullis
         if self.orfs:
-            self.input.update(self.orfs.output)
+            self.input["orfs"] = self.orfs.output["orfs"]
         if homology:
-            self.input.update(self.homology.output)
+            for key, val in self.homology.output.items():
+                self.input["homology_{key}".format(key=key)] = val
         if self.portcullis:
-            self.input.update(self.portcullis.output)
+            for key, val in self.portcullis.output.items():
+                self.input["portcullis_{key}".format(key=key)] = val
         # self.input.update(faidx.output)
         self.input["cfg"] = prepare.config
         self.configuration = prepare.configuration
