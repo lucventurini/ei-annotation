@@ -42,9 +42,9 @@ class RetrieveLibraries(AtomicOperation):
     @property
     def order(self):
         if self.configuration["repeats"]["species"]:
-            return " -species {species}".format(species=self.configuration["repeats"]["species"])
+            return " -species \"{species}\" ".format(species=self.configuration["repeats"]["species"])
         elif self.configuration["repeats"]["clade"]:
-            return " -clade {clade}".format(clade=self.configuration["repeats"]["clade"])
+            return " -clade \"{clade}\" ".format(clade=self.configuration["repeats"]["clade"])
 
     @property
     def outdir(self):
