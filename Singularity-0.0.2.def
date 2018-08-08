@@ -1,0 +1,303 @@
+BootStrap: yum
+OSVersion: 7
+MirrorURL: http://yum-repos.hpccluster/centos/7/os/$basearch/
+Include: yum wget
+
+# If you want the updates (available at the bootstrap date) to be installed
+# inside the container during the bootstrap instead of the General Availability
+# point release (7.x) then uncomment the following line
+
+UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
+
+%test
+    python3.6 --version
+    pip3.6 --version
+    gcc --version
+    make --version
+
+%post
+    mkdir /jic
+    mkdir /nbi
+    mkdir /tgac
+    mkdir /ei
+    mkdir /tsl
+    mkdir /opt/software
+
+    ### Install your packages ###
+    cd /opt/software/
+    yum -y install yum-utils which
+    yum -y groupinstall development
+    yum -y install https://centos7.iuscommunity.org/ius-release.rpm
+    yum -y install python36u python36u-devel
+    yum -y install zlib autoconf automake libtool pthreads tar curl cmake3 git
+    cmake3 --version
+    yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel
+    yum -y install lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel
+
+    yum -y install centos-release-scl
+    yum -y install scl-utils
+    yum -y install devtoolset-7-gcc*
+    scl enable devtoolset-7 bash
+    which gcc
+    gcc --version
+    mkdir -p /etc/profile.d/
+    echo -e '#!/bin/bash\nsource scl_source enable devtoolset-7' > /etc/profile.d/enablegcc7.sh
+
+    python3.6 --version
+    cd $(dirname $(which python3.6))
+    ln -s python3.6 python3
+    cd /opt/software/
+
+    curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+    python3.6 get-pip.py
+
+    pip3.6 --version
+    gcc --version
+    make --version
+
+    ### Samtools
+    wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
+    tar xaf samtools-1.9.tar.bz2
+    cd samtools-1.*    # and similarly for bcftools and htslib
+    ./configure
+    make -j 20
+    make install
+    samtools --help
+    cd ../
+
+    # HTSLib
+    wget https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
+    tar xaf htslib-1.9.tar.bz2
+    cd htslib-1.9
+    ./configure
+    make -j 20
+    make install
+    htsfile --help
+    # tabix
+    cd /opt/software/
+
+    # BCFTools
+    wget https://github.com/samtools/bcftools/releases/download/1.9/bcftools-1.9.tar.bz2
+    tar xaf bcftools-1.9.tar.bz2
+    cd bcftools-1.9
+    ./configure
+    make -j 20
+    make install
+    bcftools --help
+    cd /opt/software/
+
+    # BAMtools
+    wget https://github.com/pezmaster31/bamtools/archive/v2.5.1.tar.gz -O bamtools-v2.5.1.tar.gz
+    tar xaf bamtools-v2.5.1.tar.gz
+    cd bamtools-2.5.1
+    mkdir build
+    cd build
+    cmake3 ../
+    make -j 20
+    make install
+    bamtools --help
+    cd /opt/software/
+
+    # Kallisto
+    wget https://github.com/pachterlab/kallisto/releases/download/v0.44.0/kallisto_linux-v0.44.0.tar.gz
+    tar xaf kallisto_linux-v0.44.0.tar.gz
+    mv kallisto_linux-v0.44.0/kallisto -t /usr/local/bin
+    kallisto version
+
+    # Boost
+    echo "Installing boost"
+    wget -q http://sourceforge.net/projects/boost/files/boost/1.59.0/boost_1_59_0.tar.gz/download
+    mv download boost.tar.gz
+    tar -xf boost.tar.gz
+    cd boost_1_59_0
+    ./bootstrap.sh --with-libraries=chrono,timer,program_options,filesystem,system,graph,graph_parallel,iostreams,thread,math
+    ./b2 -d0 -j20 install;
+    cd /opt/software/
+
+    # Augustus
+    export TOOLDIR=$(dirname $(which samtools))
+    wget http://bioinf.uni-greifswald.de/augustus/binaries/augustus-3.3.1.tar.gz
+    tar xaf augustus-3.3.1.tar.gz
+    cd augustus-3.3.1
+    sed -i 's/#.*COMPGENEPRED = true/COMPGENEPRED = true/; s/# SQLITE = true/SQLITE = true/; s/# ZIPINPUT = true/ZIPINPUT = true/' common.mk
+    make -j 20
+    make install
+    augustus --help
+    cd /opt/software/
+
+    # echo "Installing Portcullis"
+    git clone --recursive https://github.com/maplesond/portcullis.git
+    pip3.6 install --prefix=/usr/local/ pandas
+    cd portcullis
+    sed -i 's/b2 /b2 -j 20 /' build_boost.sh
+    ./build_boost.sh
+    ./autogen.sh
+    ./configure
+    make V=1 -j 20
+    make V=1 check -j 20
+    make install
+    cat tests/test-suite.log
+    portcullis --help
+    cd /opt/software/
+
+    # CLASS 2
+    cd /opt/software/
+    wget https://downloads.sourceforge.net/project/splicebox/CLASS-2.1.7.tar.gz
+    tar xaf CLASS-2.1.7.tar.gz
+    cd CLASS-2.1.7;
+    bash build.sh
+    make
+    mv class junc clnb grader addXS -t /usr/local/bin/
+    cd /opt/software/
+
+    # Stringtie binaries
+    wget http://ccb.jhu.edu/software/stringtie/dl/stringtie-1.3.4d.Linux_x86_64.tar.gz
+    tar xaf stringtie-1.3.4d.Linux_x86_64.tar.gz
+    cd stringtie-1.3.4d.Linux_x86_64
+    mv stringtie -t /usr/local/bin/
+    stringtie -h
+    cd /opt/software/
+
+    # Scallop
+    wget https://github.com/Kingsford-Group/scallop/releases/download/v0.10.2/scallop-0.10.2_linux_x86_64.tar.gz
+    tar xaf scallop-0.10.2_linux_x86_64.tar.gz
+    cd scallop-0.10.2_linux_x86_64
+    mv scallop -t /usr/local/bin/
+    scallop --help
+    cd /opt/software/
+
+    # Strawberry
+    git clone --recursive https://github.com/ruolin/strawberry.git
+    cd strawberry
+    git checkout 0.9.3
+    mkdir build
+    cmake3 -E chdir build/ cmake3 -G "Unix Makefiles" cmake -DCMAKE_BUILD_TYPE=Release ../
+    cd build/
+    make
+    make install
+    strawberry --help
+    cd /opt/software/
+
+    # HISAT2
+    wget ftp://ftp.ccb.jhu.edu/pub/infphilo/hisat2/downloads/hisat2-2.1.0-Linux_x86_64.zip
+    unzip hisat2-2.1.0-Linux_x86_64.zip
+    cd hisat2-2.1.0
+    for file in $(ls | egrep -v "(AUTHOR|LICENSE|MANUAL.*|NEWS|TUTORIAL|VERSION|doc|example|scripts|hisatgenotype_modules|hisatgenotype_scripts)"); do
+    	mv $file -t /usr/local/bin/;
+    done
+    hisat2 --help
+    cd /opt/software/
+
+    # STAR
+    wget https://github.com/alexdobin/STAR/archive/2.6.0c.tar.gz -O star-2.6.0c.tar.gz
+    tar xaf star-2.6.0c.tar.gz
+    mv STAR-2.6.0c/bin/Linux_x86_64_static/STAR -t /usr/local/bin/
+    mv STAR-2.6.0c/bin/Linux_x86_64_static/STARlong -t /usr/local/bin/
+    STAR --help
+    STARlong --help
+
+    # GMAP
+    wget http://research-pub.gene.com/gmap/src/gmap-gsnap-2018-07-04.tar.gz
+    tar xaf gmap-gsnap-2018-07-04.tar.gz
+    cd gmap-2018-07-04
+    ./configure
+    make -j 20
+    make install
+    gmap --help
+    gsnap --help
+    cd /opt/software/
+
+    # MiniMap2
+    wget https://github.com/lh3/minimap2/releases/download/v2.12/minimap2-2.12_x64-linux.tar.bz2
+    tar xaf minimap2-2.12_x64-linux.tar.bz2
+    cd minimap2-2.12_x64-linux
+    mv k8 minimap2 paftools.js -t /usr/local/bin/
+    minimap2 --help
+    cd /opt/software/
+
+    # Now install mikado
+    pip3.6 install --prefix=/usr/local/ cython pandas jupyter
+    pip3.6 install --prefix=/usr/local/ sphinx
+    pip3.6 install --prefix=/usr/local/ mikado==1.2.4
+    mikado --help
+
+    # Finally install EiAnnot
+    git clone --recursive https://github.com/lucventurini/ei-annotation.git
+    cd ei-annotation;
+    git checkout 0.0.2;
+    cd eicore;
+    python3 setup.py bdist_wheel;
+    pip3.6 install --prefix=/usr/local/ -U dist/*whl;
+    cd ../;
+    python3 setup.py bdist_wheel;
+    pip install --prefix=/usr/local/ -U dist/*whl;
+    cd /opt/software/
+
+%apprun snakemake
+	snakemake "@"
+
+%apprun hisat2-build
+	hisat2-build "@"
+
+%apprun jupyter
+	jupyter "@"
+
+%apprun gmap-build
+	gmap-build "@"
+
+%apprun gmap
+	gmap "@"
+
+%apprun gsnap
+	gsnap "@"
+
+%apprun mikado
+	mikado "@"
+
+%apprun samtools
+	samtools "@"
+
+%apprun portcullis
+	portcullis "@"
+
+%apprun junctools
+	junctools "@"
+
+%apprun stringtie
+	stringtie "@"
+
+%apprun class
+	class "@"
+
+%apprun hisat2
+	hisat2 "@"
+
+%apprun augustus
+        augustus "@"
+
+%apprun paftools
+	k8 $(which paftools.js) "@"
+
+%apprun k8
+	k8 "@"
+
+%apprun eiannot
+	eiannot "@"
+
+%apprun strawberry
+	strawberry "@"
+
+%apprun class
+	class "@"
+
+%apprun scallop
+	scallop "@"
+
+%apprun ruby
+	ruby "@"
+
+%apprun STAR
+	STAR "@"
+
+%apprun STARlong
+	STARlong "@"
