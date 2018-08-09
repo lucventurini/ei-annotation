@@ -64,6 +64,7 @@ def remove_genes_with_overlaps(training_candidates: pd.DataFrame,
         found.remove(gid)
         if len(found) > 0:
             to_remove.add(gid)
+
     training_candidates = training_candidates[~
                               training_candidates[training_candidates.columns[0]].isin(to_remove)]
     return training_candidates
@@ -88,7 +89,7 @@ def main():
     parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
     parser.add_argument("fln")
     parser.add_argument("mikado")
-    parser.add_argument("out")
+    parser.add_argument("out_prefix")
     args = parser.parse_args()
 
     args.flank = abs(args.flank)
@@ -155,10 +156,28 @@ def main():
         merged["Category"] = pd.Series()
 
     # Now write out the CSVs ...
-    merged.to_csv(args.out + ".table.txt", sep="\t", index=False, header=True)
+    merged.to_csv(args.out_prefix + ".table.txt", sep="\t", index=False, header=True)
     merged[[merged.columns[0], "parent", "Training", "Category"]].to_csv(
-        args.out + ".list.txt", sep="\t", index=False, header=True
+        args.out_prefix + ".list.txt", sep="\t", index=False, header=True
     )
+
+    # Now write out the GFFs
+
+    with open("{args.out}.training.gff3".format(**locals()), "wt") as training:
+        print("##gff-version\t3", file=training)
+        for gene in merged[merged.Training == True].parent.astype(str):
+            gene = genes[gene]
+            assert isinstance(gene, Mikado.loci.Gene)
+            print(gene.format("gff3"), file=training)
+
+    for category in ("Gold", "Silver", "Bronze"):
+        with open("{args.out}.{category}.gff3".format(**locals()), "wt") as out_gff:
+            print("##gff-version\t3", file=out_gff)
+            for gene in merged[merged.Category == category].parent.astype(str):
+                gene = genes[gene]
+                assert isinstance(gene, Mikado.loci.Gene)
+                print(gene.format("gff3"), file=out_gff)
+
     return
 
 
