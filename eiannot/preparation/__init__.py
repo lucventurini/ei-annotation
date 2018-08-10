@@ -66,7 +66,7 @@ class SanitizeGenome(AtomicOperation):
         input, output = self.input, self.output
         log = self.log
 
-        cmd = "{load} sanitize_blast_db.py -o {output[genome]} {input[genome]} 2> {log} > {log}"
+        cmd = "{load} sanitize_sequence_db.py -o {output[genome]} {input[genome]} 2> {log} > {log}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -176,7 +176,7 @@ class SanitizeProteinBlastDB(AtomicOperation):
                                "{}.temp".format(os.path.basename(output["db"])))
 
         # We have to use a temporary file because otherwise gt will pollute the folder
-        cmd = "{load} sanitize_blast_db.py -cstop {dbs} 2> {log} > {out_tmp} && "
+        cmd = "{load} sanitize_sequence_db.py -cstop {dbs} 2> {log} > {out_tmp} && "
         cmd += " gt seqtransform -addstopaminos -width 60 {out_tmp} > {output[db]} 2> {log} && "
         cmd += " rm {out_tmp}*"
         cmd = cmd.format(**locals())
