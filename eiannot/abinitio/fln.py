@@ -119,9 +119,11 @@ class SelfDiamondP(FLNOp):
         self.input = index.output
         self.input["query"] = index.input["db"]
         self.outdir = os.path.dirname(self.input["query"])
-        self.output["blast_txt"] = os.path.join(self.outdir,
-                                          os.path.splitext(os.path.basename(self.input["query"]))[0] + ".dmnd.txt")
+        self.output["blast_txt"] = os.path.join(
+            self.outdir,
+            os.path.splitext(os.path.basename(self.input["query"]))[0] + ".dmnd.txt")
         self.__loader = index.loader
+        self.log = os.path.join(self.outdir, "diamond_proteins.log")
 
     @property
     def fmt(self):
@@ -149,7 +151,7 @@ class SelfDiamondP(FLNOp):
 
     @property
     def _rulename(self):
-        return "self_diamond_index"
+        return "self_diamond_blastp"
 
 
 class MikadoSequenceExtractor(FLNOp):
