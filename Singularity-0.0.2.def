@@ -15,6 +15,9 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     gcc --version
     make --version
 
+    python3.6 -c "import numpy"
+
+
 %post
     mkdir /jic
     mkdir /nbi
@@ -215,10 +218,27 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     minimap2 --help
     cd /opt/software/
 
+    # GenomeTools
+    cd /opt/software/
+    wget https://github.com/genometools/genometools/archive/v1.5.10.tar.gz -O genometools-1.5.10.tar.gz
+    tar xaf genometools-1.5.10.tar.gz
+    cd genometools-1.5.10
+    make 64bit=yes opt=yes cairo=no errorcheck=yes useshared=no -j 20
+    make install
+    cd /opt/software/
+
+    # PrinSeq for cleaning up sequences
+    cd /usr/local/bin/
+    wget https://downloads.sourceforge.net/project/prinseq/standalone/prinseq-lite-0.20.4.tar.gz
+    tar xaf prinseq-lite-0.20.4.tar.gz
+    cd /opt/software/
+
     # Now install mikado
+    pip3.6 install -U numpy
     pip3.6 install --prefix=/usr/local/ cython pandas jupyter
     pip3.6 install --prefix=/usr/local/ sphinx
     pip3.6 install --prefix=/usr/local/ mikado==1.2.4
+    # pip3.6 install --prefix=/usr/local/ networkit==4.6  # High-performance networks in Python
     mikado --help
 
     # Finally install EiAnnot
@@ -232,6 +252,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     python3 setup.py bdist_wheel;
     pip install --prefix=/usr/local/ -U dist/*whl;
     cd /opt/software/
+
 
 %apprun snakemake
 	snakemake "@"
@@ -301,3 +322,15 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
 
 %apprun STARlong
 	STARlong "@"
+
+%apprun diamond
+    diamond "@"
+
+%apprun prinseq
+    /usr/local/bin/prinseq-lite-0.20.4/prinseq-lite.pl "@"
+
+%apprun prinseq-lite.pl
+    /usr/local/bin/prinseq-lite-0.20.4/prinseq-lite.pl "@"
+
+%apprun gt
+    gt "@"

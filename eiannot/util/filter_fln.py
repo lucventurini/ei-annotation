@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 
-import sys
-import os
+# import sys
+# import os
 import argparse
 import pandas as pd
 import Mikado
+import networkx as nx
+# import networkit as nk
 import itertools
 import sqlite3
 import collections
 import magic
 from Mikado.exceptions import CorruptIndex
 from functools import partial
+try:
+    import ujson as json
+except ImportError:
+    import json
 
 
 def build_pos_index(index_name):
@@ -27,17 +33,18 @@ def build_pos_index(index_name):
         tables = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
         if sorted(tables) != sorted([("positions",), ("genes",)]):
             raise CorruptIndex("Invalid database file")
+
     except sqlite3.DatabaseError:
         raise CorruptIndex("Invalid database file")
 
-    genes = dict()
     try:
-        for counter, obj in enumerate(cursor.execute("SELECT * from positions")):
+        gene_positions = dict()
+        for obj in cursor.execute("SELECT * from positions"):
             chrom, start, end, gid = obj
             if chrom not in positions:
                 positions[chrom] = collections.defaultdict(list)
             positions[chrom][(start, end)].append(gid)
-            genes[gid] = (chrom, start, end)
+            gene_positions[gid] = (chrom, start, end)
     except sqlite3.DatabaseError:
         raise CorruptIndex("Invalid index file. Rebuilding.")
 
@@ -47,7 +54,16 @@ def build_pos_index(index_name):
             positions[chrom].keys()
         )
 
-    return indexer, positions, genes
+    genes = dict()
+    try:
+        for obj in cursor.execute("SELECT * from genes"):
+            gid, blob = obj
+            genes[gid] = Mikado.loci.Gene(None)
+            genes[gid].load_dict(json.loads(blob))
+    except sqlite3.DatabaseError:
+        raise CorruptIndex("Invalid index file. Rebuilding.")
+
+    return indexer, positions, gene_positions, genes
 
 
 def remove_genes_with_overlaps(training_candidates: pd.DataFrame,
@@ -82,13 +98,23 @@ def determine_category(row, gold, silver, bronze):
         return "NA"
 
 
+def perc(string):
+    string = float(string)
+    assert 0 <= string <= 100
+    return string
+
+
 def main():
 
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--flank", type=int, default=1000)
     parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
+    parser.add_argument("-cov", "--coverage", type=perc, default=80)
+    parser.add_argument("-id", "--identity", type=perc, default=80)
+    parser.add_argument("--max_training", default=2000, type=int)
     parser.add_argument("fln")
     parser.add_argument("mikado")
+    parser.add_argument("blast")
     parser.add_argument("out_prefix")
     args = parser.parse_args()
 
@@ -114,7 +140,7 @@ def main():
     # Now we have to exclude genes that are within 1000bps of another gene
     # Load from the MIDX the positions
 
-    indexer, positions, genes = build_pos_index(midx)
+    indexer, positions, gene_positions, genes = build_pos_index(midx)
 
     # This instead are the gold/silver/bronze categories for the training
 
@@ -132,7 +158,54 @@ def main():
          (gold.max_intron_length <= args.max_intron) &
          (gold.transcripts_per_gene == 1) & (gold.source_score == gold.source_score.max()))
     ][[gold.columns[0], "parent"]]
-    training_candidates = remove_genes_with_overlaps(training_candidates, indexer, positions, genes, args.flank)
+    training_candidates = remove_genes_with_overlaps(training_candidates,
+                                                     indexer,
+                                                     positions,
+                                                     gene_positions,
+                                                     args.flank)
+
+    blast_db = pd.read_csv(args.blast, delimiter="\t",
+                           names=["qseqid",
+                                      'sseqid',
+                                      'pident',
+                                      'qstart',
+                                      'qend',
+                                      'sstart',
+                                      'send',
+                                      'qlen',
+                                      'slen',
+                                      'length',
+                                      'nident',
+                                      'mismatch',
+                                      'positive',
+                                      'gapopen',
+                                      'gaps',
+                                      'evalue',
+                                      'bitscore'])
+
+    blast_db["subject_coverage"] = 100 * (blast_db.send -blast_db.sstart +1) /blast_db.slen
+    blast_db["query_coverage"] = 100 * (blast_db.qend - blast_db.qstart + 1) / blast_db.qlen
+    blast_db["coverage"] = blast_db[["subject_coverage", "query_coverage"]].apply(max, axis=1)
+
+    nodes = blast_db[(blast_db.qseqid.isin(training_candidates.tid)) &
+                         (blast_db.qseqid != blast_db.sseqid) &
+                         (blast_db.sseqid.isin(training_candidates.tid)) &
+                         (blast_db.coverage >= args.coverage) & (blast_db.pident >= args.identity)]
+
+    # Now we are going to use NetworKit, as networkx would just make us cry
+    node_index = pd.Series(nodes.qseqid.append(nodes.sseqid).unique())
+
+    graph = nx.Graph()
+    graph.add_edges_from(zip(nodes.sseqid, nodes.qseqid))
+
+    to_keep = [list(_)[0] for _ in nx.connected_components(nodes)]
+    training_candidates = training_candidates[(training_candidates.tid.isin(to_keep)) |
+                                              (~training_candidates.tid.isin(node_index))]
+
+    # Now select only X candidates
+    # Sample would fail if asked to select an X > df.shape[0], so we enforce the minimum of the two
+    training_candidates = training_candidates.sample(min(args.max_training,
+                                                         training_candidates.shape[0]))
 
     silver = merged[(
         (~merged["parent"].isin(gold["parent"])) &
@@ -163,19 +236,17 @@ def main():
 
     # Now write out the GFFs
 
-    with open("{args.out}.training.gff3".format(**locals()), "wt") as training:
+    with open("{args.out_prefix}.training.gff3".format(**locals()), "wt") as training:
         print("##gff-version\t3", file=training)
         for gene in merged[merged.Training == True].parent.astype(str):
             gene = genes[gene]
-            assert isinstance(gene, Mikado.loci.Gene)
             print(gene.format("gff3"), file=training)
 
     for category in ("Gold", "Silver", "Bronze"):
-        with open("{args.out}.{category}.gff3".format(**locals()), "wt") as out_gff:
+        with open("{args.out_prefix}.{category}.gff3".format(**locals()), "wt") as out_gff:
             print("##gff-version\t3", file=out_gff)
             for gene in merged[merged.Category == category].parent.astype(str):
                 gene = genes[gene]
-                assert isinstance(gene, Mikado.loci.Gene)
                 print(gene.format("gff3"), file=out_gff)
 
     return
