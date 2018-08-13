@@ -2,7 +2,7 @@ from ..abstract import EIWrapper, AtomicOperation
 from ..rnaseq.mikado.pick import MikadoStats
 from ..rnaseq.mikado import Mikado
 from ..rnaseq.mikado.abstract import MikadoOp
-from ..preparation import SanitizeProteinBlastDB, BlastxIndex
+from ..preparation import SanitizeProteinBlastDB, BlastxIndex, DiamondIndex
 # from ..repeats.__init__ import RepeatMasking
 import os
 import abc
@@ -27,7 +27,15 @@ class FlnWrapper(EIWrapper):
             else:
                 self.blast_index = None
             sequence_extractor = MikadoSequenceExtractor(mikado.stats)
+            if mikado.stats.is_long is True:
+                diamond_index = DiamondIndex(sequence_extractor, key="proteins", rule_suffix="fln_long")
+            else:
+                diamond_index = DiamondIndex(sequence_extractor, key="proteins", rule_suffix="fln")
+            self.self_blast = SelfDiamondP(diamond_index, is_long=mikado.stats.is_long)
+
             self.add_edge(mikado, sequence_extractor)
+            self.add_edge(sequence_extractor, diamond_index)
+            self.add_edge(diamond_index, self.self_blast)
             indexer = MikadoSequenceIndexer(sequence_extractor)
             self.add_edge(sequence_extractor, indexer)
             splitter = SplitMikadoFasta(indexer)
@@ -42,13 +50,14 @@ class FlnWrapper(EIWrapper):
             self.add_edges_from([(chunk, concat) for chunk in fln_chunks])
             convert_mikado = ConvertMikadoToBed12(mikado.stats)
             self.add_edge(mikado, convert_mikado)
-            fln_filter = FilterFLN(concat, convert_mikado)
-            self.add_edge(concat, fln_filter)
-            self.add_edge(convert_mikado, fln_filter)
-            self.categories = dict((cat, ExtractFLNClass(fln_filter, mikado.stats, cat))
-                                   for cat in ("Gold", "Silver", "Bronze"))
-            self.add_edges_from([(mikado.stats, self.categories[cat]) for cat in self.categories])
-            self.add_edges_from([(fln_filter, self.categories[cat]) for cat in self.categories])
+            self.fln_filter = FilterFLN(concat, convert_mikado, self.self_blast)
+            self.add_edge(concat, self.fln_filter)
+            self.add_edge(convert_mikado, self.fln_filter)
+            self.add_edge(self.self_blast, self.fln_filter)
+            for category in ['Training', 'Gold', 'Silver', 'Bronze']:
+                stats = FlnCategoryStats(self.fln_filter, category, is_long=mikado.stats.is_long)
+                self.add_edge(self.fln_filter, stats)
+
             if mikado.stats.is_long:
                 self.__final_rulename__ += "_long"
 
@@ -60,7 +69,7 @@ class FlnWrapper(EIWrapper):
 
     @property
     def flag_name(self):
-        return os.path.join(self.categories["Gold"].outdir, "fln.done")
+        return os.path.join(self.fln_filter.outdir, "fln.done")
 
     @property
     def dbs(self):
@@ -69,10 +78,13 @@ class FlnWrapper(EIWrapper):
 
 class FLNOp(AtomicOperation, metaclass=abc.ABCMeta):
 
-    def __init__(self, ancestor):
+    def __init__(self, ancestor, is_long=None):
 
         super().__init__()
-        self.__is_long = ancestor.is_long
+        if is_long is None:
+            self.__is_long = ancestor.is_long
+        else:
+            self.__is_long = is_long
         self.configuration = ancestor.configuration
         self.input.update(ancestor.output)
 
@@ -99,6 +111,47 @@ class FLNOp(AtomicOperation, metaclass=abc.ABCMeta):
         return "full_lengther_next"
 
 
+class SelfDiamondP(FLNOp):
+
+    def __init__(self, index: DiamondIndex, is_long):
+
+        super().__init__(index, is_long=is_long)
+        self.input = index.output
+        self.input["query"] = index.input["db"]
+        self.outdir = os.path.dirname(self.input["query"])
+        self.output["blast_txt"] = os.path.join(self.outdir,
+                                          os.path.splitext(os.path.basename(self.input["query"]))[0] + ".dmnd.txt")
+        self.__loader = index.loader
+
+    @property
+    def fmt(self):
+        line = "6 qseqid sseqid pident qstart qend sstart send "
+        line += "qlen slen length nident mismatch positive gapopen gaps evalue bitscore"
+        return line
+
+    @property
+    def loader(self):
+        return self.__loader
+
+    @property
+    def cmd(self):
+        load, input, output = self.load, self.input, self.output
+        threads = self.threads
+        log = self.log
+        fmt = self.fmt
+        cmd = "{load} "
+        cmd += "diamond blastp --threads {threads} --outfmt {fmt} --compress 0 "
+        cmd += " --out {output[blast_txt]} --db {input[db]} --query {input[query]} --sensitive "
+        evalue = 1
+        cmd += " --evalue {evalue} > {log} 2>&1"
+        cmd = cmd.format(**locals())
+        return cmd
+
+    @property
+    def _rulename(self):
+        return "self_diamond_index"
+
+
 class MikadoSequenceExtractor(FLNOp):
 
     def __init__(self, stats: MikadoStats):
@@ -107,7 +160,9 @@ class MikadoSequenceExtractor(FLNOp):
         self.input["loci"] = stats.input["link"]
         self.input["genome"] = self.genome
         self.outdir = stats.outdir
-        self.output = {"transcripts": os.path.join(self.outdir, "mikado.loci.transcripts.fasta")}
+        self.output = {"transcripts": os.path.join(self.outdir, "mikado.loci.transcripts.fasta"),
+                       "proteins": os.path.join(self.outdir, "mikado.loci.proteins.fasta"),
+                       "cds": os.path.join(self.outdir, "mikado.loci.cds.fasta")}
 
     @property
     def loader(self):
@@ -119,7 +174,10 @@ class MikadoSequenceExtractor(FLNOp):
         input, output = self.input, self.output
         genome = self.genome
         outdir = self.outdir
-        cmd = "{load} gffread -g {genome} -w {output[transcripts]} -C {input[loci]}".format(**locals())
+        cmd = "{load} gffread -g {genome} -w {output[transcripts]}  "
+        cmd += " -x {output[cds]} -y {output[proteins]} "
+        cmd += " -C {input[loci]}"
+        cmd = cmd.format(**locals())
         return cmd
 
     @property
@@ -418,13 +476,20 @@ class ConvertMikadoToBed12(MikadoOp):
 
 class FilterFLN(FLNOp):
 
-    def __init__(self, concat: ConcatenateFLN, to_bed12: ConvertMikadoToBed12):
+    def __init__(self, concat: ConcatenateFLN,
+                 to_bed12: ConvertMikadoToBed12,
+                 self_blast: SelfDiamondP):
         super().__init__(concat)
         self.input.update(to_bed12.output)
+        self.input.update(self_blast.output)
         # self.input.update(to_bed12.input)
         self.outdir = concat.outdir
         self.output = {"table": self.outprefix + ".table.txt",
-                       "list": self.outprefix + ".list.txt"}
+                       # "list": self.outprefix + ".list.txt",
+                       }
+        for category in ['Training', 'Gold', 'Silver', 'Bronze']:
+            self.output[category] = self.outprefix + ".{category}.gff3".format(**locals())
+
         self.log = os.path.join(self.outdir, "filter_fln.log")
 
     @property
@@ -454,63 +519,54 @@ class FilterFLN(FLNOp):
         mikado_loci = os.path.splitext(self.input["bed12"])[0]
 
         cmd = "{load} "
-        cmd += "mkdir -p {outdir} && filter_fln.py {input[table]} {mikado_loci} {outprefix} > {log} 2> {log}"
+        cmd += "mkdir -p {outdir} && filter_fln.py {input[table]} {mikado_loci} {input[blast_txt]}"
+        cmd += " {outprefix} > {log} 2> {log}"
         cmd = cmd.format(**locals())
 
         return cmd
 
     @property
     def is_small(self):
-        return True
+        return False
 
 
-class ExtractFLNClass(FLNOp):
+class FlnCategoryStats(AtomicOperation):
 
-    def __init__(self, fln_filter: FilterFLN, stats: MikadoStats, category):
+    def __init__(self, fln: FilterFLN, category, is_long=False):
 
-        super().__init__(fln_filter)
-        self.configuration = fln_filter.configuration
-        self.input = fln_filter.output
-        self.input["loci"] = stats.input["loci"]
-        self.outdir = fln_filter.outdir
-        self.__category = None
+        super().__init__()
+        self.is_long = is_long
+        self.input = fln.output
+        # self.input.update(index.input)
         self.category = category
-        self.output = {
-            "list": os.path.join(self.outdir, "{}_models.txt".format(self.category)),
-            "gff3": os.path.join(self.outdir, "{}_models.gff3".format(self.category)),
-                       }
+        self.outdir = fln.outdir
+        self.configuration = fln.configuration
+        self.output = {"stats": os.path.splitext(self.input[self.category])[0] + ".stats"}
+        self.message = "Calculating statistics for FLN filtering, {self.category} category".format(**locals())
+        self.log = self.output["stats"] + ".log"
 
     @property
-    def category(self):
-        return self.__category
-
-    @category.setter
-    def category(self, category):
-        if category not in ("Gold", "Silver", "Bronze"):
-            raise ValueError("Invalid category! Expected one of {}, received: {}".format(
-                ", ".join(("Gold", "Silver", "Bronze")), category
-            ))
-        self.__category = category
-
-    @property
-    def _rulename(self):
-        return "extract_fln_{}".format(self.category.lower())
+    def rulename(self):
+        return "stats_fln_{category}{long}".format(category=self.category, long="" if not self.is_long else "_long")
 
     @property
     def loader(self):
         return ["mikado"]
 
     @property
+    def loci_dir(self):
+        return os.path.dirname(self.input["link"])
+
+    @property
     def cmd(self):
+
         load = self.load
-        input, output = self.input, self.output
-        category = self.category
-
-        cmd = "{load} "
-        cmd += """awk '{{if ($4=="{category}") {{OFS="\\t"; print $1,$2}} }}' {input[list]} > {output[list]} && """
-        cmd += """ mikado util grep {output[list]} {input[loci]} {output[gff3]}"""
+        input, output, log = self.input, self.output, self.log
+        inp_file = self.input[self.category]
+        cmd = "{load}  if [ -s {inp_file} ]; then "
+        cmd += " mikado util stats {inp_file} {output[stats]} > {log} 2>&1; else "
+        cmd += " touch {output[stats]}; fi"
         cmd = cmd.format(**locals())
-
         return cmd
 
     @property

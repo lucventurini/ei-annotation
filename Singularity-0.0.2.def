@@ -58,16 +58,6 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     gcc --version
     make --version
 
-    ### Samtools
-    wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
-    tar xaf samtools-1.9.tar.bz2
-    cd samtools-1.*    # and similarly for bcftools and htslib
-    ./configure
-    make -j 20
-    make install
-    samtools --help
-    cd ../
-
     # HTSLib
     wget https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
     tar xaf htslib-1.9.tar.bz2
@@ -78,6 +68,17 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     htsfile --help
     # tabix
     cd /opt/software/
+    rm -rf htslib-1.9.tar.bz2 htslib-1.9
+
+    ### Samtools
+    wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
+    tar xaf samtools-1.9.tar.bz2
+    cd samtools-1.*    # and similarly for bcftools and htslib
+    ./configure
+    make -j 20
+    make install
+    samtools --help
+    cd ../
 
     # BCFTools
     wget https://github.com/samtools/bcftools/releases/download/1.9/bcftools-1.9.tar.bz2
@@ -88,6 +89,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     make install
     bcftools --help
     cd /opt/software/
+    rm -rf bcftools-1.9.tar.bz2 bcftools-1.9
 
     # BAMtools
     wget https://github.com/pezmaster31/bamtools/archive/v2.5.1.tar.gz -O bamtools-v2.5.1.tar.gz
@@ -100,22 +102,25 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     make install
     bamtools --help
     cd /opt/software/
+    rm -rf bamtools-v2.5.1.tar.gz bamtools-2.5.1
 
     # Kallisto
     wget https://github.com/pachterlab/kallisto/releases/download/v0.44.0/kallisto_linux-v0.44.0.tar.gz
     tar xaf kallisto_linux-v0.44.0.tar.gz
     mv kallisto_linux-v0.44.0/kallisto -t /usr/local/bin
     kallisto version
+    cd /opt/software/
+    rm -rf kallisto_linux-v0.44.0.tar.gz kallisto_linux-v0.44.0/;
 
     # Boost
     echo "Installing boost"
-    wget -q http://sourceforge.net/projects/boost/files/boost/1.59.0/boost_1_59_0.tar.gz/download
-    mv download boost.tar.gz
-    tar -xf boost.tar.gz
-    cd boost_1_59_0
+    wget -q https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz
+    tar -xf boost_1_68_0.tar.gz
+    cd boost_1_68_0
     ./bootstrap.sh --with-libraries=chrono,timer,program_options,filesystem,system,graph,graph_parallel,iostreams,thread,math
     ./b2 -d0 -j20 install;
     cd /opt/software/
+    rm -rf boost_1_68_0.tar.gz boost_1_68_0;
 
     # Augustus
     export TOOLDIR=$(dirname $(which samtools))
@@ -127,11 +132,14 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     make install
     augustus --help
     cd /opt/software/
+    rm -rf augustus-3.3.1.tar.gz augustus-3.3.1;
 
     # echo "Installing Portcullis"
+    cd /opt/software/
     git clone --recursive https://github.com/maplesond/portcullis.git
     pip3.6 install --prefix=/usr/local/ pandas
     cd portcullis
+    git checkout Release-1.1.2  # set the release
     sed -i 's/b2 /b2 -j 20 /' build_boost.sh
     ./build_boost.sh
     ./autogen.sh
@@ -142,6 +150,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     cat tests/test-suite.log
     portcullis --help
     cd /opt/software/
+    rm -rf portcullis
 
     # CLASS 2
     cd /opt/software/
@@ -152,6 +161,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     make
     mv class junc clnb grader addXS -t /usr/local/bin/
     cd /opt/software/
+    rm -rf CLASS-2.1.7 CLASS-2.1.7.tar.gz;
 
     # Stringtie binaries
     wget http://ccb.jhu.edu/software/stringtie/dl/stringtie-1.3.4d.Linux_x86_64.tar.gz
@@ -160,6 +170,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     mv stringtie -t /usr/local/bin/
     stringtie -h
     cd /opt/software/
+    rm -rf stringtie-1.3.4d.Linux_x86_64 stringtie-1.3.4d.Linux_x86_64.tar.gz
 
     # Scallop
     wget https://github.com/Kingsford-Group/scallop/releases/download/v0.10.2/scallop-0.10.2_linux_x86_64.tar.gz
@@ -168,6 +179,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     mv scallop -t /usr/local/bin/
     scallop --help
     cd /opt/software/
+    rm -rf scallop-0.10.2_linux_x86_64.tar.gz scallop-0.10.2_linux_x86_64;
 
     # Strawberry
     git clone --recursive https://github.com/ruolin/strawberry.git
@@ -180,6 +192,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     make install
     strawberry --help
     cd /opt/software/
+    rm -rf strawberry
 
     # HISAT2
     wget ftp://ftp.ccb.jhu.edu/pub/infphilo/hisat2/downloads/hisat2-2.1.0-Linux_x86_64.zip
@@ -190,6 +203,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     done
     hisat2 --help
     cd /opt/software/
+    rm -rf hisat2-2.1.0-Linux_x86_64.zip hisat2-2.1.0;
 
     # STAR
     wget https://github.com/alexdobin/STAR/archive/2.6.0c.tar.gz -O star-2.6.0c.tar.gz
@@ -198,6 +212,8 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     mv STAR-2.6.0c/bin/Linux_x86_64_static/STARlong -t /usr/local/bin/
     STAR --help
     STARlong --help
+    cd /opt/software/
+    rm -rf star-2.6.0c.tar.gz STAR-2.6.0c
 
     # GMAP
     wget http://research-pub.gene.com/gmap/src/gmap-gsnap-2018-07-04.tar.gz
@@ -209,6 +225,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     gmap --help
     gsnap --help
     cd /opt/software/
+    rm -rf gmap-gsnap-2018-07-04.tar.gz gmap-2018-07-04
 
     # MiniMap2
     wget https://github.com/lh3/minimap2/releases/download/v2.12/minimap2-2.12_x64-linux.tar.bz2
@@ -217,6 +234,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     mv k8 minimap2 paftools.js -t /usr/local/bin/
     minimap2 --help
     cd /opt/software/
+    rm -rf minimap2-2.12_x64-linux.tar.bz2 minimap2-2.12_x64-linux
 
     # GenomeTools
     cd /opt/software/
@@ -226,11 +244,15 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     make 64bit=yes opt=yes cairo=no errorcheck=yes useshared=no -j 20
     make install
     cd /opt/software/
+    rm -rf genometools-1.5.10.tar.gz genometools-1.5.10
 
     # PrinSeq for cleaning up sequences
     cd /usr/local/bin/
     wget https://downloads.sourceforge.net/project/prinseq/standalone/prinseq-lite-0.20.4.tar.gz
     tar xaf prinseq-lite-0.20.4.tar.gz
+    chmod +x prinseq-lite-0.20.4/prinseq-*pl
+    mv prinseq-lite-0.20.4/prinseq-*pl -t /usr/local/bin
+    prinseq-lite.pl --help
     cd /opt/software/
 
     # Now install mikado

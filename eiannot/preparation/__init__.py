@@ -246,10 +246,16 @@ class FaidxProtein(AtomicOperation):
 
 class DiamondIndex(AtomicOperation):
 
-    def __init__(self, sanitizer: SanitizeProteinBlastDB):
+    def __init__(self, sanitizer: SanitizeProteinBlastDB, key="db", rule_suffix=""):
 
         super().__init__()
+        self.__rule_suffix = ""
+        self._rule_suffix = rule_suffix
         self.input = sanitizer.output
+        assert key in sanitizer.output
+        if key != "db":
+            del self.input[key]  # Otherwise there are repeated inputs
+        self.input["db"] = sanitizer.output[key]
         self.configuration = sanitizer.configuration
         self.output["db"] = os.path.splitext(self.input["db"])[0] + ".dmnd"
         self.outdir = os.path.dirname(self.output["db"])
@@ -262,7 +268,23 @@ class DiamondIndex(AtomicOperation):
 
     @property
     def rulename(self):
-        return "diamond_protein_index"
+        rule = "diamond_protein_index"
+        if self._rule_suffix == '':
+            return rule
+        else:
+            return rule + "_" + self._rule_suffix
+
+    @property
+    def _rule_suffix(self):
+        return self.__rule_suffix
+
+    @_rule_suffix.setter
+    def _rule_suffix(self, rule):
+        if rule is None:
+            rule = ""
+        if not isinstance(rule, str):
+            raise TypeError()
+        self.__rule_suffix = rule
 
     @property
     def cmd(self):
@@ -276,9 +298,15 @@ class DiamondIndex(AtomicOperation):
 
 class BlastxIndex(AtomicOperation):
 
-    def __init__(self, sanitizer: SanitizeProteinBlastDB):
+    def __init__(self, sanitizer: SanitizeProteinBlastDB, key="db", rule_suffix=""):
         super().__init__()
+        self.__rule_suffix = ""
+        self._rule_suffix = rule_suffix
+        assert key in sanitizer.output  # Sanity check!
         self.input = sanitizer.output
+        self.input["db"] = sanitizer.output[key]
+        if key != "db":
+            del self.input[key]  # Otherwise there are repeated inputs
         self.configuration = sanitizer.configuration
         self.output["db"] = os.path.splitext(self.input["db"])[0] + ".pog"
         self.outdir = os.path.dirname(self.output["db"])
@@ -291,7 +319,23 @@ class BlastxIndex(AtomicOperation):
 
     @property
     def rulename(self):
-        return "protein_blast_index"
+        rule = "protein_blast_index_"
+        if self._rule_suffix != '':
+            return rule
+        else:
+            return rule + "_" + self._rule_suffix
+
+    @property
+    def _rule_suffix(self):
+        return self.__rule_suffix
+
+    @_rule_suffix.setter
+    def _rule_suffix(self, rule):
+        if rule is None:
+            rule = ""
+        if not isinstance(rule, str):
+            raise TypeError()
+        self.__rule_suffix = rule
 
     @property
     def threads(self):

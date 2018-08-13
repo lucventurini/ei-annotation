@@ -187,9 +187,9 @@ def main():
     blast_db["query_coverage"] = 100 * (blast_db.qend - blast_db.qstart + 1) / blast_db.qlen
     blast_db["coverage"] = blast_db[["subject_coverage", "query_coverage"]].apply(max, axis=1)
 
-    nodes = blast_db[(blast_db.qseqid.isin(training_candidates.tid)) &
+    nodes = blast_db[(blast_db.qseqid.isin(training_candidates[gold.columns[0]])) &
                          (blast_db.qseqid != blast_db.sseqid) &
-                         (blast_db.sseqid.isin(training_candidates.tid)) &
+                         (blast_db.sseqid.isin(training_candidates[gold.columns[0]])) &
                          (blast_db.coverage >= args.coverage) & (blast_db.pident >= args.identity)]
 
     # Now we are going to use NetworKit, as networkx would just make us cry
@@ -198,9 +198,9 @@ def main():
     graph = nx.Graph()
     graph.add_edges_from(zip(nodes.sseqid, nodes.qseqid))
 
-    to_keep = [list(_)[0] for _ in nx.connected_components(nodes)]
-    training_candidates = training_candidates[(training_candidates.tid.isin(to_keep)) |
-                                              (~training_candidates.tid.isin(node_index))]
+    to_keep = [list(_)[0] for _ in nx.connected_components(graph)]
+    training_candidates = training_candidates[(training_candidates[gold.columns[0]].isin(to_keep)) |
+                                              (~training_candidates[gold.columns[0]].isin(node_index))]
 
     # Now select only X candidates
     # Sample would fail if asked to select an X > df.shape[0], so we enforce the minimum of the two
@@ -230,13 +230,13 @@ def main():
 
     # Now write out the CSVs ...
     merged.to_csv(args.out_prefix + ".table.txt", sep="\t", index=False, header=True)
-    merged[[merged.columns[0], "parent", "Training", "Category"]].to_csv(
-        args.out_prefix + ".list.txt", sep="\t", index=False, header=True
-    )
+    # merged[[merged.columns[0], "parent", "Training", "Category"]].to_csv(
+    #     args.out_prefix + ".list.txt", sep="\t", index=False, header=True
+    # )
 
     # Now write out the GFFs
 
-    with open("{args.out_prefix}.training.gff3".format(**locals()), "wt") as training:
+    with open("{args.out_prefix}.Training.gff3".format(**locals()), "wt") as training:
         print("##gff-version\t3", file=training)
         for gene in merged[merged.Training == True].parent.astype(str):
             gene = genes[gene]
