@@ -61,19 +61,20 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     # HTSLib
     wget https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2
     tar xaf htslib-1.9.tar.bz2
-    cd htslib-1.9
+    mv htslib-1.9 htslib  # Necessary for augustus
+    cd htslib
     ./configure
     make -j 20
     make install
     htsfile --help
     # tabix
     cd /opt/software/
-    rm -rf htslib-1.9.tar.bz2 htslib-1.9
 
     ### Samtools
     wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
     tar xaf samtools-1.9.tar.bz2
-    cd samtools-1.*    # and similarly for bcftools and htslib
+    mv samtools-1.9 samtools  # Necessary for augustus
+    cd samtools  # and similarly for bcftools and htslib
     ./configure
     make -j 20
     make install
@@ -83,7 +84,8 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     # BCFTools
     wget https://github.com/samtools/bcftools/releases/download/1.9/bcftools-1.9.tar.bz2
     tar xaf bcftools-1.9.tar.bz2
-    cd bcftools-1.9
+    mv bcftools-1.9 bcftools
+    cd bcftools
     ./configure
     make -j 20
     make install
@@ -94,7 +96,8 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     # BAMtools
     wget https://github.com/pezmaster31/bamtools/archive/v2.5.1.tar.gz -O bamtools-v2.5.1.tar.gz
     tar xaf bamtools-v2.5.1.tar.gz
-    cd bamtools-2.5.1
+    mv bamtools-2.5.1 bamtools
+    cd bamtools
     mkdir build
     cd build
     cmake3 ../
@@ -123,11 +126,13 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     rm -rf boost_1_68_0.tar.gz boost_1_68_0;
 
     # Augustus
-    export TOOLDIR=$(dirname $(which samtools))
+    export TOOLDIR=/opt/software/
     wget http://bioinf.uni-greifswald.de/augustus/binaries/augustus-3.3.1.tar.gz
     tar xaf augustus-3.3.1.tar.gz
     cd augustus-3.3.1
     sed -i 's/#.*COMPGENEPRED = true/COMPGENEPRED = true/; s/# SQLITE = true/SQLITE = true/; s/# ZIPINPUT = true/ZIPINPUT = true/' common.mk
+    sed -i '/^INCLUDES/s|INCLUDES.*|BAMTOOLS=/usr/local/bin/bamtools\nINCLUDES=/usr/local/include/bamtools|; /LIBS = -lbamtools -lz/s|LIBS = -lbamtools -lz|LIBS= /usr/local/lib/libbamtools.a -lz|' auxprogs/bam2hints/Makefile
+    sed -i '/^BAMTOOLS/s|BAMTOOLS.*|BAMTOOLS = /usr/local/include/bamtools/|' auxprogs/filterBam/src/Makefile
     make -j 20
     make install
     augustus --help
