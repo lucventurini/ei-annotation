@@ -128,7 +128,9 @@ class ShortSample(Sample):
             os.symlink(os.path.abspath(read1), r1out)
         self.__read1 = r1out
 
-        if read2 is not None:
+        if read2 is not None and read2 != "-":
+            if not os.path.exists(os.path.abspath(read2)):
+                raise OSError("Read file {} not found".format(os.path.abspath(read2)))
             r2out = os.path.join(read_dir, "{label}.R2.fq{suffix}".format(**locals()))
             if not os.path.islink(r2out):
                 os.symlink(os.path.abspath(read2), r2out)
