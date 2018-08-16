@@ -46,9 +46,10 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel
     yum -y install lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel
     yum -y install blas-devel libgfortran
-    yum -y install pcre-devel curl libcurl-devel perl-WWW-Curl libxml2-devel
-    yum -y install libxml2-devel
-
+    yum -y install pcre-devel curl libcurl-devel perl-WWW-Curl libxml2-devel xz-devel 
+    yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel \
+        	lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel \
+    		perl-devel perl-CPAN libxml2-devel
 
     yum -y install centos-release-scl
     yum -y install scl-utils
@@ -131,6 +132,10 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     make install
     cd ../
     rm -rf libdeflate
+
+    # CPAN
+    curl -L http://cpanmin.us | perl - App::cpanminus
+    cpanm -i Parallel::ForkManager File::Which Scalar::Util::Numeric  # I might need more for augustus
 
     # HTSLib
     wget https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2

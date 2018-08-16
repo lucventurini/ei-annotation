@@ -361,6 +361,10 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         if key in self.__params:
             del self.__params[key]
 
+    @property
+    def _root_dir(self):
+        return self.configuration["outdir"]
+
     def __str__(self):
         """This will create the SnakeMake-like block of code."""
 
@@ -665,6 +669,10 @@ class EIWorfkflow(metaclass=abc.ABCMeta):
                                                                     getattr(val, attr)))
                 self.remove_node(vals[0])
             keys = Counter([_.rulename for _ in self])
+
+    @property
+    def _root_dir(self):
+        return self.configuration["outdir"]
 
     def add_node(self, node: AtomicOperation):
 

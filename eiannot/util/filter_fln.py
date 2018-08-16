@@ -107,11 +107,22 @@ def perc(string):
 def main():
 
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("--flank", type=int, default=1000)
-    parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
-    parser.add_argument("-cov", "--coverage", type=perc, default=80)
-    parser.add_argument("-id", "--identity", type=perc, default=80)
-    parser.add_argument("--max_training", default=2000, type=int)
+    parser.add_argument(
+        "--flank", type=int, default=1000,
+        help="Minimum distance between candidate training genes and any other gene (default %(default)s bps).")
+    parser.add_argument(
+        "--max-intron", dest="max_intron", type=int, default=10000,
+        help="Maximum intron length for ")
+    parser.add_argument(
+        "-cov", "--coverage", type=perc, default=80,
+        help="Minimum coverage in the self-blast for a candidate to be considered a self-hit. Default: %(default)s%%")
+    parser.add_argument(
+        "-id", "--identity", type=perc, default=80,
+        help="Minimum identity in the self-blast for a candidate to be considered a self-hit. Default: %(default)s%%")
+    parser.add_argument("--max-training", default=2000, type=int, dest="max_training",
+                        help="Maximum number of genes to select for training. Default %(default)s.")
+    parser.add_argument("-ctf", "--cross-test-fraction", default=80, type=perc, dest="cross_test",
+                        help="Fraction of training models to keep sperated for testing. Default: %(default)s%%.")
     parser.add_argument("fln")
     parser.add_argument("mikado")
     parser.add_argument("blast")
@@ -199,13 +210,29 @@ def main():
     graph.add_edges_from(zip(nodes.sseqid, nodes.qseqid))
 
     to_keep = [list(_)[0] for _ in nx.connected_components(graph)]
-    training_candidates = training_candidates[(training_candidates[gold.columns[0]].isin(to_keep)) |
-                                              (~training_candidates[gold.columns[0]].isin(node_index))]
+    id_column = gold.columns[0]
+    training_candidates = training_candidates[(training_candidates[id_column].isin(to_keep)) |
+                                              (~training_candidates[id_column].isin(node_index))]
 
     # Now select only X candidates
     # Sample would fail if asked to select an X > df.shape[0], so we enforce the minimum of the two
-    training_candidates = training_candidates.sample(min(args.max_training,
-                                                         training_candidates.shape[0]))
+    max_test_train = int(100 * args.max_training / args.cross_test)
+
+    if training_candidates.shape[0] <= max_test_train:
+        test_candidates = training_candidates.sample(
+            int(training_candidates.shape[0] * (100 - args.cross_test) / 100)
+        )
+        training_candidates = training_candidates[~training_candidates[id_column].isin(
+            test_candidates[id_column])]
+    else:
+        test_candidates = training_candidates.sample(
+            int(max_test_train * (100 - args.cross_test) / 100)
+        )
+        training_candidates = training_candidates[
+            ~training_candidates[id_column].isin(test_candidates[id_column])].sample(args.max_training)
+
+    assert test_candidates.shape[0] > 0, "No candidates left for testing!"
+    assert training_candidates.shape[0] > 0, "No candidates left for training!"
 
     silver = merged[(
         (~merged["parent"].isin(gold["parent"])) &
@@ -215,9 +242,11 @@ def main():
 
     bronze = merged[((~merged["parent"].isin(silver["parent"])) &
                      (~merged["parent"].isin(gold["parent"])) &
-                     (merged["max_intron_length"] <= 50000))][[merged.columns[0], "parent"]]
+                     (merged["max_intron_length"] <= max(50000, min(50000, args.max_intron))))][
+        [merged.columns[0], "parent"]]
 
-    merged["Training"] = merged[merged.columns[0]].isin(training_candidates[training_candidates.columns[0]])
+    merged["Training"] = merged[merged.columns[0]].isin(training_candidates[id_column])
+    merged["Testing"] = merged[merged.columns[0]].isin(test_candidates[id_column])
     cat = partial(determine_category,
                   gold=set(gold.iloc[:, 0].unique()),
                   silver=set(silver.iloc[:, 0].unique()),
@@ -241,6 +270,12 @@ def main():
         for gene in merged[merged.Training == True].parent.astype(str):
             gene = genes[gene]
             print(gene.format("gff3"), file=training)
+
+    with open("{args.out_prefix}.Testing.gff3".format(**locals()), "wt") as testing:
+        print("##gff-version\t3", file=testing)
+        for gene in merged[merged.Testing == True].parent.astype(str):
+            gene = genes[gene]
+            print(gene.format("gff3"), file=testing)
 
     for category in ("Gold", "Silver", "Bronze"):
         with open("{args.out_prefix}.{category}.gff3".format(**locals()), "wt") as out_gff:
