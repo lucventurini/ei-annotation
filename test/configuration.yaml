@@ -12,7 +12,8 @@ programs:
   default_small:
     threads: 1
     memory: 4000
-    queue: 
+  augustus:
+    load: 'export PATH=$PATH:/opt/augustus-3.3/scripts/ && export AUGUSTUS_CONFIG_PATH="/opt/augustus-3.3/config/"'
   minimap2:
     load: ''
     runs: ['']

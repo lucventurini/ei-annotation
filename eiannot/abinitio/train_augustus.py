@@ -105,6 +105,7 @@ class PrepareAugConfig(AtomicOperation):
         if self.augustus_species is not None:
             species = self.augustus_species
             cmd += "&& cp -r ${{AUGUSTUS_CONFIG_PATH}}/species/{species} config/species/"
+
         cmd = cmd.format(**locals())
         return cmd
 
@@ -170,6 +171,7 @@ class TrainAugustus(AtomicOperation):
         self.input.update(converter.output)
         self.input.update(config_preparer.output)
         self.log = os.path.join(self.outdir, "training.log")
+        self.output["flag"] = os.path.join(self.outdir, "training.done")
 
     @property
     def rulename(self):
@@ -205,19 +207,20 @@ class TrainAugustus(AtomicOperation):
         outdir = self.outdir
         training_src = os.path.relpath(os.path.abspath(self.input["Training"]), start=self.outdir)
         log = os.path.abspath(self.log)
+        flag = os.path.basename(self.output["flag"])
 
         cmd = "{load} "
         cmd += "mkdir -p {outdir} && cd {outdir} && "
         cmd += "ln -sf {training_src} training.gb && "
-        cmd += "new_species.pl --AUGUSTUS_CONFIG_PATH=$(pwd)/config --species={species} && "
+        cmd += "new_species.pl --AUGUSTUS_CONFIG_PATH=$(pwd)/config --species={species} 2> new_species.log >&2 && "
         cmd += " sed -i '/^UTR/s/.*/UTR\ton/' config/species/{species}/{species}_parameters.cfg && "
         cmd += "AUGUSTUS_CONFIG_PATH=$(pwd)/config && "
         if self.quick is True:
             cmd += "(etraining --species={species} training.gb 2>&1 > {log} "
         else:
-            cmd += "(optimize_augustus.pl --species={species} --kfold={threads} --cpus={threads} --UTR=on 2>&1 > {log}"
+            cmd += "(optimize_augustus.pl --species={species} --kfold={threads} --cpus={threads} --UTR=on "
             cmd += "training.gb 2>&1 > {log}"
-        cmd += "&& touch training.done)"
+        cmd += "&& touch {flag})"
 
         cmd = cmd.format(**locals())
 

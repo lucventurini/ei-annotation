@@ -580,6 +580,7 @@ class FilterFLN(FLNOp):
         flank = self.flank
         coverage, identity = self.coverage, self.identity
         max_intron = self.max_intron
+        max_training = self.max_training
 
         cmd = "{load} "
         cmd += "mkdir -p {outdir} && filter_fln.py --flank {flank} -cov {coverage} -id {identity} "

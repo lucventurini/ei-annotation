@@ -353,7 +353,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             raise KeyError("{}:\n{}".format(self.rulename, self.configuration))
         cmd = loadPreCmd(*to_load)
         if cmd:
-            return cmd
+            return cmd + " "  # Make sure it does end with a space
         else:
             return ''
 

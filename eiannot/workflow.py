@@ -7,7 +7,7 @@ from .rnaseq.alignments.portcullis import PortcullisWrapper
 from .rnaseq.mikado import Mikado
 from .rnaseq.assemblies import AssemblyWrapper
 from .proteins import ExonerateProteinWrapper, GTHProteinWrapper
-from .abinitio.fln import FlnWrapper
+from .abinitio import FlnWrapper, TrainAugustusWrapper
 import os
 
 
@@ -71,9 +71,14 @@ class AnnotationWorklow(EIWorfkflow):
 
         self.merge([self.repeats, self.protein_alignments])
 
+        self.augustus_configuration = TrainAugustusWrapper(self.fln, self.repeats)
+        self.add_edge(self.repeats, self.augustus_configuration)
+        self.add_edge(self.fln, self.augustus_configuration)
+
         self.add_final_flag()
         faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
         assert list(faid.input.keys()) == ["genome"], faid.input
+
 
     @property
     def flag_name(self):
