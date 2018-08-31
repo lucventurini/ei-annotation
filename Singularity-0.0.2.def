@@ -41,7 +41,7 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     yum -y groupinstall development
     yum -y install https://centos7.iuscommunity.org/ius-release.rpm
     yum -y install python36u python36u-devel
-    yum -y install zlib autoconf automake libtool pthreads tar curl cmake3 git
+    yum -y install zlib autoconf automake libtool pthreads tar curl cmake3 git openssl-devel
     cmake3 --version
     yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel
     yum -y install lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel

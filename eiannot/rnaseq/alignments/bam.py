@@ -47,7 +47,7 @@ class BamIndex(AtomicOperation):
         self.sample = bamrule.sample
         self.configuration = bamrule.configuration
         self.input = {"bam": bamrule.output["bam"]}
-        self.output = {"index": self.input["bam"] + ".bai"}
+        self.output = {"index": self.input["bam"] + ".csi"}
         self.message = "Using samtools to index: {input[bam]}".format(input=self.input)
         self.log = os.path.join(self.input["bam"] + ".index.log")
 
@@ -59,9 +59,9 @@ class BamIndex(AtomicOperation):
     def align_run(self):
         return os.path.splitext(os.path.basename(self.input["bam"]))[0]
 
-    @property
-    def threads(self):
-        return 1
+    # @property
+    # def threads(self):
+    #     return 1
 
     @property
     def rulename(self):
@@ -72,13 +72,13 @@ class BamIndex(AtomicOperation):
         load = self.load
         input = self.input
         log = self.log
-        cmd = "{load} samtools index {input[bam]} >{log} 2>&1".format(**locals())
-
+        threads = self.threads
+        cmd = "{load} samtools index -c -@ {threads} {input[bam]} >{log} 2>&1".format(**locals())
         return cmd
-
-    @property
-    def is_small(self):
-        return True
+    #
+    # @property
+    # def is_small(self):
+    #     return True
 
 
 class BamStats(AtomicOperation):
