@@ -236,7 +236,7 @@ class PortcullisJunc(AtomicOperation):
         threads = self.threads
         alrun = self.alrun
         cmd = "{load}"
-        cmd += " portcullis junc -o {outdir}/portcullis {strand} -t {threads} {prepdir} > {log} 2>&1"
+        cmd += " portcullis junc -c -o {outdir}/portcullis {strand} -t {threads} {prepdir} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 
