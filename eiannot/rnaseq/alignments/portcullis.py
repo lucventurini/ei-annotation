@@ -150,7 +150,7 @@ class PortcullisPrep(AtomicOperation):
         input = self.input
         log = self.log
         threads = self.threads
-        cmd += "portcullis prep -o {outdir} -t {threads} {input[genome]} {input[bam]} > {log} 2>&1"
+        cmd += "portcullis prep -c -o {outdir} -t {threads} {input[genome]} {input[bam]} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 
