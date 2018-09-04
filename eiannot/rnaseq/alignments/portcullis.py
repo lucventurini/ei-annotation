@@ -109,9 +109,9 @@ class PortcullisPrep(AtomicOperation):
         self.input = {"genome": self.genome, "bam": bam.input["bam"], "index": bam.input["index"]}
         self.sample = bam.sample
         self._outdir = outdir
-        self.output = {"bai": os.path.join(
+        self.output = {"csi": os.path.join(
             self.sample_dir,
-            "1-prep", "portcullis.sorted.alignments.bam.bai")}
+            "1-prep", "portcullis.sorted.alignments.bam.csi")}
         self.log = os.path.join(self._outdir, "log", "portcullis_{alrun}-prep.log".format(alrun=self.alrun))
         if not os.path.exists(os.path.dirname(self.log)):
             os.makedirs(os.path.dirname(self.log))
@@ -146,7 +146,7 @@ class PortcullisPrep(AtomicOperation):
     def cmd(self):
         load = self.load
         cmd = "{load}"
-        outdir = os.path.dirname(self.output["bai"])
+        outdir = os.path.dirname(self.output["csi"])
         input = self.input
         log = self.log
         threads = self.threads
@@ -199,7 +199,7 @@ class PortcullisJunc(AtomicOperation):
         super().__init__()
         self.configuration, self.sample = portcullis_prep.configuration, portcullis_prep.sample
         self._outdir = portcullis_prep._outdir
-        self.input = {"bai": portcullis_prep.output["bai"]}
+        self.input = {"csi": portcullis_prep.output["csi"]}
         self.alrun = portcullis_prep.alrun
         self.output = {"tab": os.path.join(self.sample_dir,
                                            "2-junc",
@@ -229,7 +229,7 @@ class PortcullisJunc(AtomicOperation):
     @property
     def cmd(self):
         strand = self.strand
-        prepdir = os.path.dirname(self.input["bai"])
+        prepdir = os.path.dirname(self.input["csi"])
         outdir = os.path.dirname(self.output["tab"])
         log = self.log
         load = self.load
