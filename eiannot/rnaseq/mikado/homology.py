@@ -13,7 +13,7 @@ class SplitMikadoPrepareFasta(MikadoOp):
         self.configuration = prepare.configuration
         self.input = prepare.output
         self.outdir = self.mikado_dir
-        self.output["split_flag"] = os.path.join(self.outdir, 'homology', 'split.done')
+        self.output["split_flag"] = os.path.join(self.outdir, 'mikado_homology', 'split.done')
         self.output["split"] = ["{outprefix}_{chunk}.fasta".format(
             outprefix=self.outprefix, chunk=str(_).zfill(3)) for _ in range(1, self.chunks + 1)]
 
