@@ -74,24 +74,38 @@ class MikadoConfig(MikadoOp):
         if not os.path.exists(os.path.dirname(self.input["asm_list"])):
             os.makedirs(os.path.dirname(self.input["asm_list"]))
 
+        lines = []
+        if not self.is_long:
+            for gf in self.assemblies.gfs:
+                try:
+                    line = [gf.input["gf"], gf.label, gf.sample.stranded]
+                except KeyError:
+                    raise KeyError((gf.rulename, gf.output))
+                lines.append(line)
+            score_add = self.long_bias_score
+        else:
+            score_add = 0
+        for gf in self.long_aln_wrapper.gfs:
+            try:
+                line = [gf.input["gf"], gf.label, gf.sample.stranded, score_add]
+            except KeyError:
+                raise KeyError((gf.rulename, gf.output))
+            lines.append(line)
+
         if not os.path.exists(self.input["asm_list"]):
             with open(self.input["asm_list"], mode="wt") as file_list:
-                if not self.is_long:
-                    for gf in self.assemblies.gfs:
-                        try:
-                            line = [gf.input["gf"], gf.label, gf.sample.stranded]
-                        except KeyError:
-                            raise KeyError((gf.rulename, gf.output))
-                        print(*line, file=file_list, sep="\t")
-                    score_add = self.long_bias_score
-                else:
-                    score_add = 0
-                for gf in self.long_aln_wrapper.gfs:
-                    try:
-                        line = [gf.input["gf"], gf.label, gf.sample.stranded, score_add]
-                    except KeyError:
-                        raise KeyError((gf.rulename, gf.output))
+                for line in lines:
                     print(*line, file=file_list, sep="\t")
+        else:
+            lines = set(["\t".join(str(_) for _ in line) for line in lines])
+            found_lines = set([line.rstrip() for line in open(self.input["asm_list"])])
+            if lines != found_lines:
+                # There is a discrepancy between found and recalculated, ablate
+                with open(self.input["asm_list"], mode="wt") as file_list:
+                    for line in lines:
+                        print(*line, file=file_list, sep="\t")
+            else:
+                pass
 
     @property
     def scoring_file(self):
