@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from ..abstract import EIWrapper, AtomicOperation
 from ..rnaseq.mikado.pick import MikadoStats
 from ..rnaseq.mikado import Mikado
@@ -15,15 +17,11 @@ class FlnWrapper(EIWrapper):
 
     def __init__(self, mikado: Mikado):  #, masker: RepeatMasking):
 
-        self.__is_long = False
-        super().__init__(configuration=mikado.configuration)
-        self.__training_candidates = None
-        self.__testing_candidates = None
+        super().__init__()
 
         if mikado.stats:
             # Start extracting the data ...
             self.configuration = mikado.configuration
-            self.__is_long = mikado.stats.is_long
             if self.dbs:
                 self.sanitizer = SanitizeProteinBlastDB(self.configuration, dbs=self.dbs)
                 self.blast_index = BlastxIndex(self.sanitizer)
@@ -58,20 +56,19 @@ class FlnWrapper(EIWrapper):
             self.add_edge(concat, self.fln_filter)
             self.add_edge(convert_mikado, self.fln_filter)
             self.add_edge(self.self_blast, self.fln_filter)
-            for category in ['Training', 'Gold', 'Silver', 'Bronze', "Testing"]:
-                if category == "Training":
-                    self.__training_candidates = self.fln_filter.output["Training"]
-                elif category == "Testing":
-                    self.__testing_candidates = self.fln_filter.output["Testing"]
-                stats = FlnCategoryStats(self.fln_filter, category, is_long=mikado.stats.is_long)
-                self.add_edge(self.fln_filter, stats)
+            self.training = FlnCategoryStats(self.fln_filter, "Training", is_long=mikado.stats.is_long)
+            self.add_edge(self.fln_filter, self.training)
+            self.gold = FlnCategoryStats(self.fln_filter, "Gold", is_long=mikado.stats.is_long)
+            self.add_edge(self.fln_filter, self.gold)
+            self.silver = FlnCategoryStats(self.fln_filter, "Silver", is_long=mikado.stats.is_long)
+            self.add_edge(self.fln_filter, self.silver)
+            self.bronze = FlnCategoryStats(self.fln_filter, "Bronze", is_long=mikado.stats.is_long)
+            self.add_edge(self.fln_filter, self.bronze)
 
             if mikado.stats.is_long:
                 self.__final_rulename__ += "_long"
 
             self.add_final_flag()
-            # assert self.exit
-            # assert self.entries
         else:
             pass
 
@@ -80,20 +77,8 @@ class FlnWrapper(EIWrapper):
         return os.path.join(self.fln_filter.outdir, "fln.done")
 
     @property
-    def training_candidates(self):
-        return self.__training_candidates
-
-    @property
-    def testing_candidates(self):
-        return self.__testing_candidates
-
-    @property
     def dbs(self):
         return self.configuration["mikado_homology"]["prot_dbs"]
-
-    @property
-    def is_long(self):
-        return self.__is_long
 
 
 class FLNOp(AtomicOperation, metaclass=abc.ABCMeta):
@@ -509,7 +494,7 @@ class FilterFLN(FLNOp):
         self.output = {"table": self.outprefix + ".table.txt",
                        # "list": self.outprefix + ".list.txt",
                        }
-        for category in ['Training', 'Gold', 'Silver', 'Bronze', "Testing"]:
+        for category in ['Training', 'Gold', 'Silver', 'Bronze']:
             self.output[category] = self.outprefix + ".{category}.gff3".format(**locals())
 
         self.log = os.path.join(self.outdir, "filter_fln.log")
@@ -532,44 +517,6 @@ class FilterFLN(FLNOp):
         return ["mikado", "ei-annotation"]
 
     @property
-    def coverage(self):
-        """Maximum coverage two sequences can have between each other before being considered too similar for training.
-        If this condition happen together with maximum identity (see below), only one of the two genes is kept."""
-        return self.configuration.get(
-            "training", {}).get(
-            "max_blast_self_identity", 80)
-
-    @property
-    def identity(self):
-        """Maximum coverage two sequences can have between each other before being considered too similar for training.
-        If this condition happen together with maximum coverage (see above), only one of the two genes is kept."""
-        return self.configuration.get(
-            "training", {}).get(
-            "max_blast_self_identity", 80)
-
-    @property
-    def max_intron(self):
-        """Maximum intron length for a training candidate. Default 10,000 (10**4)."""
-        return self.configuration.get(
-            "training", {}).get(
-            "max_intron", 10000)
-
-    @property
-    def flank(self):
-        """Minimum distance between two genes for them not to be considered overlapping, for training purposes.
-        Default 2000"""
-        return self.configuration.get(
-            "training", {}).get(
-            "flank", 2000)
-
-    @property
-    def max_training(self):
-        """Maximum number of genes to be selected for training. Default 2,200 (2,000 for training, 200 for test)"""
-        return self.configuration.get(
-            "training", {}).get(
-            "training_models", 2200)
-
-    @property
     def cmd(self):
 
         load = self.load
@@ -577,15 +524,9 @@ class FilterFLN(FLNOp):
         input, log = self.input, self.log
         outprefix = self.outprefix
         mikado_loci = os.path.splitext(self.input["bed12"])[0]
-        flank = self.flank
-        coverage, identity = self.coverage, self.identity
-        max_intron = self.max_intron
-        max_training = self.max_training
 
         cmd = "{load} "
-        cmd += "mkdir -p {outdir} && filter_fln.py --flank {flank} -cov {coverage} -id {identity} "
-        cmd += " --max-intron {max_intron} --max-training {max_training} "
-        cmd += "{input[table]} {mikado_loci} {input[blast_txt]}"
+        cmd += "mkdir -p {outdir} && filter_fln.py {input[table]} {mikado_loci} {input[blast_txt]}"
         cmd += " {outprefix} > {log} 2> {log}"
         cmd = cmd.format(**locals())
 

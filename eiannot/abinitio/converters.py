@@ -3,10 +3,31 @@ from ..rnaseq.mikado.__init__ import Mikado
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
 from ..repeats.__init__ import RepeatMasking
 from ..proteins.__init__ import ExonerateProteinWrapper
+from .fln import FilterFLN
 import os
 
 
+__doc__ = """A single file of hints has to be generated.
+
+Portcullis: only "intron"
+Mikado:
+  - "exon": internal exons
+  - "exonpart": beginning/end of the model
+  - "intron": the introns present
+  - "CDSpart": beginning/end of the model
+  - "CDS": internal CDS exons.
+Proteins:
+  - "intron"
+  - "CDS": internal exons
+  - "CDSpart": terminal exons
+Repeats:
+  - "nonexonpart" 
+
+"""
+
+
 augustus_help = """
+
               5. USING HINTS (AUGUSTUS+)
               --------------------------
 AUGUSTUS can take hints on the gene structure. It currently accepts 16 types of hints:  
@@ -205,7 +226,9 @@ translation starts and variation in UTR.
 
 """
 
+
 outdir = os.path.join( "abinitio", "3-Hints")
+
 
 class ConvertToHints(EIWrapper):
 
@@ -215,7 +238,90 @@ class ConvertToHints(EIWrapper):
 
 class ConvertMikado(AtomicOperation):
 
-    pass
+    """Mikado will have to be converted in *four* batches, with *four* different priorities and two different sources:
+    - gold: source "M", default priority: 10
+    - silver: source "M", default priority: 9
+    - bronze: source "E", default priority: 8
+    - all: source "E", default priority: 7
+    """
+
+    def __init__(self, filterer: FilterFLN, category: str):
+
+        super().__init__(filterer)
+
+        self.input["table"] = filterer.output["table"]
+        self.input["bed12"] = filterer.input["bed12"]
+        
+        self.output["hints"] = os.path.join(, outdir, "mikado.hints.gff3")
+
+    @property
+    def gold_score(self):
+        pass
+
+    @property
+    def silver_score(self):
+        pass
+
+    @property
+    def bronze_score(self):
+        pass
+
+    @property
+    def all_score(self):
+
+        pass
+
+    @property
+    def gold_source(self):
+        pass
+
+    @property
+    def silver_source(self):
+        pass
+
+    @property
+    def bronze_source(self):
+        pass
+
+    @property
+    def all_source(self):
+        pass
+
+    @property
+    def loader(self):
+        return ["mikado", "ei-annotation"]
+
+    @property
+    def cmd(self):
+
+        load = self.load
+        input, output = self.input, self.output
+        mikado_loci = os.path.splitext(self.input["bed12"])[0]
+        
+        cmd = "{load} filtered_fln_to_hints.py "
+        gold_score, gold_source = self.gold_score, self.gold_source
+        cmd += " -gs {gold_score} --gold-source {gold_source} "
+        
+        silver_score, silver_source = self.silver_score, self.silver_source
+        cmd += " -gs {silver_score} --silver-source {silver_source} "
+        
+        bronze_score, bronze_source = self.bronze_score, self.bronze_source
+        cmd += " -gs {bronze_score} --bronze-source {bronze_source} "
+
+        all_score, all_source = self.all_score, self.all_source
+        cmd += " -gs {all_score} --all-source {all_source} "
+
+        cmd += " {mikado_loci} {table} {out}"
+
+        return ""
+
+    @property
+    def rulename(self):
+        return "prepare_mikado_hints"
+
+    @property
+    def threads(self):
+        return 1
 
 
 class ConvertRepeats(AtomicOperation):

@@ -1,69 +1,16 @@
 #!/usr/bin/env python3
 
-# import sys
-# import os
 import argparse
 import pandas as pd
 import Mikado
 import networkx as nx
-# import networkit as nk
 import itertools
-import sqlite3
-import collections
-import magic
-from Mikado.exceptions import CorruptIndex
+from . import build_pos_index
 from functools import partial
 try:
     import ujson as json
 except ImportError:
     import json
-
-
-def build_pos_index(index_name):
-
-    positions = dict()
-
-    wizard = magic.Magic(mime=True)
-
-    if wizard.from_file("{0}".format(index_name)) == b"application/gzip":
-        raise CorruptIndex("Invalid index file")
-    try:
-        conn = sqlite3.connect("{0}".format(index_name))
-        cursor = conn.cursor()
-        tables = cursor.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
-        if sorted(tables) != sorted([("positions",), ("genes",)]):
-            raise CorruptIndex("Invalid database file")
-
-    except sqlite3.DatabaseError:
-        raise CorruptIndex("Invalid database file")
-
-    try:
-        gene_positions = dict()
-        for obj in cursor.execute("SELECT * from positions"):
-            chrom, start, end, gid = obj
-            if chrom not in positions:
-                positions[chrom] = collections.defaultdict(list)
-            positions[chrom][(start, end)].append(gid)
-            gene_positions[gid] = (chrom, start, end)
-    except sqlite3.DatabaseError:
-        raise CorruptIndex("Invalid index file. Rebuilding.")
-
-    indexer = collections.defaultdict(list).fromkeys(positions)
-    for chrom in positions:
-        indexer[chrom] = Mikado.utilities.intervaltree.IntervalTree.from_tuples(
-            positions[chrom].keys()
-        )
-
-    genes = dict()
-    try:
-        for obj in cursor.execute("SELECT * from genes"):
-            gid, blob = obj
-            genes[gid] = Mikado.loci.Gene(None)
-            genes[gid].load_dict(json.loads(blob))
-    except sqlite3.DatabaseError:
-        raise CorruptIndex("Invalid index file. Rebuilding.")
-
-    return indexer, positions, gene_positions, genes
 
 
 def remove_genes_with_overlaps(training_candidates: pd.DataFrame,
@@ -107,22 +54,11 @@ def perc(string):
 def main():
 
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument(
-        "--flank", type=int, default=1000,
-        help="Minimum distance between candidate training genes and any other gene (default %(default)s bps).")
-    parser.add_argument(
-        "--max-intron", dest="max_intron", type=int, default=10000,
-        help="Maximum intron length for ")
-    parser.add_argument(
-        "-cov", "--coverage", type=perc, default=80,
-        help="Minimum coverage in the self-blast for a candidate to be considered a self-hit. Default: %(default)s%%")
-    parser.add_argument(
-        "-id", "--identity", type=perc, default=80,
-        help="Minimum identity in the self-blast for a candidate to be considered a self-hit. Default: %(default)s%%")
-    parser.add_argument("--max-training", default=2000, type=int, dest="max_training",
-                        help="Maximum number of genes to select for training. Default %(default)s.")
-    parser.add_argument("-ctf", "--cross-test-fraction", default=80, type=perc, dest="cross_test",
-                        help="Fraction of training models to keep sperated for testing. Default: %(default)s%%.")
+    parser.add_argument("--flank", type=int, default=1000)
+    parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
+    parser.add_argument("-cov", "--coverage", type=perc, default=80)
+    parser.add_argument("-id", "--identity", type=perc, default=80)
+    parser.add_argument("--max_training", default=2000, type=int)
     parser.add_argument("fln")
     parser.add_argument("mikado")
     parser.add_argument("blast")
@@ -146,6 +82,8 @@ def main():
                               
                               metrics, left_on=fln.columns[0], right_on=metrics.columns[0])
 
+    # Purge everything which has a long intron
+    merged = merged[merged.max_intron_length <= args.max_intron]
     # Now that we have a complete table, it is easy to filter out
 
     # Now we have to exclude genes that are within 1000bps of another gene
@@ -156,19 +94,21 @@ def main():
     # This instead are the gold/silver/bronze categories for the training
 
     gold = merged[(
+        (merged.index.str.endswith(".1")) &
+
         (merged.Status.str.contains("complete", case=False)) &
         ((merged["ORF_start"] == merged["mikado_orf_start"]) &
          # Mikado and FLN account for the end of the ORF differently. This ensures that they mean the same codon.
          (abs(merged["ORF_end"] - merged["mikado_orf_end"])) < 3) &
-        ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length >= 300) &
-         (merged.five_utr_num > 0) & (merged.three_utr_num > 0))
+        ((merged.combined_cds_length == merged.selected_cds_length) &
+         (merged.three_utr_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
+        (merged.three_utr_num <= 2) &  (merged.five_utr_num <= 3)
     )]  # [[merged.columns[0], "parent"]]
 
     training_candidates = gold[(
          (gold.combined_cds_fraction >= 0.5) &
-         (gold.max_intron_length <= args.max_intron) &
-         (gold.transcripts_per_gene == 1) & (gold.source_score == gold.source_score.max()))
-    ][[gold.columns[0], "parent"]]
+         (gold.transcripts_per_gene == 1)  # & (gold.source_score == gold.source_score.max())  # Not sure about this
+    )][[gold.columns[0], "parent"]]
     training_candidates = remove_genes_with_overlaps(training_candidates,
                                                      indexer,
                                                      positions,
@@ -210,43 +150,31 @@ def main():
     graph.add_edges_from(zip(nodes.sseqid, nodes.qseqid))
 
     to_keep = [list(_)[0] for _ in nx.connected_components(graph)]
-    id_column = gold.columns[0]
-    training_candidates = training_candidates[(training_candidates[id_column].isin(to_keep)) |
-                                              (~training_candidates[id_column].isin(node_index))]
+    training_candidates = training_candidates[(training_candidates[gold.columns[0]].isin(to_keep)) |
+                                              (~training_candidates[gold.columns[0]].isin(node_index))]
 
     # Now select only X candidates
     # Sample would fail if asked to select an X > df.shape[0], so we enforce the minimum of the two
-    max_test_train = int(100 * args.max_training / args.cross_test)
+    training_candidates = training_candidates.sample(min(args.max_training,
+                                                         training_candidates.shape[0]))
 
-    if training_candidates.shape[0] <= max_test_train:
-        test_candidates = training_candidates.sample(
-            int(training_candidates.shape[0] * (100 - args.cross_test) / 100)
-        )
-        training_candidates = training_candidates[~training_candidates[id_column].isin(
-            test_candidates[id_column])]
-    else:
-        test_candidates = training_candidates.sample(
-            int(max_test_train * (100 - args.cross_test) / 100)
-        )
-        training_candidates = training_candidates[
-            ~training_candidates[id_column].isin(test_candidates[id_column])].sample(args.max_training)
-
-    assert test_candidates.shape[0] > 0, "No candidates left for testing!"
-    assert training_candidates.shape[0] > 0, "No candidates left for training!"
-
-    silver = merged[(
+    silver = merged[
+        (merged.index.str.endswith(".1")) &
+        (
         (~merged["parent"].isin(gold["parent"])) &
-        ((merged.combined_cds_length == merged.selected_cds_length) & (merged.selected_cds_length >= 300) &
-         (merged.five_utr_num == 2) & (merged.three_utr_num == 1))
+        ((merged.combined_cds_length == merged.selected_cds_length) &
+         (merged.selected_cds_length >= 900) &
+          (merged.three_utr_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
+         (merged.three_utr_num <= 2) & (merged.five_utr_num <= 3)
     )][[merged.columns[0], "parent"]]
 
-    bronze = merged[((~merged["parent"].isin(silver["parent"])) &
-                     (~merged["parent"].isin(gold["parent"])) &
-                     (merged["max_intron_length"] <= max(50000, min(50000, args.max_intron))))][
-        [merged.columns[0], "parent"]]
+    bronze = merged[(
+        (merged.index.str.endswith(".1")) &
+        (~merged["parent"].isin(silver["parent"])) &
+        (~merged["parent"].isin(gold["parent"]))
+    )][[merged.columns[0], "parent"]]
 
-    merged["Training"] = merged[merged.columns[0]].isin(training_candidates[id_column])
-    merged["Testing"] = merged[merged.columns[0]].isin(test_candidates[id_column])
+    merged["Training"] = merged[merged.columns[0]].isin(training_candidates[training_candidates.columns[0]])
     cat = partial(determine_category,
                   gold=set(gold.iloc[:, 0].unique()),
                   silver=set(silver.iloc[:, 0].unique()),
@@ -270,12 +198,6 @@ def main():
         for gene in merged[merged.Training == True].parent.astype(str):
             gene = genes[gene]
             print(gene.format("gff3"), file=training)
-
-    with open("{args.out_prefix}.Testing.gff3".format(**locals()), "wt") as testing:
-        print("##gff-version\t3", file=testing)
-        for gene in merged[merged.Testing == True].parent.astype(str):
-            gene = genes[gene]
-            print(gene.format("gff3"), file=testing)
 
     for category in ("Gold", "Silver", "Bronze"):
         with open("{args.out_prefix}.{category}.gff3".format(**locals()), "wt") as out_gff:
