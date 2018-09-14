@@ -1,13 +1,12 @@
-BootStrap: yum
-OSVersion: 7
-MirrorURL: http://yum-repos.hpccluster/centos/7/os/$basearch/
+Bootstrap: docker
+From: centos:7
+OSversion: 7
 Include: yum wget
-
 # If you want the updates (available at the bootstrap date) to be installed
 # inside the container during the bootstrap instead of the General Availability
 # point release (7.x) then uncomment the following line
 
-UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
+# UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
 
 %test
     python3.6 --version
@@ -37,19 +36,19 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
 
     ### Install your packages ###
     cd /opt/software/
-    yum -y install yum-utils which
-    yum -y groupinstall development
-    yum -y install https://centos7.iuscommunity.org/ius-release.rpm
-    yum -y install python36u python36u-devel
-    yum -y install zlib autoconf automake libtool pthreads tar curl cmake3 git openssl-devel
-    cmake3 --version
-    yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel
-    yum -y install lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel
-    yum -y install blas-devel libgfortran
-    yum -y install pcre-devel curl libcurl-devel perl-WWW-Curl libxml2-devel xz-devel 
-    yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel \
-        	lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel \
-    		perl-devel perl-CPAN libxml2-devel
+    # yum -y install yum-utils which wget
+    # yum -y groupinstall development
+    # yum -y install https://centos7.iuscommunity.org/ius-release.rpm
+    # yum -y install python36u python36u-devel
+    # yum -y install zlib autoconf automake libtool pthreads tar curl cmake3 git openssl-devel
+    # cmake3 --version
+    # yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel
+    # yum -y install lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel
+    # yum -y install blas-devel libgfortran
+    # yum -y install pcre-devel curl libcurl-devel perl-WWW-Curl libxml2-devel xz-devel 
+    # yum -y install perl gsl-devel libsqlite3x-devel libboost-graph-dev suitesparse-devel lpsolve-devel \
+    #     	lzma-devel zlib-devel ncurses-devel bzip2-devel bzip2-devel xz-devel \
+    # 		perl-devel perl-CPAN libxml2-devel
 
     yum -y install centos-release-scl
     yum -y install scl-utils
@@ -60,27 +59,6 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     mkdir -p /etc/profile.d/
     echo -e '#!/bin/bash\nsource scl_source enable devtoolset-7' > /etc/profile.d/enablegcc7.sh
 
-    
-    version=2.5.1
-    cd /usr/local/src
-    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-    bash Miniconda3-latest-Linux-x86_64.sh -b -p /usr/local/conda
-    export PATH="/usr/local/conda/bin:$PATH"
-    source activate
-    conda install -y -c conda-forge jemalloc
-    conda install -y -c conda-forge ruby=2.4.4
-
-    python3.6 --version
-    cd $(dirname $(which python3.6))
-    ln -s python3.6 python3
-    cd /opt/software/
-
-    curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
-    python3.6 get-pip.py
-    pip3.6 --version
-    gcc --version
-    make --version
-
     ### Perl
     yum -y install perl-CPAN perl-App-cpanminus
     yum -y install perl-DB_File
@@ -89,16 +67,19 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     yum -y install perl-Digest-MD5
     yum -y install perl-List-MoreUtils
 
+    gcc --version
+    make --version
+
     # Clean up yum
     yum clean all
 
-    # Install samtools
-    export LD_LIBRARY_PATH="/usr/include/:$LD_LIBRARY_PATH"
-    export CPPFLAGS="-I/usr/include/:/usr/local/include:$CPPFLAGS"
-
-    # Install python requirements
-    wget https://github.com/lucventurini/mikado/blob/1.2.4/requirements.txt
-    pip3.6 install -r requirements.txt
+    version=2.5.1
+    cd /usr/local/src
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    bash Miniconda3-latest-Linux-x86_64.sh -b -p /usr/local/conda
+    export PATH="/usr/local/conda/bin:$PATH"
+    source activate
+    conda install -y -c conda-forge jemalloc ruby=2.4.4 pip
 
     # FullLengtherNext
     ruby --version
@@ -112,6 +93,19 @@ UpdateURL: http://yum-repos.hpccluster/centos/7/updates/$basearch/
     cd exonerate-2.2.0-x86_64/bin/;
     mv * -t /usr/local/bin/;
     cd ../../;
+
+    python3 --version
+    cd $(dirname $(which python3))
+    cd /opt/software/
+
+    # Install samtools
+    export LD_LIBRARY_PATH="/usr/include/:$LD_LIBRARY_PATH"
+    export CPPFLAGS="-I/usr/include/:/usr/local/include:$CPPFLAGS"
+
+    # Install python requirements
+    wget https://github.com/lucventurini/mikado/blob/1.2.4/requirements.txt
+    cat requirements.txt
+    pip3 install -r requirements.txt
 
     # Install TopHat2
     # This will need to be installed in a specific CONDA ENVIRONMENT

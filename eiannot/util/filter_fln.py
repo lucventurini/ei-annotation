@@ -59,6 +59,8 @@ def main():
     parser.add_argument("-cov", "--coverage", type=perc, default=80)
     parser.add_argument("-id", "--identity", type=perc, default=80)
     parser.add_argument("--max-training", dest="max_training", default=2000, type=int)
+    parser.add_argument("-cs", "--cross-testing", dest="cross_testing", default=0.2, type=float,
+                        help="Fraction of training candidates to be used for cross testing.")
     parser.add_argument("fln")
     parser.add_argument("mikado")
     parser.add_argument("blast")
