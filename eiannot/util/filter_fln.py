@@ -58,7 +58,7 @@ def main():
     parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
     parser.add_argument("-cov", "--coverage", type=perc, default=80)
     parser.add_argument("-id", "--identity", type=perc, default=80)
-    parser.add_argument("--max_training", default=2000, type=int)
+    parser.add_argument("--max-training", dest="max_training", default=2000, type=int)
     parser.add_argument("fln")
     parser.add_argument("mikado")
     parser.add_argument("blast")
@@ -102,7 +102,7 @@ def main():
          (abs(merged["ORF_end"] - merged["mikado_orf_end"])) < 3) &
         ((merged.combined_cds_length == merged.selected_cds_length) &
          (merged.three_utr_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
-        (merged.three_utr_num <= 2) &  (merged.five_utr_num <= 3)
+        (merged.three_utr_num <= 2) & (merged.five_utr_num <= 3)
     )]  # [[merged.columns[0], "parent"]]
 
     training_candidates = gold[(
@@ -157,6 +157,8 @@ def main():
     # Sample would fail if asked to select an X > df.shape[0], so we enforce the minimum of the two
     training_candidates = training_candidates.sample(min(args.max_training,
                                                          training_candidates.shape[0]))
+    training_final = training_candidates.sample(frac=args.cross_testing)
+    testing_final = training_candidates[~training_candidates.index.isin(training_final.index)]
 
     silver = merged[
         (merged.index.str.endswith(".1")) &
@@ -174,7 +176,8 @@ def main():
         (~merged["parent"].isin(gold["parent"]))
     )][[merged.columns[0], "parent"]]
 
-    merged["Training"] = merged[merged.columns[0]].isin(training_candidates[training_candidates.columns[0]])
+    merged["Training"] = merged[merged.columns[0]].isin(training_final[training_final.columns[0]])
+    merged["Testing"] = merged[merged.columns[0]].isin(testing_final[testing_final.columns[0]])
     cat = partial(determine_category,
                   gold=set(gold.iloc[:, 0].unique()),
                   silver=set(silver.iloc[:, 0].unique()),
@@ -196,15 +199,18 @@ def main():
     with open("{args.out_prefix}.Training.gff3".format(**locals()), "wt") as training:
         print("##gff-version\t3", file=training)
         for gene in merged[merged.Training == True].parent.astype(str):
-            gene = genes[gene]
-            print(gene.format("gff3"), file=training)
+            print(genes[gene].format("gff3"), file=training)
+
+    with open("{args.out_prefix}.Testing.gff3".format(**locals()), "wt") as testing:
+        print("##gff-version\t3", file=testing)
+        for gene in merged[merged.Training == True].parent.astype(str):
+            print(genes[gene].format("gff3"), file=testing)
 
     for category in ("Gold", "Silver", "Bronze"):
         with open("{args.out_prefix}.{category}.gff3".format(**locals()), "wt") as out_gff:
             print("##gff-version\t3", file=out_gff)
             for gene in merged[merged.Category == category].parent.astype(str):
-                gene = genes[gene]
-                print(gene.format("gff3"), file=out_gff)
+                print(genes[gene].format("gff3"), file=out_gff)
 
     return
 

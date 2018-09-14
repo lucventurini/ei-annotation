@@ -252,7 +252,7 @@ class ConvertMikado(AtomicOperation):
         self.input["table"] = filterer.output["table"]
         self.input["bed12"] = filterer.input["bed12"]
         
-        self.output["hints"] = os.path.join(, outdir, "mikado.hints.gff3")
+        # self.output["hints"] = os.path.join(, outdir, "mikado.hints.gff3")
 
     @property
     def gold_score(self):
@@ -334,6 +334,7 @@ class ConvertRepeats(AtomicOperation):
             self.input["table"] = repeats.output["table"]
             self.output["gff3"] = os.path.join(self.outdir, "repeat_hints.gff3")
             self.log = os.path.join(os.path.dirname(self.outdir), "logs", "extract_repeats.log")
+            self.logdir = os.path.dirname(self.log)
 
     @property
     def outdir(self):
@@ -367,7 +368,18 @@ class ConvertRepeats(AtomicOperation):
 
 
 class ConvertProteins(AtomicOperation):
-    pass
+
+    def __init_subclass__(cls, **kwargs):
+        pass
+
+    def __init__(self):
+
+        super().__init__()
+
+    def rulename(self):
+        return "convert_proteins_to_hits"
+
+    # def
 
 
 class ConvertJunctions(AtomicOperation):

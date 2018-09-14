@@ -160,8 +160,10 @@ class PortcullisPrepRef(AtomicOperation):
     def __init__(self, configuration, outdir):
         super().__init__()
         self.configuration = configuration
-        self.input = {"reference": self.transcriptome}
-        if not self.input["reference"]:
+        if self.transcriptome:
+            self.input = {"reference": self.transcriptome}
+        else:
+            self.input = {"reference": ""}
             self.output = {"refbed": ""}
             return
         self._outdir = outdir

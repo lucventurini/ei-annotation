@@ -43,13 +43,19 @@ class MikadoPick(MikadoOp):
         return "mikado_pick_{mode}".format(mode=self.mode)
 
     @property
+    def flank(self):
+        return self.configuration.get("mikado", {}).get("pick", {}).get("flank", 200)
+
+    @property
     def cmd(self):
         load = self.load
 
         cmd = "{load} "
         mode = self.mode
         threads = self.threads
+        flank = self.flank
         cmd += "mkdir -p {loci_dir} && mikado pick --source Mikado_{mode} --mode={mode} --procs={threads} "
+        cmd += " --flank {flank} "
         input, output = self.input, self.output
         cmd += "--start-method=spawn --json-conf={input[cfg]} "
         loci_out = os.path.basename(self.output["loci"])

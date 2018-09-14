@@ -1,7 +1,10 @@
 reference:
   min_intron: 20
   max_intron: 10000
-  transcriptome: "chr5.gff3"
+  # transcriptome: "chr5.gff3"
+abinitio:
+  train: true
+  max_training_models: 2000
 programs:
   gth:
     species: 'arabidopsis'
@@ -80,7 +83,7 @@ name: "eitest"
 mikado_homology:
   prot_dbs: &prot_db
   - "uniprot_sprot_plants.fasta"
-  - "chr5.pep.fasta"
+  # - "chr5.pep.fasta"
   execute: true
   program: 'diamond'
   chunks: 2

@@ -5,6 +5,7 @@ from ..rnaseq.mikado.pick import MikadoStats
 from ..rnaseq.mikado import Mikado
 from ..rnaseq.mikado.abstract import MikadoOp
 from ..preparation import SanitizeProteinBlastDB, BlastxIndex, DiamondIndex
+from ..proteins.chunking import _get_value
 # from ..repeats.__init__ import RepeatMasking
 import os
 import abc
@@ -18,6 +19,8 @@ class FlnWrapper(EIWrapper):
     def __init__(self, mikado: Mikado):  #, masker: RepeatMasking):
 
         super().__init__()
+
+        self.__is_long = mikado.stats.is_long
 
         if mikado.stats:
             # Start extracting the data ...
@@ -58,6 +61,8 @@ class FlnWrapper(EIWrapper):
             self.add_edge(self.self_blast, self.fln_filter)
             self.training = FlnCategoryStats(self.fln_filter, "Training", is_long=mikado.stats.is_long)
             self.add_edge(self.fln_filter, self.training)
+            self.testing = FlnCategoryStats(self.fln_filter, "Testing", is_long=mikado.stats.is_long)
+            self.add_edge(self.fln_filter, self.training)
             self.gold = FlnCategoryStats(self.fln_filter, "Gold", is_long=mikado.stats.is_long)
             self.add_edge(self.fln_filter, self.gold)
             self.silver = FlnCategoryStats(self.fln_filter, "Silver", is_long=mikado.stats.is_long)
@@ -71,6 +76,22 @@ class FlnWrapper(EIWrapper):
             self.add_final_flag()
         else:
             pass
+
+    @property
+    def flank(self):
+        return self.configuration.get("mikado", {}).get("pick", {}).get("flank", 200)
+
+    @property
+    def training_candidates(self):
+        return self.training.input["Training"]
+
+    @property
+    def testing_candidates(self):
+        return self.testing.input["Testing"]
+
+    @property
+    def is_long(self):
+        return self.__is_long
 
     @property
     def flag_name(self):
@@ -494,7 +515,7 @@ class FilterFLN(FLNOp):
         self.output = {"table": self.outprefix + ".table.txt",
                        # "list": self.outprefix + ".list.txt",
                        }
-        for category in ['Training', 'Gold', 'Silver', 'Bronze']:
+        for category in ['Training', 'Testing', 'Gold', 'Silver', 'Bronze']:
             self.output[category] = self.outprefix + ".{category}.gff3".format(**locals())
 
         self.log = os.path.join(self.outdir, "filter_fln.log")
@@ -517,6 +538,22 @@ class FilterFLN(FLNOp):
         return ["mikado", "ei-annotation"]
 
     @property
+    def flank(self):
+        return self.configuration.get("mikado", {}).get("pick", {}).get("flank", 200)
+
+    @property
+    def identity(self):
+        return _get_value(self.configuration, None, "identity")
+
+    @property
+    def coverage(self):
+        return _get_value(self.configuration, None, "coverage")
+
+    @property
+    def max_training(self):
+        return self.configuration.get("abinitio", {}).get("max_training_models", 2000)
+
+    @property
     def cmd(self):
 
         load = self.load
@@ -524,10 +561,29 @@ class FilterFLN(FLNOp):
         input, log = self.input, self.log
         outprefix = self.outprefix
         mikado_loci = os.path.splitext(self.input["bed12"])[0]
+        max_intron = self.max_intron
+        flank = self.flank
+        coverage, identity = self.coverage, self.identity
+        max_training = self.max_training
+
+        # parser = argparse.ArgumentParser(__doc__)
+        # parser.add_argument("--flank", type=int, default=1000)
+        # parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
+        # parser.add_argument("-cov", "--coverage", type=perc, default=80)
+        # parser.add_argument("-id", "--identity", type=perc, default=80)
+        # parser.add_argument("--max-training", default=2000, type=int)
+        # parser.add_argument("fln")
+        # parser.add_argument("mikado")
+        # parser.add_argument("blast")
+        # parser.add_argument("out_prefix")
+        # args = parser.parse_args()
 
         cmd = "{load} "
-        cmd += "mkdir -p {outdir} && filter_fln.py {input[table]} {mikado_loci} {input[blast_txt]}"
-        cmd += " {outprefix} > {log} 2> {log}"
+        cmd += "mkdir -p {outdir} && filter_fln.py "
+        cmd += " --flank {flank} "
+        cmd += " --max-intron {max_intron} -cov {coverage} -id {identity} --max-training {max_training} "
+        cmd += " {input[table]} {mikado_loci} {input[blast_txt]} {outprefix} > {log} 2> {log}"
+
         cmd = cmd.format(**locals())
 
         return cmd
