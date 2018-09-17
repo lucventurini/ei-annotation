@@ -379,8 +379,6 @@ class ConvertProteins(AtomicOperation):
     def rulename(self):
         return "convert_proteins_to_hits"
 
-    # def
-
 
 class ConvertJunctions(AtomicOperation):
 
