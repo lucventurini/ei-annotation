@@ -220,7 +220,7 @@ class TrainAugustus(AtomicOperation):
         else:
             cmd += "(optimize_augustus.pl --species={species} --kfold={threads} --cpus={threads} --UTR=on "
             cmd += "training.gb 2>&1 > {log}"
-        cmd += "&& touch {flag})"
+        cmd += " && touch {flag})"
 
         cmd = cmd.format(**locals())
 

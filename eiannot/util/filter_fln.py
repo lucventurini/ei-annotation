@@ -5,7 +5,7 @@ import pandas as pd
 import Mikado
 import networkx as nx
 import itertools
-from . import build_pos_index
+from eiannot.util import build_pos_index
 from functools import partial
 try:
     import ujson as json
@@ -81,8 +81,9 @@ def main():
     metrics = pd.read_csv(metrics, sep="\t")
     metrics["transcripts_per_gene"] = metrics.groupby("parent")["parent"].transform("count")
     merged = pd.merge(pd.merge(fln, orf_df, on=fln.columns[0]),
-                              
-                              metrics, left_on=fln.columns[0], right_on=metrics.columns[0])
+                                metrics, left_on=fln.columns[0], right_on=metrics.columns[0])
+
+    merged.set_index(fln.columns[0], inplace=True)
 
     # Purge everything which has a long intron
     merged = merged[merged.max_intron_length <= args.max_intron]
@@ -103,7 +104,7 @@ def main():
          # Mikado and FLN account for the end of the ORF differently. This ensures that they mean the same codon.
          (abs(merged["ORF_end"] - merged["mikado_orf_end"])) < 3) &
         ((merged.combined_cds_length == merged.selected_cds_length) &
-         (merged.three_utr_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
+         (merged.three_utr_num_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
         (merged.three_utr_num <= 2) & (merged.five_utr_num <= 3)
     )]  # [[merged.columns[0], "parent"]]
 
@@ -168,7 +169,7 @@ def main():
         (~merged["parent"].isin(gold["parent"])) &
         ((merged.combined_cds_length == merged.selected_cds_length) &
          (merged.selected_cds_length >= 900) &
-          (merged.three_utr_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
+          (merged.three_utr_num_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
          (merged.three_utr_num <= 2) & (merged.five_utr_num <= 3)
     )][[merged.columns[0], "parent"]]
 

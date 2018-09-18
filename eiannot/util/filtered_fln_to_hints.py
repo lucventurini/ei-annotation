@@ -4,7 +4,11 @@ import sys
 import argparse
 import pandas as pd
 import Mikado
-from . import build_pos_index
+import Mikado.transcripts
+from Mikado.parsers.GFF import GffLine
+from eiannot.util import build_pos_index
+import os
+import re
 
 
 def prepare_rows(transcript: Mikado.transcripts.Transcript,
@@ -15,7 +19,7 @@ def prepare_rows(transcript: Mikado.transcripts.Transcript,
     for row in Mikado.transcripts.transcript.create_lines_cds(transcript,
                                                               with_introns=True,
                                                               to_gtf=False, all_orfs=False, transcriptomic=False):
-        assert isinstance(row, Mikado.parsers.GFF.GffLine)
+        row = GffLine(row)
 
         if row.is_transcript:
             continue
@@ -64,33 +68,50 @@ def main():
     parser.add_argument("outfile", type=argparse.FileType("wt"), default=sys.stdout, nargs="?")
     args = parser.parse_args()
 
+    if args.loci.endswith("midx"):
+        midx = args.loci
+    else:
+        midx = os.path.join(os.path.dirname(args.loci),
+                            re.sub("\.(gff3*|bed12)", ".gff3.midx", os.path.basename(args.loci)))
+        if not os.path.exists(midx):
+            raise OSError("I cannot find the MIDX index file {midx}".format(**locals()))
+
+    try:
+        indexer, positions, gene_positions, genes = build_pos_index(midx)
+    except Mikado.exceptions.CorruptIndex:
+        raise Mikado.exceptions.CorruptIndex("Invalid MIDX file: {midx}".format(**locals()))
+
     table = pd.read_csv(args.table, delimiter="\t", index_col=[0])
-    indexer, positions, gene_positions, genes = build_pos_index(args.loci)
+
     grouped = table.groupby("parent")
     for parent in grouped.groups:
         gene = genes[parent]
         group = grouped.get_group(parent)
-        for tid in group.index:
-            row = group.loc[tid]
-            transcript = gene[tid]
+        for tidx in group.index:
+            row = group.loc[tidx]
+            tid = row.tid
+            try:
+                transcript = gene[tid]
+            except KeyError:
+                raise KeyError(group.index, row.tid)
             lines = prepare_rows(transcript, category="all",
                                  score=args.all_score, source=args.all_source,
                                  print_cds=args.cds)
             print(*lines, sep="\n", file=args.outfile)
-            if row.category.isna():
+            if pd.isna(row.Category):
                 continue
-            elif row.category.astype(str) == "Gold":
+            elif row.Category == "Gold":
                 source, score, category = args.gold_source, args.gold_score, "gold"
-            elif row.category.astype(str) == "Silver":
+            elif row.Category == "Silver":
                 source, score, category = args.silver_source, args.silver_score, "silver"
-            elif row.category.astype(str) == "Bronze":
+            elif row.Category == "Bronze":
                 source, score, category = args.bronze_source, args.bronze_score, "bronze"
             else:
-                raise ValueError("Unrecognised category: {}".format(row.category.astype(str)))
+                raise ValueError("Unrecognised category: {}".format(row.Category))
             lines = prepare_rows(transcript, category=category,
                                  score=score, source=source,
                                  print_cds=args.cds)
-            print(*lines, sep="\n")
+            print(*lines, sep="\n", file=args.outfile)
 
 
 main()

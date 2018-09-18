@@ -2,4 +2,6 @@ snakemake
 networkx
 eicore
 mikado>=1.2.4
+pyBigWig
+deeptools
 pandas

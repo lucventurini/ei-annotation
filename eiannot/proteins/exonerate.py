@@ -1,7 +1,7 @@
 from ..abstract import AtomicOperation
 from .abstract import ProteinChunkAligner, FilterAlignments, ProteinWrapper, _get_value
 import functools
-from .chunking import ChunkProteins
+from .abstract import ChunkProteins
 from ..repeats import RepeatMasking
 import re
 import subprocess as sp
@@ -280,3 +280,4 @@ class ExonerateProteinWrapper(ProteinWrapper):
         self.add_edge(self.masker, filterer)
         self.add_edge(self.portcullis, filterer)
         self.add_edge(convert, filterer)
+        self._add_to_proteins(filterer)

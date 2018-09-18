@@ -4,6 +4,7 @@ reference:
   # transcriptome: "chr5.gff3"
 abinitio:
   train: true
+  quick: true
   max_training_models: 2000
 programs:
   gth:

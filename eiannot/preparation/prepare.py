@@ -53,4 +53,3 @@ def parse_samplesheet(samplesheet, configuration):
             configuration[tag][label] = sample
 
     return configuration
-

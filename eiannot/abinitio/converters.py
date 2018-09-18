@@ -1,9 +1,12 @@
 from ..abstract import AtomicOperation, EIWrapper
-from ..rnaseq.mikado.__init__ import Mikado
+# from ..rnaseq.mikado.__init__ import Mikado
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
+from ..rnaseq.alignments import ShortAlignmentsWrapper
+from ..rnaseq.alignments.bam import Bam2BigWig, MergeWigs
 from ..repeats.__init__ import RepeatMasking
-from ..proteins.__init__ import ExonerateProteinWrapper
-from .fln import FilterFLN
+from ..proteins.__init__ import ProteinWrapper
+from ..proteins.abstract import _get_value, FilterAlignments
+from .fln import FlnWrapper, FilterFLN
 import os
 
 
@@ -16,6 +19,8 @@ Mikado:
   - "intron": the introns present
   - "CDSpart": beginning/end of the model
   - "CDS": internal CDS exons.
+Portcullis junctions:
+  - "intron"  
 Proteins:
   - "intron"
   - "CDS": internal exons
@@ -232,8 +237,76 @@ outdir = os.path.join( "abinitio", "3-Hints")
 
 class ConvertToHints(EIWrapper):
 
-    def __init__(self):
-        pass
+    __final_rulename__ = "augustus_conversion_done"
+
+    def __init__(self,
+                 mikado: FlnWrapper,
+                 alignments: ShortAlignmentsWrapper,
+                 mikado_long: FlnWrapper,
+                 portcullis: PortcullisWrapper,
+                 repeats: RepeatMasking,
+                 proteins: ProteinWrapper):
+
+        super().__init__(configuration=mikado.configuration)
+
+        self.__coverages = {"+": [], "-": [], ".": []}
+
+        for bam in alignments.bams:
+
+            if bam.sample.stranded is True:
+                plus = Bam2BigWig(bam, strand="+")
+                self.add_edge(bam, plus)
+                self.__coverages["+"].append(plus)
+                minus = Bam2BigWig(bam, strand="-")
+                self.add_edge(bam, minus)
+                self.__coverages["-"].append(minus)
+            else:
+                nonstrand = Bam2BigWig(bam, strand=None)
+                self.add_edge(bam, nonstrand)
+                self.__coverages["."].append(nonstrand)
+
+        merged_plus = MergeWigs(bigwigs=self.__coverages["+"], strand="forward",
+                                faidx=alignments.prepare_wrapper.fai)
+        merged_minus = MergeWigs(bigwigs=self.__coverages["-"], strand="reverse",
+                                 faidx=alignments.prepare_wrapper.fai)
+        merged_null = MergeWigs(bigwigs=self.__coverages["-"], strand=None,
+                               faidx=alignments.prepare_wrapper.fai)
+        self.add_edges_from([(coverage, merged_plus) for coverage in self.__coverages["+"]])
+        self.add_edges_from([(coverage, merged_minus) for coverage in self.__coverages["-"]])
+        self.add_edges_from([(coverage, merged_null) for coverage in self.__coverages["."]])
+
+        if mikado.fln_filter:
+            self.mikado_converter = ConvertMikado(mikado.fln_filter)
+            self.add_node(self.mikado_converter)
+        else:
+            self.mikado_converter = None
+        if mikado_long.fln_filter:
+            self.mikado_converter_long = ConvertMikado(mikado_long.fln_filter)
+            self.add_node(self.mikado_converter_long)
+        else:
+            self.mikado_converter_long = None
+
+        portcullis = ConvertJunctions(portcullis)
+        self.add_node(portcullis)
+        if repeats.execute:
+            repeats = ConvertRepeats(repeats)
+            self.add_node(repeats)
+        self.proteins = []
+        for filterer in proteins.proteins:
+            converter = ConvertProteins(filterer)
+            self.proteins.append(converter)
+
+        # Add them to the graph
+        [self.add_node(converter) for converter in self.proteins]
+        self.add_final_flag()
+
+    @property
+    def flag_name(self):
+        return os.path.join(self.outdir, "augustus_hints_conversion.done")
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], outdir, "output")
 
 
 class ConvertMikado(AtomicOperation):
@@ -245,47 +318,60 @@ class ConvertMikado(AtomicOperation):
     - all: source "E", default priority: 7
     """
 
-    def __init__(self, filterer: FilterFLN, category: str):
+    def __init__(self, filterer: FilterFLN):
 
-        super().__init__(filterer)
+        super().__init__()
+        self.configuration = filterer.configuration
+        self.__is_long = filterer.is_long
 
         self.input["table"] = filterer.output["table"]
         self.input["bed12"] = filterer.input["bed12"]
-        
-        # self.output["hints"] = os.path.join(, outdir, "mikado.hints.gff3")
+        self.output["hints"] = os.path.join(self.outdir, "mikado.hints.{long}gff3".format(
+            long="long." if self.is_long else ""))
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], outdir, "output")
 
     @property
     def gold_score(self):
-        pass
+        return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("gold", 10)
 
     @property
     def silver_score(self):
-        pass
+        return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("silver", 9)
 
     @property
     def bronze_score(self):
-        pass
+        return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("bronze", 8)
 
     @property
     def all_score(self):
-
-        pass
+        return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("all", 7)
 
     @property
     def gold_source(self):
-        pass
+        src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("gold", "M")
+        assert src in ("M", "E", "P", "RM", "W")
+        return src
 
     @property
     def silver_source(self):
-        pass
+        src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("silver", "M")
+        assert src in ("M", "E", "P", "RM", "W")
+        return src
 
     @property
     def bronze_source(self):
-        pass
+        src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("bronze", "E")
+        assert src in ("M", "E", "P", "RM", "W")
+        return src
 
     @property
     def all_source(self):
-        pass
+        src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("all", "E")
+        assert src in ("M", "E", "P", "RM", "W")
+        return src
 
     @property
     def loader(self):
@@ -296,28 +382,36 @@ class ConvertMikado(AtomicOperation):
 
         load = self.load
         input, output = self.input, self.output
-        mikado_loci = os.path.splitext(self.input["bed12"])[0]
+        mikado_loci = self.input["bed12"]
         
         cmd = "{load} filtered_fln_to_hints.py "
         gold_score, gold_source = self.gold_score, self.gold_source
         cmd += " -gs {gold_score} --gold-source {gold_source} "
         
         silver_score, silver_source = self.silver_score, self.silver_source
-        cmd += " -gs {silver_score} --silver-source {silver_source} "
+        cmd += " -ss {silver_score} --silver-source {silver_source} "
         
         bronze_score, bronze_source = self.bronze_score, self.bronze_source
-        cmd += " -gs {bronze_score} --bronze-source {bronze_source} "
+        cmd += " -bs {bronze_score} --bronze-source {bronze_source} "
 
         all_score, all_source = self.all_score, self.all_source
-        cmd += " -gs {all_score} --all-source {all_source} "
+        cmd += " -as {all_score} --all-source {all_source} "
 
+        table = self.input["table"]
+        out = self.output["hints"]
         cmd += " {mikado_loci} {table} {out}"
 
-        return ""
+        cmd = cmd.format(**locals())
+
+        return cmd
+
+    @property
+    def is_long(self):
+        return self.__is_long
 
     @property
     def rulename(self):
-        return "prepare_mikado_hints"
+        return "prepare_mikado_hints{long}".format(long="_long" if self.is_long else "")
 
     @property
     def threads(self):
@@ -338,7 +432,6 @@ class ConvertRepeats(AtomicOperation):
 
     @property
     def outdir(self):
-
         return os.path.join(self.configuration["outdir"], outdir, "output")
 
     @property
@@ -372,23 +465,57 @@ class ConvertProteins(AtomicOperation):
     def __init_subclass__(cls, **kwargs):
         pass
 
-    def __init__(self):
+    def __init__(self, proteins: FilterAlignments):
 
         super().__init__()
+        self.configuration = proteins.configuration
+        self.__dbname = proteins.dbname
+        self.input = proteins.output
+        self.output["hints"] = os.path.join(self.outdir, "{dbname}.hints.gff".format(dbname=self.dbname))
 
+    @property
     def rulename(self):
-        return "convert_proteins_to_hits"
+        return "convert_proteins_to_hints_{dbname}".format(dbname=self.dbname)
+
+    @property
+    def loader(self):
+        return ["mikado", "ei-annotation"]
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], outdir, "output")
+
+    @property
+    def dbname(self):
+        return self.__dbname
+
+    @property
+    def priority(self):
+        value = _get_value(self.configuration, self.dbname, "priority")
+        if value is None:
+            return 4
+        else:
+            return value
+
+    @property
+    def cmd(self):
+        load = self.load
+        input, output = self.input, self.output
+        priority = self.priority
+        cmd = "{load} convert_proteins_to_hints.py -p {priority} {input[gff3]} {output[hints]}"
+        cmd = cmd.format(**locals())
+        return cmd
 
 
 class ConvertJunctions(AtomicOperation):
 
-    def __init__(self, junctions: (PortcullisWrapper)):
+    def __init__(self, junctions: PortcullisWrapper):
 
         super().__init__()
         self.configuration = junctions.configuration
-        self.input["gff3"] = junctions.junctions_task.input["gff3"]
-        self.output["gold"] = os.path.join(self.outdir, "portcullis_junctions_gold.gff3")
-        self.output["silver"] = os.path.join(self.outdir, "portcullis_junctions_silver.gff3")
+        self.input["tab"] = junctions.junctions_task.output["tab"]
+        self.output["gold"] = os.path.join(self.outdir, "portcullis_junctions.gold.gff3")
+        self.output["silver"] = os.path.join(self.outdir, "portcullis_junctions.silver.gff3")
 
     @property
     def rulename(self):
@@ -418,7 +545,7 @@ class ConvertJunctions(AtomicOperation):
         priority = " ".join([str(_) for _ in self.priority])
         threshold = self.threshold
         maxintron = self.max_intron  # TODO: maybe this should be yet another value in the conf?
-        prefix = os.path.splitext(self.output["gold"])[0]
+        prefix = os.path.join(self.outdir, "portcullis_junctions")
         cmd = "{load} mkdir -p {outdir} && filter_portcullis.py -p {priority} -s gold silver -t {threshold}"
         cmd += " -mi {maxintron} {input[tab]} {prefix}"
         cmd = cmd.format(**locals())
@@ -427,7 +554,3 @@ class ConvertJunctions(AtomicOperation):
     @property
     def outdir(self):
         return os.path.join(self.configuration["outdir"], outdir, "output")
-
-
-class GetCoverage(AtomicOperation):
-    pass

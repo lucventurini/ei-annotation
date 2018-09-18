@@ -3,7 +3,9 @@ from .gmap import GsnapWrapper, GmapLongWrapper
 from .tophat2 import TopHat2Wrapper
 from .star import StarWrapper, StarLongWrapper
 from ...abstract import EIWrapper
+from ...preparation import PrepareWrapper
 from .minimap2 import MiniMap2Wrapper
+from .bam import MergeWigs
 import os
 
 
@@ -14,7 +16,7 @@ class ShortAlignmentsWrapper(EIWrapper):
                 "tophat2": TopHat2Wrapper,
                 "gsnap": GsnapWrapper}
 
-    def __init__(self, prepare_wrapper: EIWrapper):
+    def __init__(self, prepare_wrapper: PrepareWrapper):
 
         super().__init__()
         self.__bams = []
@@ -24,7 +26,7 @@ class ShortAlignmentsWrapper(EIWrapper):
         instances = []
         flags = []
         for tool, wrapper in self.wrappers.items():
-            instance = wrapper(self.configuration, self.__prepare_flag)
+            instance = wrapper(self.configuration, self.prepare_wrapper)
             instance.finalise()
 
             # print(tool, instance.bams)
@@ -55,6 +57,10 @@ class ShortAlignmentsWrapper(EIWrapper):
     def bams(self):
         return self.__bams.copy()
 
+    @property
+    def prepare_wrapper(self):
+        return self.__prepare_flag
+
 
 class LongAlignmentsWrapper(EIWrapper):
 
@@ -73,7 +79,7 @@ class LongAlignmentsWrapper(EIWrapper):
         flags = []
 
         for wrapper in self.wrappers.values():
-            instance = wrapper(self.__prepare_flag)
+            instance = wrapper(self.prepare_wrapper)
             instance.finalise()
             assert instance.exit
             self.merge([instance])
@@ -99,3 +105,7 @@ class LongAlignmentsWrapper(EIWrapper):
     @property
     def gfs(self):
         return self.__gf_rules
+
+    @property
+    def prepare_wrapper(self):
+        return self.__prepare_flag

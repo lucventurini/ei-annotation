@@ -128,6 +128,7 @@ def main():
                         type=float, default=50)
     parser.add_argument("-mincov", "--min-coverage", dest="min_coverage",
                         type=float, default=80)
+    parser.add_argument("-s", "--source", required=True, type=str)
     parser.add_argument("-g", "--genome", required=True, type=pyfaidx.Fasta)
     parser.add_argument("gff", type=to_gff)
     parser.add_argument("out", type=argparse.FileType("wt"), default=sys.stdout, nargs="?")
@@ -157,7 +158,8 @@ def main():
             if current:
                 current = evaluate(current, args, introns)
                 if current:
-                    print(current, file=args.out)
+                    current.source = args.source
+                    print(current.format("gff3"), file=args.out)
                     print("###", file=args.out)
             current = Transcript(line, intron_range=[args.minI, max(args.maxE, args.maxM)])
         elif line.feature == "match_part":
@@ -165,7 +167,8 @@ def main():
 
     current = evaluate(current, args, introns)
     if current:
-        print(current, file=args.out)
+        current.source = args.source
+        print(current.format("gff3"), file=args.out)
 
 
 if __name__ == "__main__":

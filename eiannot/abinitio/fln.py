@@ -5,7 +5,7 @@ from ..rnaseq.mikado.pick import MikadoStats
 from ..rnaseq.mikado import Mikado
 from ..rnaseq.mikado.abstract import MikadoOp
 from ..preparation import SanitizeProteinBlastDB, BlastxIndex, DiamondIndex
-from ..proteins.chunking import _get_value
+from ..proteins.abstract import _get_value
 # from ..repeats.__init__ import RepeatMasking
 import os
 import abc

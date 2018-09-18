@@ -1,6 +1,5 @@
-from .chunking import ChunkProteins
-from ..abstract import AtomicOperation, EIWrapper
-from .abstract import ProteinChunkAligner, FilterAlignments, _get_value, ProteinWrapper
+from ..abstract import AtomicOperation  # , EIWrapper
+from .abstract import ChunkProteins, ProteinChunkAligner, FilterAlignments, _get_value, ProteinWrapper
 from ..repeats import RepeatMasking
 from ..preparation import FaidxProtein, SanitizeProteinBlastDB
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
@@ -217,3 +216,4 @@ class GTHProteinWrapper(ProteinWrapper):
         self.add_edge(self.masker, filterer)
         self.add_edge(self.portcullis, filterer)
         self.add_edge(collapsed, filterer)
+        self._add_to_proteins(filterer)

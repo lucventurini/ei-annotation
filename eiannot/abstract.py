@@ -361,6 +361,9 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         if key in self.__params:
             del self.__params[key]
 
+    def get_from_params(self, key):
+        return self.__params[key]
+
     @property
     def _root_dir(self):
         return self.configuration["outdir"]
@@ -656,7 +659,6 @@ class EIWorfkflow(metaclass=abc.ABCMeta):
     def check_graph(self):
         """This method will check that the graph is valid, before printing."""
 
-        # TODO: implement
         keys = Counter([_.rulename for _ in self])
         while keys.most_common()[0][1] > 1:
             vals = [_ for _ in self if _.rulename == keys.most_common()[0][0]]

@@ -8,6 +8,7 @@ from .rnaseq.mikado import Mikado
 from .rnaseq.assemblies import AssemblyWrapper
 from .proteins import ExonerateProteinWrapper, GTHProteinWrapper
 from .abinitio import FlnWrapper, TrainAugustusWrapper
+from .abinitio.converters import ConvertToHints
 import os
 
 
@@ -75,10 +76,21 @@ class AnnotationWorklow(EIWorfkflow):
         self.add_edge(self.repeats, self.augustus_configuration)
         self.add_edge(self.fln, self.augustus_configuration)
 
-        self.add_final_flag()
-        faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
-        assert list(faid.input.keys()) == ["genome"], faid.input
+        self.converter = ConvertToHints(mikado=self.fln,
+                                        mikado_long=self.fln_long,
+                                        alignments=self.short_wrapper,
+                                        portcullis=self.portcullis,
+                                        repeats=self.repeats,
+                                        proteins=self.protein_alignments)
+        for node in [self.fln, self.fln_long, self.short_wrapper, self.portcullis,
+                     self.repeats, self.protein_alignments]:
+            if not node:
+                continue
+            self.add_edge(node, self.converter)
 
+        self.add_final_flag()
+        # faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
+        # assert list(faid.input.keys()) == ["genome"], faid.input
 
     @property
     def flag_name(self):

@@ -1,8 +1,9 @@
 import abc
 from ...abstract import ShortSample, LongSample, AtomicOperation, EIWrapper
 import os
-from .bam import BamIndex, BamSort, BamStats
-import networkx as nx
+from .bam import BamIndex, BamSort, BamStats, Bam2BigWig
+from ...preparation import PrepareWrapper
+# import networkx as nx
 
 
 class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
@@ -369,7 +370,7 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
         cls.__final_rulename__ = "{toolname}_flag".format(toolname=cls.__toolname__)
         super().__init_subclass__()
 
-    def __init__(self, configuration, prepare_wrapper):
+    def __init__(self, configuration, prepare_wrapper: PrepareWrapper):
         self.__finalised = False
         self.__prepare_wrapper = prepare_wrapper
         super().__init__()
@@ -401,7 +402,9 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
             stater = BamStats(indexer)
             self.add_edge(indexer, stater)
             new_bams.add(stater)
+            # Now add the coverage
             self.__stats.append(stater)
+
         self.__bam_rules = new_bams
         self.add_final_flag()
         self.__finalised = True
@@ -434,16 +437,6 @@ class ShortWrapper(EIWrapper, metaclass=abc.ABCMeta):
     @property
     def runs(self):
         return self.configuration["programs"].get(self.toolname, dict()).get("runs", [])
-
-    # def __add_flag_to_inputs(self):
-    #     preds = nx.ancestors(self.graph, flag)
-    #     for rule in self.nodes:
-    #         if rule == self.__prepare_wrapper.exit:
-    #             continue
-    #         elif
-    #
-    #         rule.input["prepare_flag"] = self.__prepare_wrapper.exit.output["flag"]
-    #         self.add_edge(self.__prepare_wrapper.exit, rule)
 
     @property
     @abc.abstractmethod
