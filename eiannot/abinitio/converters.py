@@ -1,8 +1,9 @@
 from ..abstract import AtomicOperation, EIWrapper
+from ..preparation import FaidxGenome
 # from ..rnaseq.mikado.__init__ import Mikado
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
 from ..rnaseq.alignments import ShortAlignmentsWrapper
-from ..rnaseq.alignments.bam import Bam2BigWig, MergeWigs
+from ..rnaseq.alignments.bam import Bam2BigWig
 from ..repeats.__init__ import RepeatMasking
 from ..proteins.__init__ import ProteinWrapper
 from ..proteins.abstract import _get_value, FilterAlignments
@@ -250,30 +251,8 @@ class ConvertToHints(EIWrapper):
         super().__init__(configuration=mikado.configuration)
 
         self.__coverages = {"+": [], "-": [], ".": []}
-
-        for bam in alignments.bams:
-
-            if bam.sample.stranded is True:
-                plus = Bam2BigWig(bam, strand="+")
-                self.add_edge(bam, plus)
-                self.__coverages["+"].append(plus)
-                minus = Bam2BigWig(bam, strand="-")
-                self.add_edge(bam, minus)
-                self.__coverages["-"].append(minus)
-            else:
-                nonstrand = Bam2BigWig(bam, strand=None)
-                self.add_edge(bam, nonstrand)
-                self.__coverages["."].append(nonstrand)
-
-        merged_plus = MergeWigs(bigwigs=self.__coverages["+"], strand="forward",
-                                faidx=alignments.prepare_wrapper.fai)
-        merged_minus = MergeWigs(bigwigs=self.__coverages["-"], strand="reverse",
-                                 faidx=alignments.prepare_wrapper.fai)
-        merged_null = MergeWigs(bigwigs=self.__coverages["-"], strand=None,
-                               faidx=alignments.prepare_wrapper.fai)
-        self.add_edges_from([(coverage, merged_plus) for coverage in self.__coverages["+"]])
-        self.add_edges_from([(coverage, merged_minus) for coverage in self.__coverages["-"]])
-        self.add_edges_from([(coverage, merged_null) for coverage in self.__coverages["."]])
+        self.alignments = alignments
+        self.perform_coverages()
 
         if mikado.fln_filter:
             self.mikado_converter = ConvertMikado(mikado.fln_filter)
@@ -300,6 +279,70 @@ class ConvertToHints(EIWrapper):
         [self.add_node(converter) for converter in self.proteins]
         self.add_final_flag()
 
+    def perform_coverages(self):
+        for bam in self.alignments.bams:
+
+            if bam.sample.stranded is True:
+                plus = Bam2BigWig(bam, strand="+")
+                self.add_edge(bam, plus)
+                self.__coverages["+"].append(plus)
+                minus = Bam2BigWig(bam, strand="-")
+                self.add_edge(bam, minus)
+                self.__coverages["-"].append(minus)
+            else:
+                nonstrand = Bam2BigWig(bam, strand=None)
+                self.add_edge(bam, nonstrand)
+                self.__coverages["."].append(nonstrand)
+
+        # Remove non-stranded if we have stranded
+        if self.__coverages["+"] or not self.always_execute_unstranded:
+            self.remove_nodes(self.__coverages["."])
+            self.__coverages["."] = []
+
+        wig2hints_store = []
+
+        for strand in self.__coverages.keys():
+            if not self.__coverages[strand]:
+                continue
+            merged = MergeWigs(bigwigs=self.__coverages[strand], strand=strand,
+                                faidx=self.alignments.prepare_wrapper.fai)
+            self.add_edges_from([(coverage, merged) for coverage in self.__coverages[strand]])
+            wig2hints = WigToHints(merged)
+            self.add_edge(merged, wig2hints)
+            wig2hints_store.append(wig2hints)
+
+    @property
+    def __always_skip_unstranded(self):
+        value = self.configuration.get("abinitio", {}).get("coverage", {}).get(
+            "always_skip_unstranded", False
+        )
+
+        assert isinstance(value, bool)
+        return value
+
+    @property
+    def always_skip_unstranded(self):
+
+        return self.__always_skip_unstranded
+
+    @property
+    def __always_execute_unstranded(self):
+
+        value = self.configuration.get("abinitio", {}).get("coverage", {}).get(
+            "always_execute_unstranded", False
+        )
+
+        assert isinstance(value, bool)
+        return value
+
+    @property
+    def always_execute_unstranded(self):
+        return self.__always_execute_unstranded or (not self.always_skip_unstranded)
+
+    @property
+    def always_execute_unstranded(self):
+        return self.__always_execute_unstranded and (not self.__always_skip_unstranded)
+
     @property
     def flag_name(self):
         return os.path.join(self.outdir, "augustus_hints_conversion.done")
@@ -307,6 +350,246 @@ class ConvertToHints(EIWrapper):
     @property
     def outdir(self):
         return os.path.join(self.configuration["outdir"], outdir, "output")
+
+
+class MergeWigs(AtomicOperation):
+
+    def __init__(self, bigwigs: [Bam2BigWig], faidx: FaidxGenome, strand=None):
+
+        super().__init__()
+        self.__strand = None
+        self.strand = strand
+        self.configuration = bigwigs[0].configuration
+        self.input = {"bigwigs": [rule.output["bw"] for rule in bigwigs],
+                      "fai": faidx.output["fai"]}
+
+        self.output = {"wig": os.path.join(self.outdir, self.name_prefix+ ".wig"),
+                       "bw_list": os.path.join(self.outdir, self.name_prefix + ".txt"),
+                       }
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], outdir, "coverage")
+
+    @property
+    def name_prefix(self):
+        name_prefix = "coverage"
+        if self.strand is not None:
+            name_prefix += "." + self.strand
+        return name_prefix
+
+    @property
+    def is_small(self):
+        return True
+
+    @property
+    def strand(self):
+        return self.__strand
+
+    @strand.setter
+    def strand(self, strand):
+        if strand == "+":
+            strand = "forward"
+        elif strand == "-":
+            strand = "reverse"
+        elif strand == ".":
+            strand = None
+
+        if strand not in (None, "forward", "reverse"):
+            raise ValueError("Invalid strand: {}".format(strand))
+        self.__strand = strand
+
+    @property
+    def normalizer(self):
+        # TODO: set this dynamically
+        return "median"
+
+    @property
+    def rulename(self):
+        name = "merge_wigs"
+        if self.strand is not None:
+            name += "_" + self.strand
+        return name
+
+    @property
+    def max_value(self):
+        return self.configuration.get("abinitio", {}).get("max_coverage", 50)
+
+    @property
+    def loader(self):
+        return ["ei-annot", "deeptools"]
+
+    @property
+    def cmd(self):
+        load = self.load
+        outdir = self.outdir
+        cmd = "{load} mkdir -p {outdir} && "
+        bigwigs = "\\n".join(self.input["bigwigs"])
+        bw_list = self.output["bw_list"]
+        out_wig = self.output["wig"]
+        genome = self.genome
+        max_value = self.max_value
+        threads = self.threads
+        normalizer = self.normalizer
+        cmd += """echo -e "{bigwigs}" > {bw_list} && """
+        cmd += """bigWigMerge.py -g {genome} -n {normalizer} -p {threads} --inList --clip={max_value} """
+        cmd += """-o {out_wig} {bw_list}"""
+
+        cmd = cmd.format(**locals())
+        return cmd
+
+
+class WigToHints(AtomicOperation):
+
+    __name__ = "wig_to_hints"
+
+    def __init__(self, merger: MergeWigs):
+
+        super().__init__()
+        self.configuration = merger.configuration
+        self.input = merger.output
+        self.__name_prefix = merger.name_prefix
+        self.__strand = merger.strand
+        self.output["hints"] = os.path.join(self.outdir, self.name_prefix + ".hints.gff")
+
+    @property
+    def name_prefix(self):
+        return self.__name_prefix
+
+    @property
+    def strand(self):
+        return self.__strand
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], outdir, "coverage")
+
+    @property
+    def rulename(self):
+        rule = self.__name__
+        if self.strand is not None:
+            rule += "_" + self.strand
+        return rule
+
+    @property
+    def loader(self):
+        return ["ei-annotation", "augustus"]
+
+    @property
+    def width(self):
+        return 10
+
+    @property
+    def margin(self):
+        return 10
+
+    @property
+    def threshold(self):
+        return 2
+
+    @property
+    def minscore(self):
+        return 4
+
+    @property
+    def prune(self):
+        return 0.1
+
+    @property
+    def radius(self):
+        return 4.5
+
+    @property
+    def src(self):
+        return "W"
+
+    @property
+    def priority(self):
+        return 3
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def cmd(self):
+        load = self.load
+        width, margin, threshold = self.width, self.margin, self.threshold
+        minscore, prune, radius = self.minscore, self.prune, self.radius
+        wig = self.input["wig"]
+        out = self.output["hints"]
+        outdir = self.outdir
+        src = self.src
+        source = "coverage"
+        if self.strand:
+            source += "_" + self.strand
+        if self.strand:
+            if self.strand == "forward":
+                strand = "+"
+            else:
+                strand = "-"
+        else:
+            strand = "."
+        priority = self.priority
+
+        cmd = "{load} mkdir -p {outdir} && wig2hints.pl --width={width} --margin={margin} --minthresh={threshold} "
+        cmd += " --src={src} --strand={strand} --type=exonpart --UCSC={source} --pri={priority}"
+        cmd += " --minscore={minscore} --prune={prune} --radius={radius} < {wig} > {out}"
+
+        cmd = cmd.format(**locals())
+        return cmd
+
+
+class MergeHints(AtomicOperation):
+
+    __doc__ = """This class has the purpose of bringing together all the hints into a single GFF file."""
+
+    def __init__(self, hints, with_coverage: bool):
+
+        super().__init__()
+        if len(hints) == 0:
+            raise ValueError("No hints provided")
+        self.__with_coverage = None
+        self.with_coverage = with_coverage
+        self.input["hints"] = []
+        self.output["hints"] = os.path.join(self.outdir, "hints{cov}.gff".format(
+            cov=".with_coverage." if self.with_coverage else ""))
+
+    @property
+    def outdir(self):
+        return os.path.join(self.configuration["outdir"], outdir, "output")
+
+    @property
+    def with_coverage(self):
+        return self.__with_coverage
+
+    @with_coverage.setter
+    def with_coverage(self, flag):
+        if flag not in (False, True):
+            raise ValueError(flag)
+        self.__with_coverage = flag
+
+    @property
+    def rulename(self):
+        return "merge_and_sort_hints"
+
+    @property
+    def loader(self):
+        return ["genometools"]
+
+    @property
+    def threads(self):
+        return 1
+
+    @property
+    def cmd(self):
+        load = self.load
+        out = self.output["hints"]
+        gffs = " ".join(self.input["hints"])
+        cmd = "{load}"
+        cmd += " gt gff3 -tidy -sort -force -o {out} {gffs}"
+        cmd = cmd.format(**locals())
+        return cmd
 
 
 class ConvertMikado(AtomicOperation):
@@ -406,16 +689,16 @@ class ConvertMikado(AtomicOperation):
         return cmd
 
     @property
+    def threads(self):
+        return 1
+
+    @property
     def is_long(self):
         return self.__is_long
 
     @property
     def rulename(self):
         return "prepare_mikado_hints{long}".format(long="_long" if self.is_long else "")
-
-    @property
-    def threads(self):
-        return 1
 
 
 class ConvertRepeats(AtomicOperation):
@@ -498,6 +781,10 @@ class ConvertProteins(AtomicOperation):
             return value
 
     @property
+    def threads(self):
+        return 1
+
+    @property
     def cmd(self):
         load = self.load
         input, output = self.input, self.output
@@ -520,6 +807,10 @@ class ConvertJunctions(AtomicOperation):
     @property
     def rulename(self):
         return "prepare_hints_portcullis"
+
+    @property
+    def threads(self):
+        return 1
 
     @property
     def loader(self):

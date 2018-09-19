@@ -5,7 +5,6 @@ from .star import StarWrapper, StarLongWrapper
 from ...abstract import EIWrapper
 from ...preparation import PrepareWrapper
 from .minimap2 import MiniMap2Wrapper
-from .bam import MergeWigs
 import os
 
 
