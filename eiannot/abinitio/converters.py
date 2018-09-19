@@ -340,10 +340,6 @@ class ConvertToHints(EIWrapper):
         return self.__always_execute_unstranded or (not self.always_skip_unstranded)
 
     @property
-    def always_execute_unstranded(self):
-        return self.__always_execute_unstranded and (not self.__always_skip_unstranded)
-
-    @property
     def flag_name(self):
         return os.path.join(self.outdir, "augustus_hints_conversion.done")
 
