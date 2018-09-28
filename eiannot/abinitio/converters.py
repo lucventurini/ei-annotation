@@ -797,8 +797,14 @@ class ConvertJunctions(AtomicOperation):
         super().__init__()
         self.configuration = junctions.configuration
         self.input["tab"] = junctions.junctions_task.output["tab"]
-        self.output["gold"] = os.path.join(self.outdir, "portcullis_junctions.gold.gff3")
-        self.output["silver"] = os.path.join(self.outdir, "portcullis_junctions.silver.gff3")
+        self.output["gold"] = os.path.join(self.outdir,
+                                           "portcullis_junctions.gold.{source}{score}.gff3".format(
+                                               source=self.gold_source, score=self.gold_score
+                                           ))
+        self.output["silver"] = os.path.join(self.outdir,
+                                             "portcullis_junctions.silver.{source}{score}.gff3".format(
+                                                 source=self.silver_source, score=self.silver_score
+                                             ))
 
     @property
     def rulename(self):
@@ -813,9 +819,21 @@ class ConvertJunctions(AtomicOperation):
         return ["ei-annotation"]
 
     @property
-    def priority(self):
+    def gold_source(self):
+        return
+
+    @property
+    def gold_score(self):
+        return
+
+    @property
+    def silver_source(self):
         # TODO: most probably this will have to go into the configuration
-        return [6, 4]
+        return
+
+    @property
+    def silver_score(self):
+        return
 
     @property
     def threshold(self):
@@ -825,16 +843,17 @@ class ConvertJunctions(AtomicOperation):
     @property
     def cmd(self):
 
-        input, output, priority = self.input, self.output, self.priority
+        input, output = self.input, self.output
         outdir = self.outdir
         load = self.load
         outdir = self.outdir
-        priority = " ".join([str(_) for _ in self.priority])
+        priority = " ".join([str(self.gold_score), str(self.silver_score)])
+        sources = " ".join([str(self.gold_source), str(self.silver_source)])
         threshold = self.threshold
         maxintron = self.max_intron  # TODO: maybe this should be yet another value in the conf?
         prefix = os.path.join(self.outdir, "portcullis_junctions")
         cmd = "{load} mkdir -p {outdir} && filter_portcullis.py -p {priority} -s gold silver -t {threshold}"
-        cmd += " -mi {maxintron} {input[tab]} {prefix}"
+        cmd += " --sources {sources} -mi {maxintron} {input[tab]} {prefix}"
         cmd = cmd.format(**locals())
         return cmd
 

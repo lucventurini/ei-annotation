@@ -28,6 +28,8 @@ def main():
     parser.add_argument("tab")
     parser.add_argument("-s", "--suffix", nargs=2, default=["gold", "silver"],
                         help="Suffices for the pass/fail. Default: gold, silver")
+    parser.add_argument("--sources", nargs=2, default=["E", "E"],
+                        help="Tag for the src field in the GFF. Default: %(default)s")
     parser.add_argument("-p", "--priorities", nargs=2, type=int, default=[6, 4],
                         help="Priorities for pass/fail. Default: 6, 4")
     parser.add_argument("-mi", "--max-intron-length", default=10000, type=int, dest="mi")
@@ -35,8 +37,12 @@ def main():
     parser.add_argument("prefix")
     args = parser.parse_args()
 
-    pass_gff3 = "{args.prefix}.gold.gff3".format(**locals())
-    fail_gff3 = "{args.prefix}.silver.gff3".format(**locals())
+    pass_gff3 = "{args.prefix}.gold.{source}{priority}.gff3".format(source=args.sources[0],
+                                                                    priority=args.priorities[0],
+                                                                    **locals())
+    fail_gff3 = "{args.prefix}.silver.{source}{priority}.gff3".format(source=args.sources[1],
+                                                                      priority=args.priorities[1],
+                                                                      **locals())
 
     if not os.path.exists(os.path.dirname(args.prefix)):
         os.makedirs(os.path.dirname(args.prefix))
