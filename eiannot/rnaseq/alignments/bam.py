@@ -205,3 +205,95 @@ class Bam2BigWig(AtomicOperation):
         cmd += "bamCoverage -b {bam} --ignoreDuplicates {rna_sense} -o {out} -p {threads} --normalizeUsing BPM"
         cmd = cmd.format(**locals())
         return cmd
+
+
+class MergeWigs(AtomicOperation):
+
+    def __init__(self, bigwigs: [Bam2BigWig], faidx: FaidxGenome, strand=None):
+
+        """This method will merge the BigWigs into a single wig file in the RNASeq output folder."""
+
+        super().__init__()
+        self.configuration = bigwigs[0].configuration
+        self.__strand = None
+        self.strand = strand
+        self.input = {"bigwigs": [rule.output["bw"] for rule in bigwigs],
+                      "fai": faidx.output["fai"]}
+
+        outdirs = [os.path.dirname(_) for _ in self.input["bigwigs"]]
+        assert len(set(outdirs)) == 1, set(outdirs)
+        self.outdir = set(outdirs).pop()
+        self.output = {"wig": os.path.join(self.outdir, self.name_prefix+ ".wig"),
+                       "bw_list": os.path.join(self.outdir, self.name_prefix + ".txt"),
+                       }
+
+    @property
+    def __subfolder(self):
+        return "3-Hints"
+
+    @property
+    def name_prefix(self):
+        name_prefix = "coverage"
+        if self.strand is not None:
+            name_prefix += "." + self.strand
+        return name_prefix
+
+    @property
+    def is_small(self):
+        return True
+
+    @property
+    def strand(self):
+        return self.__strand
+
+    @strand.setter
+    def strand(self, strand):
+        if strand == "+":
+            strand = "forward"
+        elif strand == "-":
+            strand = "reverse"
+        elif strand == ".":
+            strand = None
+
+        if strand not in (None, "forward", "reverse"):
+            raise ValueError("Invalid strand: {}".format(strand))
+        self.__strand = strand
+
+    @property
+    def normalizer(self):
+        # TODO: set this dynamically
+        return "median"
+
+    @property
+    def rulename(self):
+        name = "merge_wigs"
+        if self.strand is not None:
+            name += "_" + self.strand
+        return name
+
+    @property
+    def max_value(self):
+        return self.configuration.get("abinitio", {}).get("max_coverage", 50)
+
+    @property
+    def loader(self):
+        return ["ei-annot", "deeptools"]
+
+    @property
+    def cmd(self):
+        load = self.load
+        outdir = self.outdir
+        cmd = "{load} mkdir -p {outdir} && "
+        bigwigs = "\\n".join(self.input["bigwigs"])
+        bw_list = self.output["bw_list"]
+        out_wig = self.output["wig"]
+        genome = self.genome
+        max_value = self.max_value
+        threads = self.threads
+        normalizer = self.normalizer
+        cmd += """echo -e "{bigwigs}" > {bw_list} && """
+        cmd += """bigWigMerge.py -g {genome} -n {normalizer} -p {threads} --inList --clip={max_value} """
+        cmd += """-o {out_wig} {bw_list}"""
+
+        cmd = cmd.format(**locals())
+        return cmd

@@ -1,13 +1,14 @@
-from ..abstract import AtomicOperation, EIWrapper
-from ..preparation import FaidxGenome
+from ..abstract import EIWrapper
+import abc
 # from ..rnaseq.mikado.__init__ import Mikado
 from ..rnaseq.alignments.portcullis import PortcullisWrapper
 from ..rnaseq.alignments import ShortAlignmentsWrapper
-from ..rnaseq.alignments.bam import Bam2BigWig
+from ..rnaseq.alignments.bam import Bam2BigWig, MergeWigs
 from ..repeats.__init__ import RepeatMasking
 from ..proteins.__init__ import ProteinWrapper
 from ..proteins.abstract import _get_value, FilterAlignments
 from .fln import FlnWrapper, FilterFLN
+from .abstract import AugustusMethod
 import os
 
 
@@ -241,6 +242,7 @@ class ConvertToHints(EIWrapper):
     __final_rulename__ = "augustus_conversion_done"
 
     def __init__(self,
+                 run: int,
                  mikado: FlnWrapper,
                  alignments: ShortAlignmentsWrapper,
                  mikado_long: FlnWrapper,
@@ -253,26 +255,28 @@ class ConvertToHints(EIWrapper):
         self.__coverages = {"+": [], "-": [], ".": []}
         self.alignments = alignments
         self.perform_coverages()
+        self.__run = None
+        self.run = run
 
         if mikado.fln_filter:
-            self.mikado_converter = ConvertMikado(mikado.fln_filter)
+            self.mikado_converter = ConvertMikado(run=self.run, filterer=mikado.fln_filter)
             self.add_node(self.mikado_converter)
         else:
             self.mikado_converter = None
         if mikado_long.fln_filter:
-            self.mikado_converter_long = ConvertMikado(mikado_long.fln_filter)
+            self.mikado_converter_long = ConvertMikado(run=self.run, filterer=mikado_long.fln_filter)
             self.add_node(self.mikado_converter_long)
         else:
             self.mikado_converter_long = None
 
-        portcullis = ConvertJunctions(portcullis)
+        portcullis = ConvertJunctions(run=self.run, junctions=portcullis)
         self.add_node(portcullis)
         if repeats.execute:
-            repeats = ConvertRepeats(repeats)
+            repeats = ConvertRepeats(run=self.run, repeats=repeats)
             self.add_node(repeats)
         self.proteins = []
         for filterer in proteins.proteins:
-            converter = ConvertProteins(filterer)
+            converter = ConvertProteins(run=self.run, proteins=filterer)
             self.proteins.append(converter)
 
         # Add them to the graph
@@ -307,7 +311,9 @@ class ConvertToHints(EIWrapper):
             merged = MergeWigs(bigwigs=self.__coverages[strand], strand=strand,
                                 faidx=self.alignments.prepare_wrapper.fai)
             self.add_edges_from([(coverage, merged) for coverage in self.__coverages[strand]])
-            wig2hints = WigToHints(merged)
+            # We will trust the main class to find out the duplications in creating the WIG files
+            # and removing them.
+            wig2hints = WigToHints(run=self.run, merger=merged)
             self.add_edge(merged, wig2hints)
             wig2hints_store.append(wig2hints)
 
@@ -345,104 +351,47 @@ class ConvertToHints(EIWrapper):
 
     @property
     def outdir(self):
-        return os.path.join(self.configuration["outdir"], outdir, "output")
+        return os.path.join(self.configuration["outdir"],
+                            "run-{run}".format(run=self.run),
+                            outdir, "output")
 
 
-class MergeWigs(AtomicOperation):
+class HintMethod(AugustusMethod, metaclass=abc.ABCMeta):
 
-    def __init__(self, bigwigs: [Bam2BigWig], faidx: FaidxGenome, strand=None):
+    def __init__(self, run, configuration):
 
-        super().__init__()
-        self.__strand = None
-        self.strand = strand
-        self.configuration = bigwigs[0].configuration
-        self.input = {"bigwigs": [rule.output["bw"] for rule in bigwigs],
-                      "fai": faidx.output["fai"]}
-
-        self.output = {"wig": os.path.join(self.outdir, self.name_prefix+ ".wig"),
-                       "bw_list": os.path.join(self.outdir, self.name_prefix + ".txt"),
-                       }
+        super().__init__(configuration)
+        self.__run = None
+        self.run = run
 
     @property
-    def outdir(self):
-        return os.path.join(self.configuration["outdir"], outdir, "coverage")
+    def run(self):
+        return self.__run
+
+    @run.setter
+    def run(self, run):
+
+        assert isinstance(run, int)
+        # Check the run is valid
+        self.__run = run
 
     @property
-    def name_prefix(self):
-        name_prefix = "coverage"
-        if self.strand is not None:
-            name_prefix += "." + self.strand
-        return name_prefix
+    def __subfolder(self):
+        return "3-Hints"
 
     @property
-    def is_small(self):
-        return True
+    def hint_dir(self):
 
-    @property
-    def strand(self):
-        return self.__strand
-
-    @strand.setter
-    def strand(self, strand):
-        if strand == "+":
-            strand = "forward"
-        elif strand == "-":
-            strand = "reverse"
-        elif strand == ".":
-            strand = None
-
-        if strand not in (None, "forward", "reverse"):
-            raise ValueError("Invalid strand: {}".format(strand))
-        self.__strand = strand
-
-    @property
-    def normalizer(self):
-        # TODO: set this dynamically
-        return "median"
-
-    @property
-    def rulename(self):
-        name = "merge_wigs"
-        if self.strand is not None:
-            name += "_" + self.strand
-        return name
-
-    @property
-    def max_value(self):
-        return self.configuration.get("abinitio", {}).get("max_coverage", 50)
-
-    @property
-    def loader(self):
-        return ["ei-annot", "deeptools"]
-
-    @property
-    def cmd(self):
-        load = self.load
-        outdir = self.outdir
-        cmd = "{load} mkdir -p {outdir} && "
-        bigwigs = "\\n".join(self.input["bigwigs"])
-        bw_list = self.output["bw_list"]
-        out_wig = self.output["wig"]
-        genome = self.genome
-        max_value = self.max_value
-        threads = self.threads
-        normalizer = self.normalizer
-        cmd += """echo -e "{bigwigs}" > {bw_list} && """
-        cmd += """bigWigMerge.py -g {genome} -n {normalizer} -p {threads} --inList --clip={max_value} """
-        cmd += """-o {out_wig} {bw_list}"""
-
-        cmd = cmd.format(**locals())
-        return cmd
+        return os.path.join(self._augustus_dir, "run-{run}".format(run=self.run), self.__subfolder)
 
 
-class WigToHints(AtomicOperation):
+class WigToHints(HintMethod):
 
     __name__ = "wig_to_hints"
 
-    def __init__(self, merger: MergeWigs):
+    def __init__(self, run, merger: MergeWigs):
 
-        super().__init__()
-        self.configuration = merger.configuration
+        super().__init__(run=run, configuration=merger.configuration)
         self.input = merger.output
         self.__name_prefix = merger.name_prefix
         self.__strand = merger.strand
@@ -458,7 +407,7 @@ class WigToHints(AtomicOperation):
 
     @property
     def outdir(self):
-        return os.path.join(self.configuration["outdir"], outdir, "coverage")
+        return os.path.join(self.hint_dir, "coverage")
 
     @property
     def rulename(self):
@@ -536,24 +485,24 @@ class WigToHints(AtomicOperation):
         return cmd
 
 
-class MergeHints(AtomicOperation):
+class MergeHints(HintMethod):
 
     __doc__ = """This class has the purpose of bringing together all the hints into a single GFF file."""
 
-    def __init__(self, hints, with_coverage: bool):
+    def __init__(self, run, hints, with_coverage: bool):
 
-        super().__init__()
         if len(hints) == 0:
             raise ValueError("No hints provided")
+
+        super().__init__(configuration=hints[0].configuration, run=hints[0].run)
         self.__with_coverage = None
         self.with_coverage = with_coverage
         self.input["hints"] = []
-        self.output["hints"] = os.path.join(self.outdir, "hints{cov}.gff".format(
-            cov=".with_coverage." if self.with_coverage else ""))
+        self.output["hints"] = os.path.join(self.outdir, "hints.gff")
 
     @property
     def outdir(self):
-        return os.path.join(self.configuration["outdir"], outdir, "output")
+        return os.path.join(self.hint_dir, "output")
 
     @property
     def with_coverage(self):
@@ -588,7 +537,7 @@ class MergeHints(AtomicOperation):
         return cmd
 
 
-class ConvertMikado(AtomicOperation):
+class ConvertMikado(HintMethod):
 
     """Mikado will have to be converted in *four* batches, with *four* different priorities and two different sources:
     - gold: source "M", default priority: 10
@@ -597,10 +546,9 @@ class ConvertMikado(AtomicOperation):
     - all: source "E", default priority: 7
     """
 
-    def __init__(self, filterer: FilterFLN):
+    def __init__(self, run, filterer: FilterFLN):
 
-        super().__init__()
-        self.configuration = filterer.configuration
+        super().__init__(run=run, configuration=filterer.configuration)
         self.__is_long = filterer.is_long
 
         self.input["table"] = filterer.output["table"]
@@ -697,13 +645,14 @@ class ConvertMikado(AtomicOperation):
         return "prepare_mikado_hints{long}".format(long="_long" if self.is_long else "")
 
 
-class ConvertRepeats(AtomicOperation):
+class ConvertRepeats(HintMethod):
 
-    def __init__(self, repeats: RepeatMasking):
+    def __init__(self, run: int, repeats: RepeatMasking):
 
-        super().__init__()
+        if not repeats.execute:
+            return
         if repeats.execute:
-
+            super().__init__(run=run, configuration=repeats.configuration)
             self.input["table"] = repeats.output["table"]
             self.output["gff3"] = os.path.join(self.outdir, "repeat_hints.gff3")
             self.log = os.path.join(os.path.dirname(self.outdir), "logs", "extract_repeats.log")
@@ -739,15 +688,14 @@ class ConvertRepeats(AtomicOperation):
         return "convert_repeat_hints"
 
 
-class ConvertProteins(AtomicOperation):
+class ConvertProteins(HintMethod):
 
     def __init_subclass__(cls, **kwargs):
         pass
 
-    def __init__(self, proteins: FilterAlignments):
+    def __init__(self, run: int, proteins: FilterAlignments):
 
-        super().__init__()
-        self.configuration = proteins.configuration
+        super().__init__(run=run, configuration=proteins.configuration)
         self.__dbname = proteins.dbname
         self.input = proteins.output
         self.output["hints"] = os.path.join(self.outdir, "{dbname}.hints.gff".format(dbname=self.dbname))
@@ -762,7 +710,7 @@ class ConvertProteins(AtomicOperation):
 
     @property
     def outdir(self):
-        return os.path.join(self.configuration["outdir"], outdir, "output")
+        return os.path.join(self.hint_dir, "output")
 
     @property
     def dbname(self):
@@ -790,11 +738,11 @@ class ConvertProteins(AtomicOperation):
         return cmd
 
 
-class ConvertJunctions(AtomicOperation):
+class ConvertJunctions(HintMethod):
 
-    def __init__(self, junctions: PortcullisWrapper):
+    def __init__(self, run: int, junctions: PortcullisWrapper):
 
-        super().__init__()
+        super().__init__(run=run, configuration=junctions.configuration)
         self.configuration = junctions.configuration
         self.input["tab"] = junctions.junctions_task.output["tab"]
         self.output["gold"] = os.path.join(self.outdir,

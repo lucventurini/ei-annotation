@@ -3,6 +3,7 @@
 import argparse
 import pandas as pd
 import Mikado
+import Mikado.transcripts
 import networkx as nx
 import itertools
 from eiannot.util import build_pos_index
@@ -73,17 +74,19 @@ def main():
     midx = args.mikado + ".gff3.midx"
 
     fln = pd.read_csv(args.fln, sep="\t")
+    fln.set_index(fln.columns[0], inplace=True)
     transcripts = [Mikado.transcripts.Transcript(_) for _ in Mikado.parsers.bed12.Bed12Parser(bed12)
                    if _.header is False]
     orfs = list(itertools.chain(
         *[[(t.id, _.thick_start, _.thick_end) for _ in t.get_internal_orf_beds()] for t in transcripts]))
     orf_df = pd.DataFrame(orfs, columns=[fln.columns[0], "mikado_orf_start", "mikado_orf_end"])
+    orf_df.set_index(fln.columns[0], inplace=True)
     metrics = pd.read_csv(metrics, sep="\t")
+    metrics.set_index(metrics.column[0], inplace=True)
     metrics["transcripts_per_gene"] = metrics.groupby("parent")["parent"].transform("count")
-    merged = pd.merge(pd.merge(fln, orf_df, on=fln.columns[0]),
-                                metrics, left_on=fln.columns[0], right_on=metrics.columns[0])
-
-    merged.set_index(fln.columns[0], inplace=True)
+    merged = pd.merge(
+        pd.merge(fln, orf_df, left_index=True, right_index=True, validate="one_to_one", how="outer"),
+        metrics, left_index=True, right_index=True, validate="one_to_one", how="outer")
 
     # Purge everything which has a long intron
     merged = merged[merged.max_intron_length <= args.max_intron]
@@ -106,7 +109,7 @@ def main():
         ((merged.combined_cds_length == merged.selected_cds_length) &
          (merged.three_utr_num_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
         (merged.three_utr_num <= 2) & (merged.five_utr_num <= 3)
-    )]  # [[merged.columns[0], "parent"]]
+    )]
 
     training_candidates = gold[(
          (gold.combined_cds_fraction >= 0.5) &

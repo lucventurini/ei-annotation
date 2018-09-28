@@ -3,5 +3,7 @@ build/
 dist/
 **/.snakemake/
 **/__pycache__/*
-./test/EIannot/
+test/EIannot/
 **/*~
+test/*stats
+test/*ipynb
