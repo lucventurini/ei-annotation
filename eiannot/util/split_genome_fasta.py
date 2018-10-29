@@ -3,20 +3,17 @@
 from itertools import chain, repeat
 import argparse
 import os
-import textwrap
 import pyfaidx
-from math import log, ceil, floor
 from itertools import zip_longest
 from eiannot.library.chromclass import Chrom, Chunk, AugBase
 from sqlalchemy.engine import create_engine, Engine
 from sqlalchemy.orm.session import Session
 from collections import defaultdict
-import numbers
 
 
 __doc__ = """Script to split FASTA sequences in a fixed number of multiple files.
 This imitates the splitMfasta.pl script from Augustus, but with a key difference - the number of files is
-pre-determined. Moreover, the overlap percentage """
+pre-determined. Moreover, the overlap percentage can be adapted until a minimum overlap size is determined."""
 
 
 def positive(string):
@@ -51,9 +48,9 @@ def main():
     parser.add_argument("-n", "--num-chunks", required=True, type=positive, dest="num_chunks")
     parser.add_argument("-ms", "--minsize", required=True, type=positive)
     parser.add_argument("-minO", "--min-overlap",
-                        required=False, default=None,
+                        required=True,
                         type=positive, dest="min_overlap")
-    parser.add_argument("-o", "--overlap", required=True, type=percentage)
+    # parser.add_argument("-o", "--overlap", required=True, type=percentage)
     parser.add_argument("fasta", type=pyfaidx.Fasta, help="Input FASTA file.")
     parser.add_argument("db")
     args = parser.parse_args()
@@ -77,14 +74,12 @@ def main():
 
     chrom_cache = dict()
 
+    args.overlap = round(args.min_overlap * 1.0 / args.minsize, 2)
+
     for obj in session.query(Chrom):
         chrom_cache[obj.name] = obj.chrom_id
 
     # Now we have to determine the chunks. Importantly, there can be *less* chunks than the number specified.
-    print(args.overlap)
-    print(total_length)
-    print(args.num_chunks)
-
     # L = w * ( n - n*o + o )
     # L: total length
     # n: number of chunks
@@ -94,33 +89,23 @@ def main():
 
     chunk_size = 0
     overlap = 0
-    if args.min_overlap is None:
-        args.min_overlap = int(args.minsize * args.overlap)
 
-    while (chunk_size < args.minsize):
-        while overlap < args.min_overlap:
-            if args.overlap >= 1:
-                raise ValueError("It is impossible to create a chunk distribution with the required parameters. Aborting")
+    while chunk_size < args.minsize or overlap < args.min_overlap:
+        if args.overlap >= 1:
+            raise ValueError("It is impossible to create a chunk distribution with the required parameters. Aborting")
 
-            chunk_size = int(total_length / (args.num_chunks - args.num_chunks * args.overlap + args.overlap))
-            overlap = int(round(chunk_size * args.overlap, 0))
-            args.overlap += 0.01
-
-    # overlap = max(overlap, args.min_overlap)
+        chunk_size = int(total_length / (args.num_chunks - args.num_chunks * args.overlap + args.overlap))
+        overlap = int(round(chunk_size * args.overlap, 0))
+        args.overlap += 0.01
 
     assert chunk_size >= args.minsize
     assert overlap >= args.min_overlap
-
-    print(chunk_size, overlap, ((chunk_size + overlap) * args.num_chunks <= total_length))
-
-    # Rules:
-    # - each genome will have a chunk of size at least equal to minsize at the beginning and end
-    # - each section of the genome should be covered at least three times, unless it's at the beginning or the end
 
     chunks = defaultdict(list)
     chunk_id = 0
     chunks = []
     current_chunk = []
+
     for chrom in args.fasta.keys():
         # We might have more than one chunk here, depending on the size of the chromosome.
         # In short, we want the following:
