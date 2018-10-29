@@ -94,7 +94,23 @@ def main():
 
     correct = set()
 
-    while chunk_size < total_length / (args.num_chunks + args.maxOP - args.num_chunks * args.maxOP):
+    overdoing = 0.05
+    __orig_chunks = args.num_chunks
+
+    args.num_chunks = min(args.num_chunks,
+                          (total_length * (1 - overdoing) / args.minsize - args.minOP) * 1 / (1 - args.minOP))
+
+    while args.num_chunks < __orig_chunks * 0.9:
+        args.num_chunks = min(args.num_chunks,
+                             (total_length * (1 - overdoing) / args.minsize - args.minOP ) * 1 / (1 - args.minOP))
+
+        overdoing += 0.01
+        if overdoing > 1:
+            raise ValueError("I cannot optimize!")
+
+    maximum_chunk_size = total_length / (args.num_chunks + args.minOP - args.num_chunks * args.minOP)
+
+    while chunk_size < maximum_chunk_size:
         chunk_size = max(chunk_size + 1, int(round(chunk_size * 1.01)))
         remainder = 0
         current_chunk = 0
@@ -126,7 +142,7 @@ def main():
                 if ol * chunk_size < args.min_overlap:
                     continue
                 total = remainder + chunk_size * (rm - rm * ol - ol)
-                if abs(total_length - total) / total_length <= 0.05:
+                if abs(total_length - total) / total_length <= overdoing:
                     correct.add((chunk_size, ol))
 
     if len(correct) == 0:
