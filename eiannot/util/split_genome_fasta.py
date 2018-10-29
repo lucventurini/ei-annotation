@@ -16,11 +16,7 @@ import numbers
 
 __doc__ = """Script to split FASTA sequences in a fixed number of multiple files.
 This imitates the splitMfasta.pl script from Augustus, but with a key difference - the number of files is
-pre-determined. Moreover, """
-
-
-
-
+pre-determined. Moreover, the overlap percentage """
 
 
 def positive(string):
@@ -101,15 +97,16 @@ def main():
     if args.min_overlap is None:
         args.min_overlap = int(args.minsize * args.overlap)
 
-    while chunk_size < args.minsize:  # and overlap < args.min_overlap:
-        if args.overlap >= 1:
-            raise ValueError("It is impossible to create a chunk distribution with the required parameters. Aborting")
+    while (chunk_size < args.minsize):
+        while overlap < args.min_overlap:
+            if args.overlap >= 1:
+                raise ValueError("It is impossible to create a chunk distribution with the required parameters. Aborting")
 
-        chunk_size = int(total_length / (args.num_chunks - args.num_chunks * args.overlap + args.overlap))
-        overlap = int(round(chunk_size * args.overlap, 0))
-        args.overlap += 0.01
+            chunk_size = int(total_length / (args.num_chunks - args.num_chunks * args.overlap + args.overlap))
+            overlap = int(round(chunk_size * args.overlap, 0))
+            args.overlap += 0.01
 
-    overlap = max(overlap, args.min_overlap)
+    # overlap = max(overlap, args.min_overlap)
 
     assert chunk_size >= args.minsize
     assert overlap >= args.min_overlap
