@@ -55,6 +55,10 @@ def main():
     parser.add_argument("db")
     args = parser.parse_args()
 
+    args.overlap = round(args.min_overlap * 1.0 / args.minsize, 2)
+    if args.overlap >= 1:
+        raise ValueError("The overlap cannot be larger than the minimum size. Aborting.")
+
     # Create the tables
     if os.path.exists(args.db):
         os.remove(args.db)
@@ -73,8 +77,6 @@ def main():
     session.bulk_save_objects(chroms)
 
     chrom_cache = dict()
-
-    args.overlap = round(args.min_overlap * 1.0 / args.minsize, 2)
 
     for obj in session.query(Chrom):
         chrom_cache[obj.name] = obj.chrom_id
