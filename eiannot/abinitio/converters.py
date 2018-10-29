@@ -446,10 +446,12 @@ class WigToHints(HintMethod):
 
     @property
     def src(self):
+        # TODO change
         return "W"
 
     @property
     def priority(self):
+        # TODO change
         return 3
 
     @property
@@ -562,40 +564,48 @@ class ConvertMikado(HintMethod):
 
     @property
     def gold_score(self):
+        # TODO CHANGE
         return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("gold", 10)
 
     @property
     def silver_score(self):
+        # TODO CHANGE
         return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("silver", 9)
 
     @property
     def bronze_score(self):
+        # TODO CHANGE
         return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("bronze", 8)
 
     @property
     def all_score(self):
+        # TODO CHANGE
         return self.configuration.get("abinitio", {}).get("mikado", {}).get("scores", {}).get("all", 7)
 
     @property
     def gold_source(self):
+        # TODO CHANGE
         src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("gold", "M")
         assert src in ("M", "E", "P", "RM", "W")
         return src
 
     @property
     def silver_source(self):
+        # TODO CHANGE
         src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("silver", "M")
         assert src in ("M", "E", "P", "RM", "W")
         return src
 
     @property
     def bronze_source(self):
+        # TODO CHANGE
         src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("bronze", "E")
         assert src in ("M", "E", "P", "RM", "W")
         return src
 
     @property
     def all_source(self):
+        # TODO CHANGE
         src = self.configuration.get("abinitio", {}).get("mikado", {}).get("sources", {}).get("all", "E")
         assert src in ("M", "E", "P", "RM", "W")
         return src
@@ -672,6 +682,7 @@ class ConvertRepeats(HintMethod):
 
     @property
     def cmd(self):
+        # TODO CHANGE
         load = self.load
         cmd = "{load} mkdir -p {logdir} && "
         logdir, log = self.logdir, self.log
@@ -718,11 +729,13 @@ class ConvertProteins(HintMethod):
 
     @property
     def priority(self):
-        value = _get_value(self.configuration, self.dbname, "priority")
-        if value is None:
-            return 4
-        else:
-            return value
+        # TODO implement
+        pass
+
+    @property
+    def source(self):
+        # TODO implement
+        pass
 
     @property
     def threads(self):
@@ -732,8 +745,8 @@ class ConvertProteins(HintMethod):
     def cmd(self):
         load = self.load
         input, output = self.input, self.output
-        priority = self.priority
-        cmd = "{load} convert_proteins_to_hints.py -p {priority} {input[gff3]} {output[hints]}"
+        priority, source = self.priority, self.source
+        cmd = "{load} convert_proteins_to_hints.py -p {priority} -s {source} {input[gff3]} {output[hints]}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -768,20 +781,23 @@ class ConvertJunctions(HintMethod):
 
     @property
     def gold_source(self):
-        return
+        #TODO implement
+        pass
 
     @property
     def gold_score(self):
-        return
+        # TODO implement
+        pass
 
     @property
     def silver_source(self):
         # TODO: most probably this will have to go into the configuration
-        return
+        pass
 
     @property
     def silver_score(self):
-        return
+        # TODO implement
+        pass
 
     @property
     def threshold(self):

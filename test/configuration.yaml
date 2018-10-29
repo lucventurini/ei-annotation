@@ -110,6 +110,14 @@ mikado:
   pick:
     mode: 'permissive'
     scoring_file: "athaliana_scoring.yaml"
+  homology:
+    prot_dbs: &prot_db
+    - "uniprot_sprot_plants.fasta"
+    execute: true
+    program: diamond
+    chunks: 2
+    evalue: 0.000001
+    max_target_seqs: 10
 repeats:
   execute: false
   model: false

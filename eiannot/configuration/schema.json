@@ -1,0 +1,541 @@
+{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "id": "eiannot-configuration",
+  "definitions": {
+    "program": {
+      "$id": "program",
+      "type": "object",
+      "properties": {
+        "load": {
+          "type": "string",
+          "default": ""
+        },
+        "extra": {
+          "type": "array",
+          "minItems": 0,
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "memory": {
+          "type": "integer",
+          "default": 10000,
+          "minimum": 1
+        },
+        "threads": {
+          "type": "integer",
+          "default": 2
+        },
+        "queue": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "index": {
+      "type": "object",
+      "properties": {
+        "index_name": {
+          "type": "string",
+          "default": "eiannot"
+        },
+        "threads": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1
+        },
+        "memory": {
+          "type": "integer",
+          "default": 20000,
+          "minimum": 1000
+        }
+      }
+    },
+    "augustus_hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "M",
+            "RM",
+            "F",
+            "E",
+            "P",
+            "W"
+          ]
+        },
+        "score": {
+          "type": "number"
+        },
+        "use": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": ["use"],
+      "anyOf": [
+        {"properties": {"use": {"enum": [false]}}, "required": []},
+        {"properties": {"use": {"enum": [true]}}, "required": ["score", "source"]}
+        ]
+    },
+    "augustus_run": {
+      "additionalProperties": false,
+      "properties": {
+        "extra": {"type": "string", "default": ""},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mikado_gold": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "mikado_silver": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "mikado_bronze": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "mikado_all": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "mikado_long_gold": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "mikado_long_silver": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "mikado_long_bronze": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "long_canonical": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "portcullis_gold": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "portcullis_silver": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "proteins": {
+              "$ref": "#definitions/augustus_hint"
+            },
+            "coverage": {
+              "$ref": "#definitions/augustus_hint"
+            }
+          }
+        }
+      }
+    }
+  },
+  "programs": {
+    "type": "object",
+    "required": [
+      "Default",
+      "Default_small"
+    ],
+    "properties": {
+      "Default": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "required": [
+              "queue",
+              "memory",
+              "threads"
+            ]
+          }
+        ]
+      },
+      "Default_small": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "required": [
+              "queue",
+              "memory",
+              "threads"
+            ],
+            "properties": {
+              "memory": {
+                "type": "integer",
+                "default": 1000,
+                "minimum": 1
+              },
+              "threads": {
+                "type": "integer",
+                "default": 1
+              }
+            }
+          }
+        ]
+      },
+      "augustus": {
+            "$ref": "#definitions/program"
+      },
+      "stringtie": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "extra": {
+                "default": [
+                  ""
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "scallop": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "extra": {
+                "default": [
+                  ""
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "hisat2": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "extra": {
+                "default": [
+                  ""
+                ]
+              },
+              "$ref": "#definitions/index"
+            }
+          }
+        ]
+      },
+      "portcullis": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "execute": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        ]
+      },
+      "samtools": {
+        "$ref": "#defitions/program"
+      },
+      "diamond": {
+        "$ref": "#definitions/program"
+      },
+      "mikado": {
+        "$ref": "#definitions/program"
+      },
+      "full_lengther_next": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "execute": {
+                "type": "boolean",
+                "default": true
+              },
+              "dbs": {
+                "type": "array",
+                "default": [
+                  "s",
+                  "t"
+                ],
+                "minItimes": 1,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "p",
+                    "s",
+                    "t",
+                    "c",
+                    "n"
+                  ]
+                }
+              },
+              "taxon": {
+                "type": "string",
+                "required": true,
+                "enum": [
+                  "fungi",
+                  "human",
+                  "invertebrates",
+                  "mammals",
+                  "plants",
+                  "rodents",
+                  "vertebrates"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "exonerate": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "extra": {
+                "default": [
+                  ""
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "gmap_long": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "extra": {
+                "default": [
+                  ""
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "strawberry": {
+        "$ref": "#definitions/program"
+      },
+      "star": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "$ref": "#definitions/index"
+            }
+          }
+        ]
+      },
+      "gmap": {
+        "allOf": [
+          {
+            "$ref": "#definitions/program"
+          },
+          {
+            "properties": {
+              "$ref": "#definitions/index"
+            }
+          }
+        ]
+      },
+      "gsnap": {
+        "$ref": "#definitions/program"
+      },
+      "star_long": {
+        "$ref": "#definitions/program"
+      },
+      "cufflinks": {
+        "$ref": "#definitions/program"
+      },
+      "tophat2": {
+        "$ref": "#definitions/program"
+      },
+      "class2": {
+        "$ref": "#definitions/program"
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "reference": {
+      "type": "object",
+      "properties": {
+        "min_intron": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 100
+        },
+        "max_intron": {
+          "type": "integer",
+          "default": 1000,
+          "minimum": 100,
+          "maximum": 1000000
+        }
+      },
+      "transcriptome": {
+        "type": "string",
+        "default": null
+      },
+      "genome": {
+        "type": "string",
+        "default": null
+      }
+    },
+    "abinitio": {
+      "type": "object",
+      "properties": {
+        "train": {
+          "default": true,
+          "type": "boolean"
+        },
+        "quick": {
+          "default": false,
+          "type": "boolean"
+        },
+        "species": {
+          "type": "string",
+          "default": ""
+        },
+        "extra": {
+          "type": "string",
+          "default": ""
+        },
+        "run_file": {
+          "type": "string",
+          "default": "augustus.cfg"
+        },
+        "runs": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#definitions/augustus_run"}
+        }
+      }
+    }
+  },
+  "homology": {
+    "type": "object",
+    "properties": {
+      "prot_dbs": {
+        "type": "object"
+      },
+      "protein_chunks": {
+        "type": "integer",
+        "default": 1,
+        "minimum": 1
+      },
+      "identity": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "default": 40
+      },
+      "coverage": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "default": 70
+      },
+      "min_intron": {
+        "type": "integer",
+        "default": 20,
+        "minimum": 5,
+        "maximum": 100
+      },
+      "max_intron_ends": {
+        "type": "integer",
+        "default": 500,
+        "minimum": 100,
+        "maximum": 10000
+      },
+      "max_intron_middle": {
+        "type": "integer",
+        "default": 1000,
+        "minimum": 100,
+        "maximum": 100000
+      },
+      "use_exonerate": {
+        "type": "boolean",
+        "default": true
+      }
+    }
+  },
+  "mikado": {
+    "type": "object",
+    "properties": {
+      "pick": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "default": "permissive",
+            "enum": [
+              "nosplit",
+              "split",
+              "lenient",
+              "stringent",
+              "permissive"
+            ]
+          },
+          "scoring_file": {
+            "required": true,
+            "type": "string",
+            "default": "athaliana_scoring.yaml"
+          }
+        }
+      }
+    }
+  },
+  "repeats": {
+    "type": "object",
+    "properties": {
+      "execute": {
+        "type": "boolean",
+        "default": true
+      },
+      "model": {
+        "type": "boolean",
+        "default": true
+      },
+      "species": {
+        "type": "string",
+        "default": ""
+      },
+      "safe_proteins": {
+        "type": "array",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true,
+        "minItems": 0
+      }
+    }
+  },
+  "outdir": {
+    "type": "string",
+    "default": "Eiannot"
+  },
+  "name": {
+    "type": "string",
+    "default": "eitest"
+  }
+}

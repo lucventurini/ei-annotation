@@ -42,8 +42,8 @@ def print_protein(transcript: Transcript, args: argparse.Namespace):
 def main():
 
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("-p", "--priority", type=int, default=4)
-    parser.add_argument("-s", "--source", default=None, help="Alternative source for the input data.")
+    parser.add_argument("-p", "--priority", type=int, required=True)
+    parser.add_argument("-s", "--source", required=True, help="Alternative source for the input data.")
     parser.add_argument("-src", default="P",
                         help="Value for the \"src\" field in the hints file. Default: %(default)s")
     parser.add_argument("proteins", type=to_gff)

@@ -1,0 +1,43 @@
+reference:
+  min_intron: 20
+  max_intron: 10000
+  transcriptome: null
+  genome: null
+abinitio:
+  train: true
+  quick: false
+programs:
+  Default:
+    threads: 2
+    memory: 5000
+  Default_small:
+    threads: 1
+    memory: 1000
+  hisat2:
+    runs: ['']
+  stringtie:
+    runs: ['']
+  scallop:
+    runs: ['']
+  gmap:
+    index:
+      threads: 1
+      index_name: eiannot
+  full_lengther_next:
+    taxon: "plants"
+    dbs: ["st"]
+outdir: "Eiannot"
+name: "eitest"
+mikado:
+  pick:
+    mode: 'permissive'
+    scoring_file: null
+  homology:
+    prot_dbs: []
+    execute: true
+    program: diamond
+repeats:
+  execute: true
+  model: true
+  species: "arabidopsis_thaliana"
+  safe_proteins: []
