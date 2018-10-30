@@ -24,13 +24,16 @@ class AssemblyWrapper(EIWrapper):
         super().__init__(configuration=short_alignments.configuration)
 
         self.__gfs = []
+        self.__short_alignments = set()
         for tool, wrapper in self.wrappers.items():
             instance = wrapper(short_alignments)
             if instance.gfs:
                 self.add_edge(short_alignments, instance)
                 instance.add_flag_to_inputs(short_alignments, "aln_flag", "flag")
+                self.__add_to_bams(instance)
                 self.__add_to_gfs(instance)
 
+        self.__short_alignments = list(self.__short_alignments)
         self.add_final_flag()
 
     __final_rulename__ = "asm_all"
@@ -43,8 +46,15 @@ class AssemblyWrapper(EIWrapper):
     def gfs(self):
         return self.__gfs
 
+    @property
+    def short_alignments(self):
+        return self.__short_alignments
+
     def __add_to_gfs(self, wrapper: ShortAssemblerWrapper):
         self.__gfs.extend(wrapper.gfs)
+
+    def __add_to_bams(self, wrapper: ShortAssemblerWrapper):
+        self.__short_alignments.update(set(wrapper.bams))
 
     @property
     def outdir(self):

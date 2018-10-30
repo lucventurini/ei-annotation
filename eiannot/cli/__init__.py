@@ -6,6 +6,7 @@ from ..rnaseq.assemblies.__init__ import AssemblyWrapper
 from ..proteins.__init__ import ExonerateProteinWrapper
 from ..repeats.__init__ import RepeatMasking
 from ..rnaseq.mikado.__init__ import Mikado
+# from .snakemake_helper import run_snakemake, loadPreCmd # TODO: integrate the functions into the CLI parser
 import yaml
 import snakemake
 from itertools import chain

@@ -8,6 +8,7 @@ from sqlalchemy.engine import create_engine, Engine
 from sqlalchemy.orm.session import Session
 from collections import defaultdict
 import numpy as np
+from math import ceil
 
 
 __doc__ = """Script to split FASTA sequences in a fixed number of multiple files.
@@ -41,23 +42,15 @@ def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("-n", "--num-chunks", required=True, type=positive, dest="num_chunks")
     parser.add_argument("-ms", "--minsize", required=True, type=positive)
-    parser.add_argument("-minOP", required=False, default=0.1, type=percentage,
-                        help="Maximum overlap in percentage of the chunk. Default: 10%.")
-    parser.add_argument("-maxOP", required=False, default=0.7, type=percentage,
-                        help="Maximum overlap in percentage of the chunk. Default: 70%.")
     parser.add_argument("-minO", "--min-overlap",
                         required=True, help="Minimum overlap length.",
                         type=positive, dest="min_overlap")
-    # parser.add_argument("-o", "--overlap", required=True, type=percentage)
     parser.add_argument("fasta", type=pyfaidx.Fasta, help="Input FASTA file.")
     parser.add_argument("db")
     args = parser.parse_args()
 
-    args.overlap = round(args.min_overlap * 1.0 / args.minsize, 2)
-    if args.overlap >= args.maxOP:
-        # raise ValueError("The overlap cannot be larger than the minimum size. Changing.")
-        # This is a mistake. Correcting.
-        args.minsize = args.min_overlap / args.maxOP
+    # We cannot have a minimum size that is lower than the overlap
+    args.minsize = max(args.minsize, args.min_overlap / 0.99)
 
     # Create the tables
     if os.path.exists(args.db):
@@ -68,105 +61,104 @@ def main():
     session = Session(bind=engine, autocommit=True, autoflush=True)
     session.begin()
     # We are doing it as an explicit for cycle to save computation time (cycles are expensive)
-    total_length = 0
     chroms = []
+
     for chrom in args.fasta.keys():
         l = len(args.fasta[chrom])
-        chroms.append(Chrom(chrom, l))
-        total_length += l
+        chroms.append(Chrom(chrom, length=l))
     session.bulk_save_objects(chroms)
 
+    chroms = [_ for _ in session.query(Chrom)]
+
+    lengths = np.array([(_.length, _.name) for _ in chroms], dtype=[("length", np.int), ("name", np.object)])
+    lengths.sort(order=["length"])
+    lengths = lengths[::-1]
+
+    # We are going to presume that the maximum overlap is 99%. So if there is no way of getting reasonably within
+    # distance of the number of chunks like that, then the parameters are wrong.
+    # The point here is that we are establishing a very high boundary for the overlap (99%)
+
     # Now we have to determine the chunks. Importantly, there can be *less* chunks than the number specified.
-    # L = w * ( n - n*o + o )
-    # L: total length
-    # n: number of chunks
-    # o: overlap percentage, 0 <= o < 1
-    # w: chunk width
-    # => w = L / (n - n*o + o)
+    # N = sum(Ni), where:
+    # Ni: number of chunks for the scaffold i
+    # N: total number of chunks
+    # L = sum(Wi) + sum(Wi(Ni + NiO - O) - Wi), where
+    # Wi: chunk size for a chromosome/scaffold of length Li. Wi can be:
+    #    - W (standard chunk size), if Li > W * 2 - O
+    #    - Li, otherwise
+    # N: number of chunks
+    # O: overlap (as percentage of W)
 
-    total = 0
-    min_size = args.minsize * 2 - args.min_overlap
+    # Let us verify the boundaries ...
 
-    chroms = [chrom for chrom in session.query(Chrom).order_by(Chrom.length.desc())]
-
-    chunk_size = args.minsize
-    rm = args.num_chunks
+    # The most basic control is to verify that, under the maximum overlap percentage, the
+    # minimum overlap and minimum chunk size are respected.
 
     correct = set()
 
-    overdoing = 0.05
-    __orig_chunks = args.num_chunks
+    # We are guaranteed to find some solutions to the problem. The issue is, which one is the best?
 
-    args.num_chunks = min(args.num_chunks,
-                          (total_length * (1 - overdoing) / args.minsize - args.minOP) * 1 / (1 - args.minOP))
+    # Increment the chunk and the overlap by fraction of the genome
+    lsum = int(lengths["length"].sum())
+    gp = genome_percentile = int(min(max(1000, int(lsum * 0.01)), int(args.minsize)))
 
-    while args.num_chunks < __orig_chunks * 0.9:
-        args.num_chunks = min(args.num_chunks,
-                             (total_length * (1 - overdoing) / args.minsize - args.minOP ) * 1 / (1 - args.minOP))
+    possibilities = []
 
-        overdoing += 0.01
-        if overdoing > 1:
-            raise ValueError("I cannot optimize!")
-
-    maximum_chunk_size = total_length / (args.num_chunks + args.minOP - args.num_chunks * args.minOP)
-
-    while chunk_size < maximum_chunk_size:
-        chunk_size = max(chunk_size + 1, int(round(chunk_size * 1.01)))
-        remainder = 0
-        current_chunk = 0
-        _exhausted_chunks = 0
-        for chrom in chroms:
-            if chrom.length > min_size:
-                if current_chunk > 0:
-                    remainder += current_chunk
-                    _exhausted_chunks += 1
-                    current_chunk = 0
+    for chunk_size in range(int(args.minsize), int(lengths["length"].max()), int(gp)):
+        ovl_perc = max(100, int(chunk_size * 0.01))
+        for overlap_size in range(args.min_overlap, chunk_size - ovl_perc, ovl_perc):
+            below = lengths[lengths['length'] < chunk_size * 2 - overlap_size]['length']
+            _exhausted = int(ceil(below.sum() / chunk_size))
+            num_chunks = _exhausted + int(ceil(
+                (lsum - below.sum() - overlap_size) / (chunk_size - overlap_size)
+            ))
+            if num_chunks <= 0 or num_chunks > args.num_chunks or chunk_size * num_chunks < lsum:
                 continue
-            else:
-                remainder += chrom.length
-                current_chunk += chrom.length
-                if current_chunk >= min_size:
-                    current_chunk = 0
-                    _exhausted_chunks += 1
-        rm = remaining_chunks = args.num_chunks - _exhausted_chunks
-        # If the overlap is the minimum, then the covered distance is maximum
-        max_total = remainder + chunk_size * (rm - rm * args.minOP - args.minOP)
-        if max_total < total_length:
-            # print(remainder, chunk_size, args.maxOP, max_total, total_length)
-            continue  # We will *never* reach the proper size
+            # print(num_chunks, chunk_size, overlap_size)
+            assert chunk_size * num_chunks >= lsum, (chunk_size * num_chunks, lsum)
+            total = below.sum() + (num_chunks - _exhausted) * chunk_size
+            possibilities.append((num_chunks, chunk_size, overlap_size, total))
+
+    # possibilities = dict((key, val) for key, val in possibilities.items() if key <= args.num_chunks)
+
+    possibilities = np.array(possibilities, dtype=[("num_chunks", np.int),
+                                                   ('chunk_size', np.int), ('overlap', np.int), ("total", np.int)
+                                                   ])
+
+    poss = possibilities.copy()
+    poss['num_chunks'] = abs(args.num_chunks - poss['num_chunks'])
+
+    # There might be more than one possibility for the best case. We have to find the best of the best, which
+    # we define as the case with the least amount of overlapping regions
+
+    best = None
+    multiplier = 1.5
+
+    while best is None:
+        __new = possibilities[possibilities["total"] <= lsum * multiplier][
+            poss[poss["total"] <= lsum * multiplier].argsort(
+                order=['num_chunks', 'chunk_size', 'total', 'overlap'])]
+        if __new.shape[0] == 0:
+            print(multiplier)
+            multiplier += .5
+            continue
         else:
-            # Now the name of the game is to find the minimum overlap which,
-            # given this chunk size, will be bound and be above the total
-            diff = float("inf")
-            for ol in np.arange(args.minOP, args.maxOP, 0.01):
-                if ol * chunk_size < args.min_overlap:
-                    continue
-                total = remainder + chunk_size * (rm - rm * ol - ol)
-                if abs(total_length - total) / total_length <= overdoing:
-                    correct.add((chunk_size, ol))
+            best = __new[0]
 
-    if len(correct) == 0:
-        # Nothing has been found that respects the parameters! Aborting
-        raise OSError(
-            """The parameters inputed for the program are unsatisfiable;
-            I cannot find a suitable way to partition the genome. Please increase the maximum overlap or
-            reduce the number of chunks.""")
-
-    correct = {chunk_size * ol: (chunk_size, ol) for chunk_size, ol in correct}
-    chunk_size, args.overlap = correct[min(correct.keys())]
+    num_chunks, chunk_size, overlap, total = best
 
     # print(rm, remainder, overlap/chunk_size, total, chunk_size, overlap)
     assert chunk_size >= args.minsize
-    assert args.minOP <= args.overlap <= args.maxOP, args.overlap
-    overlap = int(round(chunk_size * args.overlap))
-    assert overlap >= args.min_overlap, (chunk_size, args.overlap, overlap, args.min_overlap)
+    assert overlap >= args.min_overlap, (chunk_size, overlap)
+
+    print(num_chunks, chunk_size, overlap, total)
 
     chunks = defaultdict(list)
     chunk_id = 0
     chunks = []
     current_chunk = []
 
-    for chrom in chroms:
+    for (length, name) in lengths:
         # We might have more than one chunk here, depending on the size of the chromosome.
         # In short, we want the following:
         # - cluster up the end of the chromosomes if we have less than the overlap remaining (thus reducing the
@@ -176,6 +168,8 @@ def main():
         # - otherwise, just store the overlap and continue
         start = 0
         end = 0
+        chrom = session.query(Chrom).filter(Chrom.name == name).one()
+        assert chrom.chrom_id is not None, chrom.name
 
         while end < chrom.length:
             end = start + chunk_size

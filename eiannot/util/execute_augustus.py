@@ -11,7 +11,9 @@ import Bio.SeqIO
 import Bio.bgzf
 from functools import partial
 import tempfile
+import io
 import gzip
+from Mikado.parsers.GTF import GtfLine
 
 
 __doc__ = """"""
@@ -44,11 +46,16 @@ def main():
     assert set.intersection(set(engine.table_names()), set(AugBase.metadata.tables.keys())) == set(engine.table_names())
     # Now query the chunk ID
 
-    with gzip.open(os.path.splitext(args.out)[0] + "_" + str(args.chunk) + ".gtf.gz", mode="wb") as out:
+    if args.out.endswith(".gz"):
+        opener = gzip.open
+    else:
+        opener = open
+
+    with opener(args.out, mode="wt") as out:
         for chunk in session.query(Chunk).filter(Chunk.chunk_id == args.chunk):
             chrom_file = Bio.bgzf.open(tempfile.mktemp(suffix=".fa.gz", dir=os.getcwd()), mode="wt")
             chrom, start, end = chunk.chrom, chunk.start, chunk.end
-            # Using SeqIO because it is much faster than
+            # Using SeqIO because it is much faster than PyFaidx for this purpose
             Bio.SeqIO.write(args.genome[chrom], chrom_file, "fasta")
             chrom_file.flush()
             assert os.path.exists(chrom_file._handle.name)
@@ -58,7 +65,28 @@ def main():
             command += "<(bgzip -cd {chrom_file._handle.name})"
             command = command.format(**locals())
             print(command)
-            subprocess.call(command, shell=True, stdout=out, executable="/bin/bash")
+            aug = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, executable="/bin/bash")
+            for line in io.TextIOWrapper(aug.stdout):
+                if line[0] == "#":
+                    print(line, file=out)
+                else:
+                    # we have to change the line so that the gene/transcript names are correct
+                    current_gene = None
+                    fields = line.rstrip().split("\t")
+                    if len(fields) != 9:  # Invalid line. Continue
+                        print("#", line, file=out)
+                    elif fields[2] in ("gene", "transcript"):  # This is an invalid GTF line ...
+                        assert ";" not in fields[-1]
+                        fields[-1] = "{chrom}_{start}_{end}-{f}".format(f=fields[-1], **locals())
+                        print(*fields, file=out, sep="\t")
+                    else:
+                        line = GtfLine(line)
+                        if "transcript_id" in line.attributes:
+                            line.transcript = "{chrom}_{start}_{end}-{line.transcript}".format(**locals())
+                        if "gene_id" in line.attributes:
+                            line.gene = "{chrom}_{start}_{end}-{line.gene}".format(**locals())
+                        print(line, file=out)
+
             os.remove(chrom_file._handle.name)
 
     return

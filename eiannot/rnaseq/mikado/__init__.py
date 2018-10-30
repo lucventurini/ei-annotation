@@ -1,6 +1,7 @@
 from ...abstract import EIWrapper
 from ..alignments.__init__ import LongAlignmentsWrapper
 from ..alignments.portcullis import PortcullisWrapper
+from ..assemblies import AssemblyWrapper
 from .prepare import MikadoConfig, MikadoPrepare
 # from ..assemblies.workflow import AssemblyWrapper
 from .serialise import MikadoSerialise
@@ -21,7 +22,7 @@ class Mikado(EIWrapper):
     __final_long_rulename__ = "mikado_done_long"
 
     def __init__(self,
-                 assemblies,  #: AssemblyWrapper,
+                 assemblies: AssemblyWrapper,
                  long_alignments: LongAlignmentsWrapper,
                  portcullis: PortcullisWrapper,
                  only_long=False):
@@ -30,6 +31,7 @@ class Mikado(EIWrapper):
         self.__indexer, self.__picker, self.__stats = None, None, None
         self.assemblies = assemblies
         self.long_alignments = long_alignments
+        self.short_alignments = assemblies.
         self.portcullis = portcullis
 
         self.configuration = assemblies.configuration
