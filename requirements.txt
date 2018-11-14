@@ -1,7 +1,7 @@
 snakemake
 networkx
 eicore
-mikado>=1.2.4
+mikado>=1.3
 pyBigWig
 deeptools
 pandas

@@ -4,8 +4,11 @@ from ..rnaseq.mikado import Mikado
 from ..repeats import RepeatMasking
 from ..preparation import FaidxGenome
 from .converters import ConvertToHints
+from .fln import FlnWrapper
 from ..proteins import ProteinWrapper
 import pkg_resources
+from .fasta_split import FastaMSplitter
+from .abstract import augustus_root_dir, AugustusMethod
 import os
 import sys
 
@@ -13,66 +16,106 @@ import sys
 class AugustusWrapper(EIWrapper):
 
     def __init__(self,
+                 faidx: FaidxGenome,
                  mikado: Mikado,
                  mikado_long: Mikado,
                  rmasker: RepeatMasking,
+                 proteins: ProteinWrapper
+                 ):
+
+        # First we have to do FLN
+
+        super().__init__(faidx.configuration)
+        self.fai = faidx
+        self.rmasker = rmasker
+        self.proteins = proteins
+        if mikado_long:
+            self.mikado_long = mikado_long
+            self.fln_long = FlnWrapper(mikado_long, self.fai)
+            self.add_edge(mikado_long, self.fln_long)
+
+        else:
+            self.mikado_long = None
+            self.fln_long = None
+        # assert self.fln_long.entries
+
+        if mikado:
+            self.mikado = mikado
+            self.fln = FlnWrapper(mikado, self.fai)
+            self.add_edge(mikado, self.fln)
+        else:
+            self.mikado = None
+            self.fln = None
+
+        self.trainer = TrainAugustusWrapper(fln_wrapper=self.fln, rm_wrapper=self.rmasker)
+        self.fasta_splitter = FastaMSplitter(faidx)
+
+        dir = None
+        fnames = []
+
+        for run in self.runs:
+
+            runner = AugustusRunWrapper(fasta_splitter=self.fasta_splitter,
+                                        mikado=self.fln,
+                                        mikado_long=self.fln_long,
+                                        rmasker=self.rmasker,
+                                        proteins=self.proteins,
+                                        trainer=self.trainer,
+                                        run=run)
+            if dir is None:
+                dir = self._augustus_dir
+
+    @property
+    def _augustus_dir(self):
+        return os.path.join(self._root_dir, augustus_root_dir)
+
+
+
+class AugustusRunWrapper(EIWrapper):
+
+    __final_rulename__ = "augustus_run"
+
+    def __init__(self,
+                 fasta_splitter: FastaMSplitter,
+                 mikado: FlnWrapper,
+                 mikado_long: FlnWrapper,
+                 rmasker: RepeatMasking,
                  proteins: ProteinWrapper,
+                 trainer:TrainAugustusWrapper,
                  run: int):
 
         super().__init__(configuration=mikado.configuration)
 
-        converter = ConvertToHints(mikado=mikado,
-                                   portcullis=mikado.portcullis,
-                                   alignments=mikado.long_alignments,
-                                   repeats=rmasker,
-                                   mikado_long=mikado_long,
-                                   run=run,
-                                   proteins=proteins)
+        self.__run = run
+        self.trainer = trainer
+        self.converter = ConvertToHints(mikado=mikado,
+                                        repeats=rmasker,
+                                        mikado_long=mikado_long,
+                                        run=run,
+                                        proteins=proteins)
+        self.add_edges_from([(_, self.converter) for _ in (mikado, mikado_long, rmasker, proteins)])
+        self.fasta_splitter = fasta_splitter
+        self.runs = [AugustusChunk(self.fasta_splitter, self.trainer, self.converter, chunk, run)
+                     for chunk in self.fasta_splitter.chunks]
 
-        pass
-
-
-# We have to split out the FASTA first
-
-
-class FastaMSplitter(AtomicOperation):
-
-    def __init__(self, faidx: FaidxGenome):
-
-        super().__init__()
-        self.input["genome"] = self.genome
-        self.input["fai"] = faidx.output["fai"]
-        self.output["chunk_db"] = pass
+        self.add_edges_from([(self.trainer, run) for run in self.runs])
+        self.add_edges_from([(self.converter, run) for run in self.runs])
 
     @property
-    def loader(self):
-        return ["ei-annotation"]
+    def augustus_run(self):
+        return self.__run
 
     @property
-    def rulename(self):
-        return "genome_chunker_augustus"
-
-    @property
-    def cmd(self):
-        """Command to split out the genome into manageable chunks. *THE* problem
-        that we have to solve is that we cannot predict beforehand the number of chunks,
-        and that the splitting script from Augustus actually tries to keep chromosomes together.
-        The command we end up using should - of course - try to have overlapping sequences as much as humanly possible.
-        """
-
-        load = self.load
-        cmd = "{load} split_genome_fasta.py -n {chunks} "
-        minsize, minoverlap = self.minsize, self.minoverlap
-        cmd += "-ms {minsize} -minO {minoverlap} {input[genome]} {output[chunk_db]}"
-        cmd = cmd.format(**locals())
-        return cmd
+    def final_rule(self):
+        return "{}_{}".format(self.__final_rulename__, self.augustus_run)
 
 
-class RunAugustus(AtomicOperation):
+class AugustusChunk(AtomicOperation):
 
     def __init__(self,
                  fastam: FastaMSplitter,
                  trained: TrainAugustusWrapper,
+                 hints: ConvertToHints,
                  chunk: int,
                  aug_run: int):
 
@@ -139,3 +182,39 @@ class RunAugustus(AtomicOperation):
         cmd += " --allow_hinted_splicesites=atac --errfile={log} \""
         cmd = cmd.format(**locals())
         return cmd
+
+
+class JoinChunks(AugustusMethod):
+
+    def __init__(self, chunks: [AugustusChunk]):
+
+        if len(chunks) == 0:
+            raise ValueError("No chunk provided")
+
+        super().__init__(chunks[0].configuration)
+        self.__run = chunks[0].run
+
+        self.input["chunks"] = [chunk.output["gtf"] for chunk in chunks]
+        self.output["gff"] = os.path.join(self._augustus_dir, "output",
+                                          "joined_{}.gtf".format(self.run))
+
+    @property
+    def loader(self):
+        return ['augustus']
+
+    @property
+    def cmd(self):
+        load = self.load
+        input, output = self.input, self.output
+        cmd = "{load} joingenes --inputfile={input.list} -o {output.gff} -e 10000 -m eukaryote -a"
+        cmd = cmd.format(**locals())
+        return cmd
+
+    @property
+    def run(self):
+        return self.__run
+
+    @property
+    def rulename(self):
+        return "join_genes_augustus_run{}".format(self.run)
+

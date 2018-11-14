@@ -3,7 +3,7 @@ import os
 import abc
 
 
-augustus_root_dir = outdir = os.path.join("abinitio")
+augustus_root_dir = os.path.join("abinitio")
 
 
 class AugustusMethod(AtomicOperation, metaclass=abc.ABCMeta):

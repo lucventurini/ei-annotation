@@ -246,7 +246,7 @@ class FaidxProtein(AtomicOperation):
 
 class DiamondIndex(AtomicOperation):
 
-    def __init__(self, sanitizer: SanitizeProteinBlastDB, key="db", rule_suffix=""):
+    def __init__(self, sanitizer, key="db", rule_suffix=""):
 
         super().__init__()
         self.__rule_suffix = ""

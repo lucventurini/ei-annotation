@@ -8,7 +8,7 @@ from ..repeats.__init__ import RepeatMasking
 from ..proteins.__init__ import ProteinWrapper
 from ..proteins.abstract import _get_value, FilterAlignments
 from .fln import FlnWrapper, FilterFLN
-from .abstract import AugustusMethod
+from .abstract import AugustusMethod, augustus_root_dir
 import os
 
 
@@ -233,8 +233,7 @@ translation starts and variation in UTR.
 
 """
 
-
-outdir = os.path.join( "abinitio", "3-Hints")
+outdir = os.path.join("3-Hints")
 
 
 class ConvertToHints(EIWrapper):
@@ -244,16 +243,14 @@ class ConvertToHints(EIWrapper):
     def __init__(self,
                  run: int,
                  mikado: FlnWrapper,
-                 alignments: ShortAlignmentsWrapper,
                  mikado_long: FlnWrapper,
-                 portcullis: PortcullisWrapper,
                  repeats: RepeatMasking,
                  proteins: ProteinWrapper):
 
         super().__init__(configuration=mikado.configuration)
 
         self.__coverages = {"+": [], "-": [], ".": []}
-        self.alignments = alignments
+        self.alignments = mikado.short_alignments
         self.perform_coverages()
         self.__run = None
         self.run = run
@@ -269,7 +266,7 @@ class ConvertToHints(EIWrapper):
         else:
             self.mikado_converter_long = None
 
-        portcullis = ConvertJunctions(run=self.run, junctions=portcullis)
+        portcullis = ConvertJunctions(run=self.run, junctions=mikado.portcullis)
         self.add_node(portcullis)
         if repeats.execute:
             repeats = ConvertRepeats(run=self.run, repeats=repeats)
@@ -351,7 +348,7 @@ class ConvertToHints(EIWrapper):
 
     @property
     def outdir(self):
-        return os.path.join(self.configuration["outdir"],
+        return os.path.join(self._root_dir, augustus_root_dir,
                             "run-{run}".format(run=self.run),
                             outdir, "output")
 

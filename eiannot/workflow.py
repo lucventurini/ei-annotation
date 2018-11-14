@@ -7,7 +7,7 @@ from .rnaseq.alignments.portcullis import PortcullisWrapper
 from .rnaseq.mikado import Mikado
 from .rnaseq.assemblies import AssemblyWrapper
 from .proteins import ExonerateProteinWrapper, GTHProteinWrapper
-from .abinitio import FlnWrapper, TrainAugustusWrapper
+from .abinitio.augustus import AugustusWrapper
 from .abinitio.converters import ConvertToHints
 import os
 
@@ -43,23 +43,19 @@ class AnnotationWorklow(EIWorfkflow):
             assert self.mikado_long.exit
             if not self.mikado_long.stats:
                 raise ValueError("No stats for mikado, number of gfs: {}".format(len(self.long_wrapper.gfs)))
-            self.merge([self.mikado_long])
-            self.fln_long = FlnWrapper(self.mikado_long)
-            # assert self.fln_long.entries
-            self.add_edge(self.mikado_long, self.fln_long)
-        else:
-            self.fln_long = None
+            self.add_edge(self.long_wrapper, self.mikado_long)
+            self.add_edge(self.portcullis, self.mikado_long)
 
         if self.long_wrapper.gfs or self.assemblies.gfs:
             self.mikado = Mikado(assemblies=self.assemblies,
                                  long_alignments=self.long_wrapper,
                                  portcullis=self.portcullis,
                                  only_long=False)
-            self.merge([self.mikado])
-            if self.mikado.stats:
-                self.fln = FlnWrapper(self.mikado)
-                self.merge([self.fln])
-                self.add_edge(self.mikado, self.fln)
+            self.add_edge(self.assemblies, self.mikado)
+            self.add_edge(self.long_wrapper, self.mikado)
+            self.add_edge(self.portcullis, self.mikado)
+
+            # self.merge([self.mikado])
 
         faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
         assert list(faid.input.keys()) == ["genome"], faid.input
@@ -72,21 +68,9 @@ class AnnotationWorklow(EIWorfkflow):
 
         self.merge([self.repeats, self.protein_alignments])
 
-        self.augustus_configuration = TrainAugustusWrapper(self.fln, self.repeats)
-        self.add_edge(self.repeats, self.augustus_configuration)
-        self.add_edge(self.fln, self.augustus_configuration)
-
-        self.converter = ConvertToHints(mikado=self.fln,
-                                        mikado_long=self.fln_long,
-                                        alignments=self.short_wrapper,
-                                        portcullis=self.portcullis,
-                                        repeats=self.repeats,
-                                        proteins=self.protein_alignments)
-        for node in [self.fln, self.fln_long, self.short_wrapper, self.portcullis,
-                     self.repeats, self.protein_alignments]:
-            if not node:
-                continue
-            self.add_edge(node, self.converter)
+        self.augustus = AugustusWrapper(mikado=self.mikado, mikado_long=self.mikado_long,
+                                        faidx=faid, proteins=self.protein_alignments,
+                                        rmasker=self.repeats)
 
         self.add_final_flag()
         # faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()

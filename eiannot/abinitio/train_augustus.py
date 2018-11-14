@@ -1,5 +1,6 @@
 from .fln import FlnWrapper
 from ..abstract import AtomicOperation, EIWrapper
+from .abstract import augustus_root_dir, AugustusMethod
 from ..repeats import RepeatMasking
 import os
 
@@ -34,8 +35,8 @@ class TrainAugustusWrapper(EIWrapper):
 
     @property
     def outdir(self):
-        return os.path.join(self._root_dir,
-                            "abinitio", "2-training{long}".format(long="-long-reads" if self.is_long else ""))
+        return os.path.join(self._root_dir, augustus_root_dir,
+                            "2-training{long}".format(long="-long-reads" if self.is_long else ""))
 
     @property
     def is_long(self):
@@ -52,11 +53,11 @@ class TrainAugustusWrapper(EIWrapper):
         return os.path.join(self.outdir, "augustus_training.done")
 
 
-class PrepareAugConfig(AtomicOperation):
+class PrepareAugConfig(AugustusMethod):
 
     def __init__(self, configuration, is_long):
 
-        super().__init__()
+        super().__init__(configuration)
         self.is_long = is_long
         self.configuration = configuration
         self.input["genome"] = self.genome
@@ -110,11 +111,11 @@ class PrepareAugConfig(AtomicOperation):
         return cmd
 
 
-class ConvertToGb(AtomicOperation):
+class ConvertToGb(AugustusMethod):
 
     def __init__(self, fln_wrapper: FlnWrapper, preparer: PrepareAugConfig):
 
-        super().__init__()
+        super().__init__(preparer.configuration)
         self.configuration = fln_wrapper.configuration
         self.is_long = fln_wrapper.is_long
         self.flank = fln_wrapper.fln_filter.flank
@@ -160,11 +161,11 @@ class ConvertToGb(AtomicOperation):
         return cmd
 
 
-class TrainAugustus(AtomicOperation):
+class TrainAugustus(AugustusMethod):
 
     def __init__(self, converter: ConvertToGb, config_preparer: PrepareAugConfig):
 
-        super().__init__()
+        super().__init__(configuration=converter.configuration)
         self.configuration = converter.configuration
         self.outdir = converter.outdir
         self.is_long = converter.is_long
