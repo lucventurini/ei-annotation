@@ -10,7 +10,6 @@ import pkg_resources
 from .fasta_split import FastaMSplitter
 from .abstract import augustus_root_dir, AugustusMethod
 import os
-import sys
 
 
 class AugustusWrapper(EIWrapper):
@@ -69,6 +68,16 @@ class AugustusWrapper(EIWrapper):
     def _augustus_dir(self):
         return os.path.join(self._root_dir, augustus_root_dir)
 
+    @property
+    def flag_name(self):
+        # TODO implement
+        pass
+
+    @property
+    def runs(self):
+        # TODO implement
+        """This property returns the runs to be executed according to the configuration"""
+        return []
 
 
 class AugustusRunWrapper(EIWrapper):
@@ -85,7 +94,6 @@ class AugustusRunWrapper(EIWrapper):
                  run: int):
 
         super().__init__(configuration=mikado.configuration)
-
         self.__run = run
         self.trainer = trainer
         self.converter = ConvertToHints(mikado=mikado,
@@ -109,6 +117,11 @@ class AugustusRunWrapper(EIWrapper):
     def final_rule(self):
         return "{}_{}".format(self.__final_rulename__, self.augustus_run)
 
+    @property
+    def flag_name(self):
+        # TODO implement
+        pass
+
 
 class AugustusChunk(AtomicOperation):
 
@@ -121,12 +134,9 @@ class AugustusChunk(AtomicOperation):
 
         super().__init__()
         self.input.update(fastam.output)
-
-
+        self.input["hints"]
         self.__chunk = chunk
         self.__run = aug_run
-
-        pass
 
     @property
     def run(self):
@@ -161,6 +171,7 @@ class AugustusChunk(AtomicOperation):
         else:
             return self.configuration["abinitio"]["extrinsic"]
 
+    @property
     def cmd(self):
 
         cmd = "{load}"
@@ -195,6 +206,9 @@ class JoinChunks(AugustusMethod):
         self.__run = chunks[0].run
 
         self.input["chunks"] = [chunk.output["gtf"] for chunk in chunks]
+        self.input["list"] = os.path.join(self._augustus_dir, "output", "file_list.{}.txt".format(self.run))
+        self.__create_file_list()
+
         self.output["gff"] = os.path.join(self._augustus_dir, "output",
                                           "joined_{}.gtf".format(self.run))
 
@@ -204,9 +218,13 @@ class JoinChunks(AugustusMethod):
 
     @property
     def cmd(self):
+        # TODO: at the moment I am just using joingenes directly, giving in a list of files;
+        # TODO: however, it might be more efficient to write a wrapper, like I did for Augustus itself, especially
+        # TODO: because different chromosomes can certainly be analysed in parallel.
         load = self.load
         input, output = self.input, self.output
-        cmd = "{load} joingenes --inputfile={input.list} -o {output.gff} -e 10000 -m eukaryote -a"
+        minoverlap = self.minoverlap  # This is to ensure that we do not miss anything that might be on the margins
+        cmd = "{load} joingenes --inputfile={input.list} -o {output.gff} -e {minoverlap} -m eukaryote -a"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -218,3 +236,19 @@ class JoinChunks(AugustusMethod):
     def rulename(self):
         return "join_genes_augustus_run{}".format(self.run)
 
+    def __create_file_list(self):
+        if not os.path.exists(os.path.dirname(self.input["list"])):
+            os.makedirs(os.path.dirname(self.input["list"]))
+
+        with open(self.input["list"], "wt") as out:
+            for gt in self.input["chunks"]:
+                print(gt, 1, sep="\t", file=out)
+
+    @property
+    def __subfolder(self):
+        return "output"
+
+    @property
+    def minoverlap(self):
+        # TODO put this into the configuration
+        return self.configuration.get("abinitio", dict()).get("minsize", 5 * 10 ** 5)
