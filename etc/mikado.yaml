@@ -1,0 +1,18 @@
+programs:
+  mikado:
+    load: ''
+  transdecoder:
+    load: ''
+  prodigal:
+    load: ''
+  blast:
+    load: ''
+  diamond:
+    load: ''
+pick:
+  mode: 'permissive'
+  scoring_file: null
+homology:
+  prot_dbs: []
+  execute: true
+  program: diamond
