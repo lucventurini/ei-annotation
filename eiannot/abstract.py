@@ -419,7 +419,10 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             for resource, value in self.resources.items():
                 if isinstance(value, str) and "," in value:
                     value = "\"{value}\"".format(**locals())
-                string.append('    {resource}={value},'.format(**locals()))
+                if resource != "memory":
+                    string.append('    {resource}={value},'.format(**locals()))
+                else:
+                    string.append("memory=lambda wildcards, attempt: {value} * (1 + 0.1 * attempt)".format(**locals()))
             string[-1] = string[-1].rstrip(",")
 
         if self.cmd:

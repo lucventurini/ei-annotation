@@ -101,6 +101,8 @@ def main():
                             help="Force the re-execution or creation of the given rules or files. \
                             Use this option if you changed a rule and want to have all its output in your \
                             workflow updated.")
+    snakeparse.add_argument("--restart-times", help="Number of times to restart failing jobs (defaults to 0).",
+                            default=0)
     snakeparse.add_argument("--cleanup-metadata", dest="cleanup_metadata",
                             nargs="+",
                             default=[],
