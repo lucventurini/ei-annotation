@@ -5,6 +5,15 @@ import itertools
 import re
 
 
+"""Minimap2 is a strange aligner, in the sense that it does not use - like HISAT2, STAR, etc. - a single index file
+which can then be queried using different parameters. Rather, it tries to index everything in memory for every run,
+and requires to re-index if one of the key parameters (-k, -w or -H) is changed by any one of the runs.
+This requires, for the sake of consistency, to dicth pre-indexing altogether."""
+
+
+_nanopore_types = ("ont-direct",)
+
+
 class MiniMap2Wrapper(LongWrapper):
 
     __toolname__ = "minimap2"
@@ -13,12 +22,15 @@ class MiniMap2Wrapper(LongWrapper):
         super().__init__(prepare_flag)
 
         if len(self.runs) > 0 and len(self.samples) > 0:
+            # First, we have to collect the runs that we have to perform.
             indexer = self.indexer(prepare_flag.configuration, prepare_flag)
             self.add_edge(prepare_flag.exit, indexer)
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                mini_run = MiniMap2(indexer=indexer, sample=sample, run=run)
+                mini_run = MiniMap2(indexer=self.indexer, sample=sample, run=run)
                 self.add_edge(indexer, mini_run)
-                self.add_to_gfs(mini_run)
+                mini_convert = Minimap2Convert(aligner=mini_run)
+                self.add_edge(mini_run, mini_convert)
+                self.add_to_gfs(mini_convert)
 
     @property
     def _do_stats(self):
@@ -38,14 +50,16 @@ class MiniMap2SpliceIndexer(IndexBuilder):
 
     __toolname__ = "minimap2"
 
-    def __init__(self, configuration, prepare_flag: PrepareWrapper):
+    def __init__(self, configuration, prepare_flag: PrepareWrapper, extra=''):
+
+        """This is a mock index."""
 
         self.configuration = configuration
         super().__init__(configuration, self.outdir)
         self.input["genome"] = self.genome
         self.__threads = self.resources["threads"]
         self.input["fai"] = prepare_flag.fai.output["fai"]
-        self.output["index"] = os.path.join(self.outdir, "genome.idx")
+        self.output["index"] = os.path.join(self.outdir, "genome.fa")
         self.log = os.path.join(self.outdir, "index.log")
 
     @property
@@ -54,7 +68,7 @@ class MiniMap2SpliceIndexer(IndexBuilder):
 
     @property
     def loader(self):
-        return ["minimap2", "ei-annotation"]
+        return []
 
     @property
     def cmd(self):
@@ -63,39 +77,38 @@ class MiniMap2SpliceIndexer(IndexBuilder):
         log = self.log
         input, output = self.input, self.output
         outdir = self.outdir
-        cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -I $(determine_genome_size.py -G {input[genome]}) "
-        cmd += " -t {threads} -d {output[index]} {input[genome]} > {log} 2> {log}"
+        cmd = "mkdir -p {outdir} && & cd {outdir} && ln -s {input[genome]} {output[index]}"
         cmd = cmd.format(**locals())
-
         return cmd
 
     @property
     def index(self):
         return self.output["index"]
 
+    @property
+    def is_small(self):
+        return True
+
 
 class MiniMap2(LongAligner):
 
     __toolname__ = "minimap2"
 
-    def __init__(self, indexer, sample, run):
+    def __init__(self, indexer: MiniMap2SpliceIndexer, sample, run):
         super().__init__(indexer=indexer, sample=sample, run=run)
-        # self.input["index"] = self.indexer.output["index"]
+        self.input["index"] = self.indexer.output["index"]
         self.output = {"link": self.link,
-                       "gf": self.bed12,
-                       "paf": os.path.join(
-                           os.path.dirname(self.bed12),
-                           re.sub("\.bed12", "", os.path.basename(self.bed12)) + ".paf.gz")}
-        self.log = os.path.join(os.path.dirname(self.bed12), "minimap.log")
+                       "bam": self.bam}
+        self.log = os.path.join(os.path.dirname(self.bam), "minimap.log")
 
     @property
     def loader(self):
-        return ["minimap2", "ei-annotation"]
+        return ["minimap2", "ei-annotation", "samtools"]
 
     @property
     def strand_option(self):
         if self.sample.stranded:
-            return " -u f"
+            return "-u f"
         else:
             return "-u b"
 
@@ -105,21 +118,66 @@ class MiniMap2(LongAligner):
         load = self.load
         extra = self.extra
         input, output = self.input, self.output
-        type_args = self.type_args
         outdir = self.outdir
         log = self.log
         paf = re.sub("\.gz$", "", self.output["paf"])
         max_intron, strand_option = self.max_intron, self.strand_option
         threads = self.threads
         genome = self.genome
-
         cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra} {type_args}"
         cmd += " -G {max_intron} {strand_option} -t {threads} "
-        cmd += " -I $(determine_genome_size.py -G {genome}) "
-        cmd += " -C 5 {input[index]} {input[read1]} 2> {log} > {paf} "  # -C 5 :> cost for non-canonical splicing site
-        cmd += " && k8 $(which paftools.js) splice2bed -m {paf} | "
+        cmd += " -I $(determine_genome_size.py -G {genome}) -a "
+        cmd += " -C 5 {input[genome]} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
+        cmd += " samtools view -bS - | samtools sort -@ {threads} --reference {genome} -T {bam}.sort -o {bam} -"
+        cmd.format(**locals())
+        return cmd
+
+    @property
+    def rulename(self):
+        return "minimap2_{sample.label}_{run}".format(sample=self.sample, run=self.run)
+
+    @property
+    def suffix(self):
+        return ".bam"
+
+    @property
+    def bam(self):
+        return os.path.join(self.outdir, "minimap2", "{label}-{run}", "minimap2.bam").format(
+            label=self.sample.label,
+            run=self.run
+        )
+
+
+class Minimap2Convert(LongAligner):
+
+    def __init__(self, aligner: MiniMap2):
+
+        super().__init__(indexer=aligner.indexer, sample=aligner.sample, run=aligner.run)
+        self.aligner = aligner
+        self.input = self.aligner.output
+        self.output = {"gf": self.bed12,
+                       "paf": os.path.join(
+                           os.path.dirname(self.bed12),
+                           re.sub("\.bed12", "", os.path.basename(self.bed12)) + ".paf.gz")
+                       }
+
+    @property
+    def rulename(self):
+        return self.aligner.rulename + "_convert"
+
+    @property
+    def loader(self):
+        return ["minimap2", "ei-annotation", "mikado", "samtools"]
+
+    @property
+    def cmd(self):
+
+        load = self.load
+        input, output = self.input, self.output
+        cmd = "{load} && k8 $(which paftools.js) sam2paf <(samtools view -h {input[bam]}) | gzip -c - > {paf} && "
+        cmd += "k8 $(which paftools.js) splice2bed -m <(samtools view -h {input[bam]}) | "
         # Needed to correct for the fact that minimap2 BED12
-        cmd += " correct_bed12_mappings.py > {output[gf]} && gzip {paf}"
+        cmd += " correct_bed12_mappings.py > {output[gf]}"
         # Now link
         link_dir = os.path.dirname(self.link)
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
@@ -129,19 +187,12 @@ class MiniMap2(LongAligner):
         return cmd
 
     @property
+    def threads(self):
+        return 1
+
+    @property
     def suffix(self):
         return ".bed12"
-
-    @property
-    def type_args(self):
-        if self.sample.type in ("ont-direct",):
-            return "-k 14"
-        else:
-            return ""
-
-    @property
-    def rulename(self):
-        return "minimap2_{sample.label}_{run}".format(sample=self.sample, run=self.run)
 
     @property
     def bed12(self):
@@ -149,3 +200,7 @@ class MiniMap2(LongAligner):
             label=self.sample.label,
             run=self.run
         )
+
+    @property
+    def is_small(self):
+        return True

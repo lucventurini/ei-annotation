@@ -16,7 +16,6 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
             raise NotImplementedError("Operation {} does not have a defined toolname!".format(cls.__name__))
         super().__init_subclass__()
 
-
     def __init__(self, configuration, outdir):
         super(IndexBuilder, self).__init__()
         self.configuration = configuration
