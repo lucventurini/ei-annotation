@@ -150,6 +150,8 @@ class MiniMap2(LongAligner):
 
 class Minimap2Convert(LongAligner):
 
+    __toolname__ = "minimap2"
+
     def __init__(self, aligner: MiniMap2):
 
         super().__init__(indexer=aligner.indexer, sample=aligner.sample, run=aligner.run)

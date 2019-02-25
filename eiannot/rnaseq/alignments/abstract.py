@@ -284,7 +284,7 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
     def __init_subclass__(cls):
 
         if not hasattr(cls, "__toolname__"):
-            raise NotImplementedError()
+            raise NotImplementedError("This class has not been properly implemented with a toolname")
         super().__init_subclass__()
 
     def __init__(self,
