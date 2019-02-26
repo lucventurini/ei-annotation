@@ -56,6 +56,7 @@ class LongSample(Sample):
             suffix = readfile.split(".")[-2]
         else:
             comp_suffix = ""
+        self.__suffix = comp_suffix
 
         if suffix in ("fa", "fna", "fasta"):
             suffix = ".fa"
@@ -109,6 +110,9 @@ class LongSample(Sample):
             raise ValueError("Invalid type: {}".format(typ))
         self.__type = typ
 
+    @property
+    def suffix(self):
+        return self.__suffix
 
 class ShortSample(Sample):
     """This simple class defines the input reads for a given sample."""

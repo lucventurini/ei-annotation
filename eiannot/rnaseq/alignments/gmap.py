@@ -409,7 +409,9 @@ class GmapLongReads(LongAligner):
         dbname = self.indexer.dbname
         genome = self.genome
 
-        cmd = "{load} $(determine_gmap.py {genome}) --dir={index} --db {dbname} "
+        compression = self.compression
+        cmd = "{load} {compression} {input[read1]} | "
+        cmd += "$(determine_gmap.py {genome}) --dir={index} --db {dbname} "
         cmd += " --min-intronlength={min_intron} {max_intron} "
         if "iit" in self.input:
             base = os.path.basename(self.input["iit"])
@@ -419,11 +421,20 @@ class GmapLongReads(LongAligner):
         cmd += " {coverage} {identity} {cross} {strand}"
         threads = self.threads
         extra = self.extra
-        cmd += " --format=2 {extra} --nthreads={threads} {input[read1]} > {output[gf]} 2> {log} "
+        cmd += " --format=2 {extra} --nthreads={threads} > {output[gf]} 2> {log} "
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
         cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
         return cmd
+
+    @property
+    def compression(self):
+        if self.sample.suffix == ".gz":
+            return " zcat "
+        elif self.sample.suffix == ".bz2":
+            return " bzcat "
+        else:
+            return " cat "
 
     @property
     def cross_species(self):

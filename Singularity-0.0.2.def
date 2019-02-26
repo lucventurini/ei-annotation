@@ -393,16 +393,16 @@ Include: yum wget
     rm -rf star-2.6.0c.tar.gz STAR-2.6.0c
 
     # GMAP
-    wget http://research-pub.gene.com/gmap/src/gmap-gsnap-2018-07-04.tar.gz
+    wget http://research-pub.gene.com/gmap/src/gmap-gsnap-2019-02-15.tar.gz
     tar xaf gmap-gsnap-2018-07-04.tar.gz
     cd gmap-2018-07-04
-    ./configure
+    ./configure --enable-zlib --enable-bzlib
     make -j 20
     make install
     gmap --help
     gsnap --help
     cd /opt/software/
-    rm -rf gmap-gsnap-2018-07-04.tar.gz gmap-2018-07-04
+    rm -rf gmap-gsnap-2019-02-15.tar.gz gmap-2019-02-15
 
     # MiniMap2
     wget https://github.com/lh3/minimap2/releases/download/v2.12/minimap2-2.12_x64-linux.tar.bz2

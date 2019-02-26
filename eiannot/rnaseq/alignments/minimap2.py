@@ -26,7 +26,7 @@ class MiniMap2Wrapper(LongWrapper):
             indexer = self.indexer(prepare_flag.configuration, prepare_flag)
             self.add_edge(prepare_flag.exit, indexer)
             for sample, run in itertools.product(self.samples, range(len(self.runs))):
-                mini_run = MiniMap2(indexer=self.indexer, sample=sample, run=run)
+                mini_run = MiniMap2(indexer=indexer, sample=sample, run=run)
                 self.add_edge(indexer, mini_run)
                 mini_convert = Minimap2Convert(aligner=mini_run)
                 self.add_edge(mini_run, mini_convert)
@@ -77,13 +77,18 @@ class MiniMap2SpliceIndexer(IndexBuilder):
         log = self.log
         input, output = self.input, self.output
         outdir = self.outdir
-        cmd = "mkdir -p {outdir} && & cd {outdir} && ln -s {input[genome]} {output[index]}"
+        genome = os.path.abspath(self.input["genome"])
+        cmd = "mkdir -p {outdir} && & cd {outdir} && ln -rs {input[genome]} {output[index]}"
         cmd = cmd.format(**locals())
         return cmd
 
     @property
     def index(self):
         return self.output["index"]
+
+    @property
+    def threads(self):
+        return 1
 
     @property
     def is_small(self):
@@ -97,8 +102,7 @@ class MiniMap2(LongAligner):
     def __init__(self, indexer: MiniMap2SpliceIndexer, sample, run):
         super().__init__(indexer=indexer, sample=sample, run=run)
         self.input["index"] = self.indexer.output["index"]
-        self.output = {"link": self.link,
-                       "bam": self.bam}
+        self.output = {"bam": self.bam}
         self.log = os.path.join(os.path.dirname(self.bam), "minimap.log")
 
     @property
@@ -120,16 +124,16 @@ class MiniMap2(LongAligner):
         input, output = self.input, self.output
         outdir = self.outdir
         log = self.log
-        paf = re.sub("\.gz$", "", self.output["paf"])
         max_intron, strand_option = self.max_intron, self.strand_option
         threads = self.threads
         genome = self.genome
-        cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra} {type_args}"
+        cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra}"
         cmd += " -G {max_intron} {strand_option} -t {threads} "
         cmd += " -I $(determine_genome_size.py -G {genome}) -a "
-        cmd += " -C 5 {input[genome]} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
-        cmd += " samtools view -bS - | samtools sort -@ {threads} --reference {genome} -T {bam}.sort -o {bam} -"
-        cmd.format(**locals())
+        cmd += " -C 5 {genome} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
+        cmd += " samtools view -bS - | "
+        cmd += "samtools sort -@ {threads} --reference {genome} -T {output[bam]}.sort -o {output[bam]} -"
+        cmd = cmd.format(**locals())
         return cmd
 
     @property
@@ -158,6 +162,7 @@ class Minimap2Convert(LongAligner):
         self.aligner = aligner
         self.input = self.aligner.output
         self.output = {"gf": self.bed12,
+                       "link": self.link,
                        "paf": os.path.join(
                            os.path.dirname(self.bed12),
                            re.sub("\.bed12", "", os.path.basename(self.bed12)) + ".paf.gz")
@@ -176,8 +181,8 @@ class Minimap2Convert(LongAligner):
 
         load = self.load
         input, output = self.input, self.output
-        cmd = "{load} && k8 $(which paftools.js) sam2paf <(samtools view -h {input[bam]}) | gzip -c - > {paf} && "
-        cmd += "k8 $(which paftools.js) splice2bed -m <(samtools view -h {input[bam]}) | "
+        cmd = "{load} && k8 $(which paftools.js) sam2paf <(samtools view -h {input[bam]}) | gzip -c - > {output[paf]}"
+        cmd += " && k8 $(which paftools.js) splice2bed -m <(samtools view -h {input[bam]}) | "
         # Needed to correct for the fact that minimap2 BED12
         cmd += " correct_bed12_mappings.py > {output[gf]}"
         # Now link
