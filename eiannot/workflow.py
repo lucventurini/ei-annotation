@@ -10,6 +10,7 @@ from .proteins import ExonerateProteinWrapper, GTHProteinWrapper
 from .abinitio.augustus import AugustusWrapper
 from .abinitio.converters import ConvertToHints
 import os
+import yaml
 
 
 class AnnotationWorklow(EIWorfkflow):
@@ -19,6 +20,8 @@ class AnnotationWorklow(EIWorfkflow):
         # First thing: prepare the reads. This is *outside* the snakemake.
         self.configuration = parse_samplesheet(samplesheet, configuration)
         super().__init__(self.configuration)
+        with open(".configuration.yaml", "wt") as out:
+            yaml.dump(self.configuration, out)
         self.prepare = PrepareWrapper(self.configuration, genome)
         self.merge([self.prepare])
         faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
@@ -46,16 +49,13 @@ class AnnotationWorklow(EIWorfkflow):
             self.add_edge(self.long_wrapper, self.mikado_long)
             self.add_edge(self.portcullis, self.mikado_long)
 
-        if self.long_wrapper.gfs or self.assemblies.gfs:
-            self.mikado = Mikado(assemblies=self.assemblies,
-                                 long_alignments=self.long_wrapper,
-                                 portcullis=self.portcullis,
-                                 only_long=False)
-            self.add_edge(self.assemblies, self.mikado)
-            self.add_edge(self.long_wrapper, self.mikado)
-            self.add_edge(self.portcullis, self.mikado)
-
-            # self.merge([self.mikado])
+        self.mikado = Mikado(assemblies=self.assemblies,
+                             long_alignments=self.long_wrapper,
+                             portcullis=self.portcullis,
+                             only_long=False)
+        self.add_edge(self.assemblies, self.mikado)
+        self.add_edge(self.long_wrapper, self.mikado)
+        self.add_edge(self.portcullis, self.mikado)
 
         faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
         assert list(faid.input.keys()) == ["genome"], faid.input
@@ -68,9 +68,9 @@ class AnnotationWorklow(EIWorfkflow):
 
         self.merge([self.repeats, self.protein_alignments])
 
-        self.augustus = AugustusWrapper(mikado=self.mikado, mikado_long=self.mikado_long,
-                                        faidx=faid, proteins=self.protein_alignments,
-                                        rmasker=self.repeats)
+        # self.augustus = AugustusWrapper(mikado=self.mikado, mikado_long=self.mikado_long,
+        #                                 faidx=faid, proteins=self.protein_alignments,
+        #                                 rmasker=self.repeats)
 
         self.add_final_flag()
         # faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()

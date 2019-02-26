@@ -65,15 +65,18 @@ class LongSample(Sample):
             suffix = ".{}".format(suffix)
 
         rout = os.path.join(self.read_dir,
-                            "{label}.long{suffix}".format(**locals()))
-        if comp_suffix and not os.path.exists(rout):
-            if comp_suffix == "gz":
-                sp.call("gzip -dc {readfile} > {rout}", shell=True)
-            else:
-                sp.call("bzip2 -dc {readfile} > {rout}", shell=True)
-        else:
-            if not os.path.islink(rout):
-                os.symlink(os.path.abspath(readfile), rout)
+                            "{label}.long{suffix}{comp_suffix}".format(**locals()))
+        if not os.path.islink(rout):
+            os.symlink(os.path.abspath(readfile), rout)
+
+        # if comp_suffix and not os.path.exists(rout):
+        #     if comp_suffix == "gz":
+        #         sp.call("gzip -dc {readfile} > {rout}".format(**locals()), shell=True)
+        #     else:
+        #         sp.call("bzip2 -dc {readfile} > {rout}".format(**locals()), shell=True)
+        # else:
+        #     if not os.path.islink(rout):
+        #         os.symlink(os.path.abspath(readfile), rout)
         self.__readfile = rout
         self.__strandedness = strandedness
         self.__type = None
@@ -417,12 +420,13 @@ class AtomicOperation(metaclass=abc.ABCMeta):
         if self.resources and not self.local:
             string.append("  params:")
             for resource, value in self.resources.items():
-                if isinstance(value, str) and "," in value:
+                if isinstance(value, str):
                     value = "\"{value}\"".format(**locals())
                 if resource != "memory":
                     string.append('    {resource}={value},'.format(**locals()))
                 else:
-                    string.append("memory=lambda wildcards, attempt: {value} * (1 + 0.1 * attempt)".format(**locals()))
+                    string.append("    memory={value},".format(**locals()))
+                    # string.append("    mem_mb= lambda wildcards, attempt: {value} * (1 + 0.1 * attempt),".format(**locals()))
             string[-1] = string[-1].rstrip(",")
 
         if self.cmd:
