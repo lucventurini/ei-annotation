@@ -7,8 +7,8 @@ class StarIndexLink(IndexLinker):
 
     __toolname__ = "star"
 
-    def __init__(self, configuration, outdir):
-        super().__init__(configuration, outdir)
+    def __init__(self, configuration):
+        super().__init__(configuration)
         self.input["index_files"] = [os.path.join(self.index_folder, self.index_name, fname) for fname in
                                      ["Genome", "SA", "chrLength.txt", "chrNameLength.txt",
                                       "genomeParameters.txt", "Log.out",
@@ -42,9 +42,9 @@ class StarIndex(IndexBuilder):
 
     __toolname__ = "star"
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
 
-        super().__init__(configuration, outdir)
+        super().__init__(configuration)
 
         self.output = {"index": os.path.join(self.outdir, "SAindex")}
         self.touch = False
@@ -171,7 +171,7 @@ class StarWrapper(ShortWrapper):
 
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = self.indexer(configuration, self.outdir)
+            indexer = self.indexer(configuration)
             self.add_node(indexer)
             # Optionally build the reference splice catalogue
             star_runs = []
@@ -315,7 +315,7 @@ class StarLongWrapper(LongWrapper):
 
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = self.indexer(self.configuration, self.outdir)
+            indexer = self.indexer(self.configuration)
             self.add_node(indexer)
             # Optionally build the reference splice catalogue
             for sample, run in itertools.product(self.samples, range(len(self.runs))):

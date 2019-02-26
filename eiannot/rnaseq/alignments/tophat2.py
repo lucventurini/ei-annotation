@@ -9,9 +9,9 @@ class TopHat2IndexLink(IndexLinker):
 
     __toolname__ = "tophat2"
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
 
-        super().__init__(configuration, outdir)
+        super().__init__(configuration)
         self.input["index_folder"] = self.index_folder
 
         index_files = []
@@ -50,9 +50,9 @@ class TopHat2Index(IndexBuilder):
 
     __toolname__ = "tophat2"
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
 
-        super().__init__(configuration, outdir)
+        super().__init__(configuration)
 
         self.output = {"index": os.path.join(self.outdir, "{}_index.done".format(self.toolname))}
         self.log = os.path.join(self.outdir, "{}.index.log".format(self.toolname))
@@ -167,7 +167,7 @@ class TopHat2Wrapper(ShortWrapper):
 
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = self.indexer(configuration, self.outdir)
+            indexer = self.indexer(configuration)
             self.add_node(indexer)
             # Optionally build the reference splice catalogue
             top_runs = []

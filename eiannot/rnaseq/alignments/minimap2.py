@@ -1,4 +1,4 @@
-from .abstract import LongAligner, LongWrapper, IndexBuilder, IndexLinker
+from .abstract import LongAligner, LongWrapper, IndexBuilder
 from ...preparation import PrepareWrapper
 import os
 import itertools
@@ -50,12 +50,12 @@ class MiniMap2SpliceIndexer(IndexBuilder):
 
     __toolname__ = "minimap2"
 
-    def __init__(self, configuration, prepare_flag: PrepareWrapper, extra=''):
+    def __init__(self, configuration, prepare_flag: PrepareWrapper):
 
         """This is a mock index."""
 
         self.configuration = configuration
-        super().__init__(configuration, self.outdir)
+        super().__init__(configuration)
         self.input["genome"] = self.genome
         self.__threads = self.resources["threads"]
         self.input["fai"] = prepare_flag.fai.output["fai"]

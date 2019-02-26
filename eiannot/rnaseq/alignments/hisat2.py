@@ -51,9 +51,9 @@ class HisatLinker(IndexLinker):
 
     __toolname__ = "hisat2"
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
 
-        super().__init__(configuration, outdir)
+        super().__init__(configuration)
         self.configuration = configuration
         self.input["index_folder"] = self.index_folder
 
@@ -215,9 +215,9 @@ class HisatBuild(IndexBuilder):
 
     __toolname__ = "hisat2"
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
 
-        super().__init__(configuration, outdir)
+        super().__init__(configuration)
         # TODO: probably the input should be the cleaned up genome
         self.output = {"flag": os.path.join(self.outdir, "hisat_index.done")}
         self.touch = True

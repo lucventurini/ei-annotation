@@ -42,7 +42,7 @@ class TrinityGGWrapper(ShortAssemblerWrapper):
                     break
 
             if indexer is None:
-                indexer = GmapIndex(aln_wrapper.configuration, self.outdir)
+                indexer = GmapIndex(aln_wrapper.configuration)
             if iit is None and has_transcriptome:
                 iit = GmapExonsIIT(indexer)
 

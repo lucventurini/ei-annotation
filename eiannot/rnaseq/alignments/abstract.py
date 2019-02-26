@@ -16,13 +16,13 @@ class IndexBuilder(AtomicOperation, metaclass=abc.ABCMeta):
             raise NotImplementedError("Operation {} does not have a defined toolname!".format(cls.__name__))
         super().__init_subclass__()
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
         super(IndexBuilder, self).__init__()
         self.configuration = configuration
         self.input = {"genome": self.genome}
         if self.transcriptome is not None:
             self.input["transcriptome"] = self.transcriptome
-        self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
+        self.log = os.path.join(self.outdir, "index", "log", "{}.log".format(self.toolname))
         self.__threads = 1
 
     @property
@@ -105,11 +105,11 @@ class IndexLinker(AtomicOperation, metaclass=abc.ABCMeta):
             raise NotImplementedError("Operation {} does not have a defined toolname!".format(cls.__name__))
         super().__init_subclass__()
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
         super(IndexLinker, self).__init__()
         self.configuration = configuration
         self.input = {"genome": self.genome}
-        self.log = os.path.join(outdir, "index", "log", "{}.log".format(self.toolname))
+        self.log = os.path.join(self.outdir, "index", "log", "{}.log".format(self.toolname))
 
     @property
     def index_folder(self):

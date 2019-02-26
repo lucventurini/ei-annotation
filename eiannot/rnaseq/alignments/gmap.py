@@ -39,7 +39,7 @@ class GsnapWrapper(ShortWrapper):
             # Start creating the parameters necessary for the run
             # Optionally build the reference splice catalogue
             gsnap_runs = []
-            indexer = self.indexer(self.configuration, self.outdir)
+            indexer = self.indexer(self.configuration)
             # self.add_node(indexer)
             self.add_edge(prepare_wrapper, indexer)
             if indexer.transcriptome is not None:
@@ -71,9 +71,9 @@ class GmapIndex(IndexBuilder):
 
     __toolname__ = "gmap"
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
 
-        super().__init__(configuration, outdir)
+        super().__init__(configuration)
         self.output = {"flag": os.path.join(self.outdir, "gmap_index.done")}
         self.touch = True
 
@@ -126,9 +126,9 @@ class GmapLink(IndexLinker):
 
     __toolname__ = "gmap"
 
-    def __init__(self, configuration, outdir):
+    def __init__(self, configuration):
 
-        super().__init__(configuration, outdir)
+        super().__init__(configuration)
         self.input["index_folder"] = self.index_folder
         self.input["index_files"] = glob.glob(os.path.join(self.index_folder,
                                                            self.index_name,

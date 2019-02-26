@@ -7,3 +7,4 @@ deeptools
 pandas
 pyfaidx
 sqlalchemy
+numpy>=1.16.0
