@@ -91,6 +91,10 @@ class MiniMap2SpliceIndexer(IndexBuilder):
         return 1
 
     @property
+    def local(self):
+        return True
+
+    @property
     def is_small(self):
         return True
 
