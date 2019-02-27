@@ -5,6 +5,7 @@ from .star import StarWrapper, StarLongWrapper
 from ...abstract import EIWrapper
 from ...preparation import PrepareWrapper
 from .minimap2 import MiniMap2Wrapper
+from .magicblast import MagicBlastWrapper
 import os
 
 
@@ -66,7 +67,8 @@ class LongAlignmentsWrapper(EIWrapper):
     wrappers = {
         "star": StarLongWrapper,
         "gmap": GmapLongWrapper,
-        "minimap2": MiniMap2Wrapper
+        "minimap2": MiniMap2Wrapper,
+        "magicblast": MagicBlastWrapper,
     }
 
     def __init__(self, prepare_wrapper):

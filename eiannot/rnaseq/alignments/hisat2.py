@@ -22,9 +22,9 @@ class HisatWrapper(ShortWrapper):
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
             if self.prebuilt is True:
-                indexer = HisatLinker(configuration, self.outdir)
+                indexer = HisatLinker(configuration)
             else:
-                indexer = self.indexer(configuration, self.outdir)
+                indexer = self.indexer(configuration)
             self.add_node(indexer)
             assert len(indexer.output) == 1, indexer.output
             # Optionally build the reference splice catalogue
@@ -218,7 +218,6 @@ class HisatBuild(IndexBuilder):
     def __init__(self, configuration):
 
         super().__init__(configuration)
-        # TODO: probably the input should be the cleaned up genome
         self.output = {"flag": os.path.join(self.outdir, "hisat_index.done")}
         self.touch = True
 

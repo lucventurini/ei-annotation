@@ -115,6 +115,7 @@ def main():
                             help="Print out the shell commands that will be executed.")
     snakeparse.add_argument("--nolock", action="store_true", default=False,
                             help="Do not lock the working directory. Use with caution!")
+    snakeparse.add_argument("--cleanup-shadow", dest="cleanup_shadow", action="store_true", default=False)
     snakeparse.add_argument("--stats", default="eiannot_stats", help="Prefix of the statistics file")
     args = parser.parse_args()
 
@@ -177,7 +178,9 @@ Please use the \"-nd\" flag to run the Ei-Annot pipeline if you do not plan to u
                         forceall=args.dag,
                         forcerun=args.forcerun,
                         lock=(not args.nolock),
-                        printreason=True
+                        printreason=True,
+                        cleanup_shadow=args.cleanup_shadow,
+
                         )
 
 

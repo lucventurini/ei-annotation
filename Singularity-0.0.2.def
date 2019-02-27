@@ -88,11 +88,7 @@ Include: yum wget
     full_lengther_next --help;
 
     # Install exonerate
-    wget http://ftp.ebi.ac.uk/pub/software/vertebrategenomics/exonerate/exonerate-2.2.0-x86_64.tar.gz
-    tar xaf exonerate-2.2.0-x86_64.tar.gz
-    cd exonerate-2.2.0-x86_64/bin/;
-    mv * -t /usr/local/bin/;
-    cd ../../;
+    conda install -c bioconda exonerate=2.4.0
 
     python3 --version
     cd $(dirname $(which python3))
@@ -111,9 +107,14 @@ Include: yum wget
     # This will need to be installed in a specific CONDA ENVIRONMENT
 
     # Install BLAST
-    wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.7.1+-1.x86_64.rpm
+    wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.7.1/ncbi-blast-2.7.1+-1.x86_64.rpm
     rpm -ivh ncbi-blast-2.7.1+-1.x86_64.rpm
-    blastx -help
+    blastx -help > /dev/null 2> /dev/null
+
+    # Install MagicBlast
+    wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/magicblast/1.4.0/ncbi-magicblast-1.4.0-2.x86_64.rpm
+    rpm -ivh ncbi-magicblast-1.4.0-2.x86_64.rpm
+    magicblast -help > /dev/null 2> /dev/null
 
     # Install CDHit
     conda install -y -c bioconda cd-hit
@@ -372,15 +373,7 @@ Include: yum wget
     rm -rf strawberry
 
     # HISAT2
-    wget ftp://ftp.ccb.jhu.edu/pub/infphilo/hisat2/downloads/hisat2-2.1.0-Linux_x86_64.zip
-    unzip hisat2-2.1.0-Linux_x86_64.zip
-    cd hisat2-2.1.0
-    for file in $(ls | egrep -v "(AUTHOR|LICENSE|MANUAL.*|NEWS|TUTORIAL|VERSION|doc|example|scripts|hisatgenotype_modules|hisatgenotype_scripts)"); do
-    	mv $file -t /usr/local/bin/;
-    done
-    hisat2 --help
-    cd /opt/software/
-    rm -rf hisat2-2.1.0-Linux_x86_64.zip hisat2-2.1.0;
+    conda install -c bioconda hisat2=2.1.0  # Conda version functions with Python3!
 
     # STAR
     wget https://github.com/alexdobin/STAR/archive/2.6.0c.tar.gz -O star-2.6.0c.tar.gz
@@ -405,13 +398,13 @@ Include: yum wget
     rm -rf gmap-gsnap-2019-02-15.tar.gz gmap-2019-02-15
 
     # MiniMap2
-    wget https://github.com/lh3/minimap2/releases/download/v2.12/minimap2-2.12_x64-linux.tar.bz2
-    tar xaf minimap2-2.12_x64-linux.tar.bz2
-    cd minimap2-2.12_x64-linux
+    wget https://github.com/lh3/minimap2/releases/download/v2.12/minimap2-2.15_x64-linux.tar.bz2
+    tar xaf minimap2-2.15_x64-linux.tar.bz2
+    cd minimap2-2.15_x64-linux
     mv k8 minimap2 paftools.js -t /usr/local/bin/
     minimap2 --help
     cd /opt/software/
-    rm -rf minimap2-2.12_x64-linux.tar.bz2 minimap2-2.12_x64-linux
+    rm -rf minimap2-2.15_x64-linux.tar.bz2 minimap2-2.15_x64-linux
 
     # GenomeTools
     cd /opt/software/

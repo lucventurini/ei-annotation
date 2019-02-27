@@ -60,10 +60,13 @@ class LongSample(Sample):
 
         if suffix in ("fa", "fna", "fasta"):
             suffix = ".fa"
+            self.__fileformat = "fasta"
         elif suffix in ("fq", "fastq"):
             suffix = ".fq"
+            self.__fileformat = "fastq"
         else:
             suffix = ".{}".format(suffix)
+            self.__fileformat = suffix
 
         rout = os.path.join(self.read_dir,
                             "{label}.long{suffix}{comp_suffix}".format(**locals()))
@@ -113,6 +116,10 @@ class LongSample(Sample):
     @property
     def suffix(self):
         return self.__suffix
+
+    @property
+    def fileformat(self):
+        return self.__fileformat
 
 class ShortSample(Sample):
     """This simple class defines the input reads for a given sample."""

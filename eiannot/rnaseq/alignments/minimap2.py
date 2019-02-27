@@ -5,7 +5,7 @@ import itertools
 import re
 
 
-"""Minimap2 is a strange aligner, in the sense that it does not use - like HISAT2, STAR, etc. - a single index file
+__doc__ = """Minimap2 is a strange aligner, in the sense that it does not use - like HISAT2, STAR, etc. - a single index file
 which can then be queried using different parameters. Rather, it tries to index everything in memory for every run,
 and requires to re-index if one of the key parameters (-k, -w or -H) is changed by any one of the runs.
 This requires, for the sake of consistency, to dicth pre-indexing altogether."""
@@ -57,7 +57,6 @@ class MiniMap2SpliceIndexer(IndexBuilder):
         self.configuration = configuration
         super().__init__(configuration)
         self.input["genome"] = self.genome
-        self.__threads = self.resources["threads"]
         self.input["fai"] = prepare_flag.fai.output["fai"]
         self.output["index"] = os.path.join(self.outdir, "genome.fa")
         self.log = os.path.join(self.outdir, "index.log")
@@ -78,7 +77,7 @@ class MiniMap2SpliceIndexer(IndexBuilder):
         input, output = self.input, self.output
         outdir = self.outdir
         genome = os.path.abspath(self.input["genome"])
-        cmd = "mkdir -p {outdir} && & cd {outdir} && ln -rs {input[genome]} {output[index]}"
+        cmd = "mkdir -p {outdir} && ln -rs {genome} {output[index]}"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -185,7 +184,7 @@ class Minimap2Convert(LongAligner):
 
         load = self.load
         input, output = self.input, self.output
-        cmd = "{load} && k8 $(which paftools.js) sam2paf <(samtools view -h {input[bam]}) | gzip -c - > {output[paf]}"
+        cmd = "{load} k8 $(which paftools.js) sam2paf <(samtools view -h {input[bam]}) | gzip -c - > {output[paf]}"
         cmd += " && k8 $(which paftools.js) splice2bed -m <(samtools view -h {input[bam]}) | "
         # Needed to correct for the fact that minimap2 BED12
         cmd += " correct_bed12_mappings.py > {output[gf]}"
@@ -214,4 +213,4 @@ class Minimap2Convert(LongAligner):
 
     @property
     def is_small(self):
-        return True
+        return False
