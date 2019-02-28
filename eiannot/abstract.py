@@ -1,11 +1,11 @@
 import abc  # The single instances of the
 import networkx as nx
-from eicore.external_process.snakemake_helper import loadPreCmd
+from eiannot import load_pre_cmd
 import os
 from frozendict import frozendict
 import re
 import copy
-import subprocess as sp
+# import subprocess as sp
 from collections import Counter
 
 
@@ -108,9 +108,14 @@ class LongSample(Sample):
 
     @type.setter
     def type(self, typ):
-        if not isinstance(typ, str) and typ.lower() not in ("cdna", "est", "pacbio", "ont", "ont-direct", None):
+        if typ is not None and not isinstance(typ, str):
+            raise TypeError("Invalid type of type label for {}: {}".format(self.label, type(typ)))
+        if typ is None:
+            self.__type = typ
+        elif typ.lower() in ("cdna", "est", "pacbio", "ont", "ont-direct"):
+            self.__type = typ
+        else:
             raise ValueError("Invalid type: {}".format(typ))
-        self.__type = typ
 
     @property
     def suffix(self):
@@ -362,7 +367,7 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             to_load = [self.configuration["programs"].get(_, dict()).get("load", '') for _ in self.loader]
         except KeyError:
             raise KeyError("{}:\n{}".format(self.rulename, self.configuration))
-        cmd = loadPreCmd(*to_load)
+        cmd = load_pre_cmd(*to_load)
         if cmd:
             return cmd + " "  # Make sure it does end with a space
         else:

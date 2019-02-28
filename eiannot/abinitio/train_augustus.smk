@@ -1,6 +1,6 @@
 import os
 import sys
-from eicore.external_process.snakemake_helper import loadPreCmd
+from eiannot import load_pre_cmd
 
 ### We should have two paths: one for training, one for not training
 

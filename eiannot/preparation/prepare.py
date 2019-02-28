@@ -30,7 +30,7 @@ def parse_samplesheet(samplesheet, configuration):
         for line in csv.reader(sheet, delimiter="\t"):
             if line[0].lstrip().startswith("#"):
                 continue  # Ignore comments!
-            label, read1, read2, strandedness, type = line
+            label, read1, read2, type, strandedness = line
             label = re.sub("\s", "_", label)  # Remove spaces!
             if type in ("illumina", "short"):
                 sample = ShortSample(read1, read2, label, outdir, strandedness=strandedness)

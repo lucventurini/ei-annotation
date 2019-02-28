@@ -1,5 +1,5 @@
 import os
-from eicore.external_process.snakemake_helper import loadPreCmd
+from eiannot import load_pre_cmd
 
 rule polish_rm:
   input: os.path.join(outdir, "RModel", "genome-families.fa")

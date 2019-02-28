@@ -1,5 +1,5 @@
 import os
-from eicore.external_process.snakemake_helper import loadPreCmd
+from eiannot import load_pre_cmd
 
 ### Snakemake rule to convert the output of RepeatMasker into suitable repeat hints for Augustus
 

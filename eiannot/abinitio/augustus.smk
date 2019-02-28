@@ -1,6 +1,6 @@
 import os
 import sys
-from eicore.external_process.snakemake_helper import loadPreCmd
+from eiannot import load_pre_cmd
 
 
 #Use join_aug_pred.pl and the predictionStart / predictionEnd arguments to make the problem tractable

@@ -18,7 +18,7 @@ else:
     long_description = ""
 
 version = None
-with open(path.join(here, "Mikado", "__init__.py"), "rt") as fp:
+with open(path.join(here, "eiannot", "__init__.py"), "rt") as fp:
     # exec(fp.read(), globals(), version)
     for line in fp:
         if line.startswith("__version__"):

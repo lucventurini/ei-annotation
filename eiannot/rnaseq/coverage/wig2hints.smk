@@ -1,5 +1,5 @@
 import os
-from eicore.external_process.snakemake_helper import loadPreCmd
+from eiannot import load_pre_cmd
 
 
 rule wig2hints:
