@@ -11,10 +11,11 @@ from collections import Counter
 
 class Sample(metaclass=abc.ABCMeta):
 
-    def __init__(self, label, read_dir):
+    def __init__(self, label, read_dir, strandedness):
         self.__label = label
         self.__read_dir = read_dir
         self.__strandedness = None
+        self.strandedness = strandedness
         if not os.path.exists(self.read_dir):
             os.makedirs(self.read_dir)
 
@@ -30,6 +31,11 @@ class Sample(metaclass=abc.ABCMeta):
         return self.__label
 
     @property
+    @abc.abstractmethod
+    def type(self):
+        pass
+
+    @property
     def stranded(self):
         return self.strandedness is not None and self.strandedness != "fr-unstranded"
 
@@ -39,17 +45,23 @@ class Sample(metaclass=abc.ABCMeta):
         # We will check the exact type of the
         return self.__strandedness
 
-    @property
-    @abc.abstractmethod
-    def type(self):
-        pass
+    @strandedness.setter
+    def strandedness(self, strandedness):
+        if strandedness is None or strandedness.lower() in ("fr-unstranded", "unstranded", "-", ""):
+            self.__strandedness = "fr-unstranded"
+        elif strandedness.lower() in ("f", "fr", "fr-secondstrand"):
+            self.__strandedness = "fr-secondstrand"
+        elif strandedness.lower() in ("r", "rf", "fr-firststrand"):
+            self.__strandedness = "fr-firststrand"
+        else:
+            raise ValueError("Unrecognised strandedness for sample {}: {}".format(self.label, strandedness))
 
 
 class LongSample(Sample):
 
     def __init__(self, readfile, label, read_dir, strandedness, type):
 
-        super().__init__(label=label, read_dir=read_dir)
+        super().__init__(label=label, read_dir=read_dir, strandedness=strandedness)
         suffix = readfile.split(".")[-1]
         if suffix in ("bz2", "gz"):
             comp_suffix = "." + suffix
@@ -73,16 +85,7 @@ class LongSample(Sample):
         if not os.path.islink(rout):
             os.symlink(os.path.abspath(readfile), rout)
 
-        # if comp_suffix and not os.path.exists(rout):
-        #     if comp_suffix == "gz":
-        #         sp.call("gzip -dc {readfile} > {rout}".format(**locals()), shell=True)
-        #     else:
-        #         sp.call("bzip2 -dc {readfile} > {rout}".format(**locals()), shell=True)
-        # else:
-        #     if not os.path.islink(rout):
-        #         os.symlink(os.path.abspath(readfile), rout)
         self.__readfile = rout
-        self.__strandedness = strandedness
         self.__type = None
         self.type = type
 
@@ -98,10 +101,6 @@ class LongSample(Sample):
     def read2(self):
         """This will always return None; long-read samples only have one set of reads."""
         return None
-
-    @property
-    def strandedness(self):
-        return self.__strandedness
 
     @property
     def type(self):
@@ -121,14 +120,14 @@ class LongSample(Sample):
     def fileformat(self):
         return self.__fileformat
 
+
 class ShortSample(Sample):
     """This simple class defines the input reads for a given sample."""
 
     def __init__(self, read1, read2, label, read_dir, strandedness=None):
 
-        super(ShortSample, self).__init__(label=label, read_dir=read_dir)
+        super(ShortSample, self).__init__(label=label, read_dir=read_dir, strandedness=strandedness)
 
-        self.__strandedness = strandedness
         suffix = read1.split(".")[-1]
         if suffix not in ("gz", "bz2"):
             suffix = ""
@@ -142,17 +141,15 @@ class ShortSample(Sample):
             os.symlink(os.path.abspath(read1), r1out)
         self.__read1 = r1out
 
-        if read2 is not None and read2 != "-":
+        if read2 and read2 != "-":
             if not os.path.exists(os.path.abspath(read2)):
                 raise OSError("Read file {} not found".format(os.path.abspath(read2)))
             r2out = os.path.join(read_dir, "{label}.R2.fq{suffix}".format(**locals()))
             if not os.path.islink(r2out):
                 os.symlink(os.path.abspath(read2), r2out)
             self.__read2 = r2out
-
-    @property
-    def strandedness(self):
-        return self.__strandedness
+        else:
+            self.__read2 = None
 
     @property
     def read1(self):

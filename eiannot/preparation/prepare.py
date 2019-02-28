@@ -28,9 +28,9 @@ def parse_samplesheet(samplesheet, configuration):
 
     with open(samplesheet) as sheet:
         for line in csv.reader(sheet, delimiter="\t"):
-            label, read1, read2, is_long, strandedness, type = line
-            if label.lstrip().startswith("#"):
+            if line[0].lstrip().startswith("#"):
                 continue  # Ignore comments!
+            label, read1, read2, is_long, strandedness, type = line
             label = re.sub("\s", "_", label)  # Remove spaces!
             if is_long not in ("True", "False"):
                 raise ValueError("Invalid is_long flag: {}".format(is_long))
