@@ -30,26 +30,19 @@ def parse_samplesheet(samplesheet, configuration):
         for line in csv.reader(sheet, delimiter="\t"):
             if line[0].lstrip().startswith("#"):
                 continue  # Ignore comments!
-            label, read1, read2, is_long, strandedness, type = line
+            label, read1, read2, strandedness, type = line
             label = re.sub("\s", "_", label)  # Remove spaces!
-            if is_long not in ("True", "False"):
-                raise ValueError("Invalid is_long flag: {}".format(is_long))
-            elif is_long == "True":
-                is_long = True
-            else:
-                is_long = False
-            if is_long:
-                sample = LongSample(read1, label, outdir, strandedness, type)
-                tag = "long_reads"
-            else:
+            if type in ("illumina", "short"):
                 sample = ShortSample(read1, read2, label, outdir, strandedness=strandedness)
                 tag = "short_reads"
+            else:
+                sample = LongSample(read1, label, outdir, strandedness, type)
+                tag = "long_reads"
             if label in configuration[tag]:  # Double label!
                 raise KeyError(
                     "{short_tag} read label {label} was found at least twice in the sample sheet. Please recheck it.".format(
                         short_tag=tag.split("_")[0].capitalize(),
                         **locals()))
-
             configuration[tag][label] = sample
 
     return configuration
