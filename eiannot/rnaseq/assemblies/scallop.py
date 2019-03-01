@@ -66,7 +66,7 @@ class Scallop(ShortAssembler):
         cmd += "mkdir -p {outdir} && "
         strand = self.strand
         log = self.log
-        cmd += "scallop -i {input[bam]} -o {output[gf]} {strand} {extra} > {log} 2>&1"
+        cmd += "scallop --verbose 0 -i {input[bam]} -o {output[gf]} {strand} {extra} > {log} 2>&1"
         if self._create_link is True:
             cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())

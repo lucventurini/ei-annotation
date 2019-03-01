@@ -265,7 +265,7 @@ class FilterGF(AtomicOperation):
 
     @property
     def is_small(self):
-        return True
+        return False
 
     @property
     def threads(self):

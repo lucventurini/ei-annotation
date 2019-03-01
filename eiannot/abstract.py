@@ -1,12 +1,21 @@
 import abc  # The single instances of the
 import networkx as nx
-from eiannot import load_pre_cmd
 import os
 from frozendict import frozendict
 import re
 import copy
 # import subprocess as sp
 from collections import Counter
+
+
+def load_pre_cmd(*args):
+    """
+    Used to prefix a shell command that utilises some external software with another command used to load that software
+    """
+    cc = "set +u && "
+    for arg in args:
+        cc += "{} && ".format(arg)
+    return cc
 
 
 class Sample(metaclass=abc.ABCMeta):
