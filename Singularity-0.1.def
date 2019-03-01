@@ -99,7 +99,7 @@ Include: yum wget
     export CPPFLAGS="-I/usr/include/:/usr/local/include:$CPPFLAGS"
 
     # Install python requirements
-    wget https://github.com/lucventurini/mikado/blob/1.2.4/requirements.txt
+    wget https://github.com/EI-CoreBioinformatics/mikado/blob/1.2.4/requirements.txt
     cat requirements.txt
     pip3 install -r requirements.txt
 
@@ -431,7 +431,7 @@ Include: yum wget
     mikado --help
 
     # Finally install EiAnnot
-    git clone --recursive https://github.com/lucventurini/ei-annotation.git
+    git clone --recursive https://github.com/EI-CoreBioinformatics/ei-annotation.git
     cd ei-annotation;
     git checkout 0.0.2;
     cd eicore;
