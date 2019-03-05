@@ -14,7 +14,10 @@ def load_pre_cmd(*args):
     """
     cc = "set +u && "
     for arg in args:
-        cc += "{} && ".format(arg)
+        if arg:
+            cc += "{} && ".format(arg)
+        else:
+            continue
     return cc
 
 

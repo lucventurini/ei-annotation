@@ -289,7 +289,7 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
 
     def __init__(self,
                  indexer: IndexBuilder,
-                 sample,
+                 sample: LongSample,
                  run):
 
         super().__init__()

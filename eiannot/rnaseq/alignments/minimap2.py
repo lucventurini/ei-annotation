@@ -1,4 +1,4 @@
-from .abstract import LongAligner, LongWrapper, IndexBuilder
+from .abstract import LongSample, LongAligner, LongWrapper, IndexBuilder
 from ...preparation import PrepareWrapper
 import os
 import itertools
@@ -102,7 +102,7 @@ class MiniMap2(LongAligner):
 
     __toolname__ = "minimap2"
 
-    def __init__(self, indexer: MiniMap2SpliceIndexer, sample, run):
+    def __init__(self, indexer: MiniMap2SpliceIndexer, sample: LongSample, run):
         super().__init__(indexer=indexer, sample=sample, run=run)
         self.input["index"] = self.indexer.output["index"]
         self.output = {"bam": self.bam}
@@ -130,10 +130,11 @@ class MiniMap2(LongAligner):
         max_intron, strand_option = self.max_intron, self.strand_option
         threads = self.threads
         genome = self.genome
+        noncanonical_cost = self.noncanonical_cost
         cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra}"
         cmd += " -G {max_intron} {strand_option} -t {threads} "
         cmd += " -I $(determine_genome_size.py -G {genome}) -a "
-        cmd += " -C 5 {genome} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
+        cmd += " {noncanonical_cost} {genome} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
         cmd += " samtools view -bS - | "
         cmd += "samtools sort -@ {threads} --reference {genome} -T {output[bam]}.sort -o {output[bam]} -"
         cmd = cmd.format(**locals())
@@ -142,6 +143,13 @@ class MiniMap2(LongAligner):
     @property
     def rulename(self):
         return "minimap2_{sample.label}_{run}".format(sample=self.sample, run=self.run)
+
+    @property
+    def noncanonical_cost(self):
+        if self.sample.type in ("cdna", "est"):
+            return " -C 5 "
+        else:
+            return " "
 
     @property
     def suffix(self):
