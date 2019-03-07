@@ -124,7 +124,7 @@ class LongSample(Sample):
             raise TypeError("Invalid type of type label for {}: {}".format(self.label, type(typ)))
         if typ is None:
             self.__type = typ
-        elif typ.lower() in ("cdna", "est", "pacbio", "ont", "ont-direct"):
+        elif typ.lower() in ("cdna", "est", "pacbio", "isoseq", "ont", "ont-direct"):
             self.__type = typ
         else:
             raise ValueError("Invalid type: {}".format(typ))

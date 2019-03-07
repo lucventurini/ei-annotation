@@ -589,3 +589,7 @@ class LongAlignerStats(AtomicOperation):
     @property
     def label(self):
         return self.__aligner.label
+
+    @property
+    def is_small(self):
+        return True

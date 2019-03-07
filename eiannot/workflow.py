@@ -38,7 +38,8 @@ class AnnotationWorklow(EIWorfkflow):
         self.long_wrapper = LongAlignmentsWrapper(self.prepare)
         faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
         assert list(faid.input.keys()) == ["genome"], faid.input
-        if self.long_wrapper.gfs:
+
+        if self.long_wrapper.gfs and not self.assemblies.gfs:
             self.mikado_long = Mikado(assemblies=self.assemblies,
                                       long_alignments=self.long_wrapper,
                                       portcullis=self.portcullis,
@@ -49,13 +50,14 @@ class AnnotationWorklow(EIWorfkflow):
             self.add_edge(self.long_wrapper, self.mikado_long)
             self.add_edge(self.portcullis, self.mikado_long)
 
-        self.mikado = Mikado(assemblies=self.assemblies,
-                             long_alignments=self.long_wrapper,
-                             portcullis=self.portcullis,
-                             only_long=False)
-        self.add_edge(self.assemblies, self.mikado)
-        self.add_edge(self.long_wrapper, self.mikado)
-        self.add_edge(self.portcullis, self.mikado)
+        if self.long_wrapper.gfs or self.assemblies.gfs:
+            self.mikado = Mikado(assemblies=self.assemblies,
+                                 long_alignments=self.long_wrapper,
+                                 portcullis=self.portcullis,
+                                 only_long=False)
+            self.add_edge(self.assemblies, self.mikado)
+            self.add_edge(self.long_wrapper, self.mikado)
+            self.add_edge(self.portcullis, self.mikado)
 
         faid = [_ for _ in self if _.rulename == "faidx_genome"].pop()
         assert list(faid.input.keys()) == ["genome"], faid.input

@@ -123,7 +123,6 @@ class MiniMap2(LongAligner):
     def cmd(self):
 
         load = self.load
-        extra = self.extra
         input, output = self.input, self.output
         outdir = self.outdir
         log = self.log
@@ -131,10 +130,18 @@ class MiniMap2(LongAligner):
         threads = self.threads
         genome = self.genome
         noncanonical_cost = self.noncanonical_cost
+        kmer = self.kmer
+        extra = ""
+        for option in re.findall("(-{1,2}[^-]*)", self.extra):
+            if option.startswith("-k"):
+                kmer = option
+            else:
+                extra += option
+
         cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra}"
-        cmd += " -G {max_intron} {strand_option} -t {threads} "
+        cmd += " -G {max_intron} {strand_option} -t {threads} {kmer}"
         cmd += " -I $(determine_genome_size.py -G {genome}) -a "
-        cmd += " {noncanonical_cost} {genome} {input[read1]} 2> {log} | "  # -C 5 :> cost for non-canonical splicing site
+        cmd += " {noncanonical_cost} {genome} {input[read1]} 2> {log} | "
         cmd += " samtools view -bS - | "
         cmd += "samtools sort -@ {threads} --reference {genome} -T {output[bam]}.sort -o {output[bam]} -"
         cmd = cmd.format(**locals())
@@ -146,8 +153,15 @@ class MiniMap2(LongAligner):
 
     @property
     def noncanonical_cost(self):
-        if self.sample.type in ("cdna", "est"):
+        if self.sample.type in ("cdna", "est", "isoseq"):
             return " -C 5 "
+        else:
+            return " "
+
+    @property
+    def kmer(self):
+        if self.sample.type in ("ont", "ont-direct"):
+            return "-k 14"
         else:
             return " "
 

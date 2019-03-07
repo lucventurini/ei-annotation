@@ -67,7 +67,8 @@ class Stringtie(ShortAssembler):
         else:
             trans = " "
         alrun = self.alrun
-        cmd += " stringtie {input[bam]} -l Stringtie_{alrun} {extra} "
+        strand = self.strand
+        cmd += " stringtie {input[bam]} -l Stringtie_{alrun} {extra} {strand} "
         cmd += " {trans} -o {output[gf]} -p {threads} > {log} 2>&1 "
         if self._create_link is True:
             cmd += "ln -sf {link_src} {output[link]} && touch -h {output[link]}"
@@ -81,7 +82,12 @@ class Stringtie(ShortAssembler):
 
     @property
     def strand(self):
-        return ''
+        if self.sample.strandedness == "fr-secondstrand":
+            return " --fr "
+        elif self.sample.strandedness == "fr-firststrand":
+            return " --rf "
+        else:
+            return ''
 
     @property
     def input_reads(self):

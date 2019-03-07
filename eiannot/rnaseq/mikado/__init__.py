@@ -38,12 +38,12 @@ class Mikado(EIWrapper):
         else:
             execute = (len(self.assemblies.gfs) > 0 or len(self.long_alignments.gfs) > 0)
 
+        self.configurer = MikadoConfig(portcullis_wrapper=self.portcullis,
+                                       assemblies=self.assemblies,
+                                       long_aln_wrapper=long_alignments,
+                                       is_long=only_long)
         if execute:
 
-            self.configurer = MikadoConfig(portcullis_wrapper=self.portcullis,
-                                           assemblies=self.assemblies,
-                                           long_aln_wrapper=long_alignments,
-                                           is_long=only_long)
             self.add_edges_from([step, self.configurer] for step in
                                 [self.assemblies, self.long_alignments, self.portcullis])
 
