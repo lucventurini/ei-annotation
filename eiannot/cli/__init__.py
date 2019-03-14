@@ -119,7 +119,7 @@ def main():
     snakeparse.add_argument("--stats", default="eiannot_stats", help="Prefix of the statistics file")
     args = parser.parse_args()
 
-    args.configuration = yaml.load(open(args.configuration))
+    args.configuration = yaml.load(open(args.configuration), Loader=yaml.SafeLoader)
 
     workflow = AnnotationWorklow(args.configuration, args.genome, args.samplesheet)
 
