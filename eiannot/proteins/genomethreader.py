@@ -20,16 +20,16 @@ class MKVTreeIndex(AtomicOperation):
         self.log = os.path.join(self.outdir, "mkvtree.log")
 
     @property
-    def loader(self):
-        return ["vmatch"]
-
-    @property
     def rulename(self):
         return "mkvtree_index"
 
     @property
     def threads(self):
         return 1
+
+    @property
+    def loader(self):
+        return ["vmatch", "gth"]
 
     @property
     def outdir(self):
@@ -102,24 +102,34 @@ class GTH(ProteinChunkAligner):
             return " "
 
     @property
-    def _identity_value(self):
-        """In GenomeThreader, we have to specify the maximum hamming distance. This
-        is roughly equivalent to the complement of the global identity of the protein match."""
-        val = _get_value(self.configuration, self.dbname, "identity")
-        if val and isinstance(val, (int, float)) and 0 <= val <= 100:
-            return 100 - val
-        elif val:
-            raise TypeError("Invalid identity: {}".format(val))
-        else:
-            return None
+    def source(self):
+        return "{dbname}.{cov}cov{hamming}id".format(dbname=self.dbname,
+                                                     cov=int(round(self.coverage)),
+                                                     hamming=int(round(self.hamming)))
 
     @property
     def hamming(self):
-        id_val = self._identity_value
-        if not id_val:
-            return " "
+        val = _get_value(self.configuration, self.dbname, "hamming")
+        if val and isinstance(val, int):
+            return " -prhdist {val}".format(**locals())
         else:
-            return " -prhdist {}".format(self._identity_value)
+            return ""
+
+    @property
+    def complete(self):
+        val = _get_value(self.configuration, self.dbname, "prhdist")
+        if val:
+            return " -startcodon -finalstopcodon"
+        else:
+            return " "
+
+    @property
+    def seedlength(self):
+        val = _get_value(self.configuration, self.dbname, "seedlength")
+        if val and isinstance(val, int):
+            return " -prseedlength {val} ".format(**locals())
+        else:
+            return ""
 
     @property
     def cmd(self):
@@ -132,14 +142,16 @@ class GTH(ProteinChunkAligner):
         gcintron = self.gcintron  # Max intron length
         cmd = "{load} gth -intermediate  -introncutout {gcintron} "
         coverage = self.coverage
-        identity = self.hamming
+        hamming = self.hamming
+        complete = self.complete
         species = self.species
         extra = self.extra
-        cmd += " {species} -gff3out {coverage} {identity} {extra} -paralogs "
+        seedlength = self.seedlength
+        cmd += " {species} -gff3out {coverage} {hamming} {seedlength} {complete} {extra} -paralogs "
         input, output = self.input, self.output
         logdir, log = os.path.dirname(self.log), self.log
         cmd += " -genomic {input[genome]} -protein {input[fasta]} 2> {log} "
-        cmd += """ | gth_correct.py > {output[gff3]}"""
+        cmd += """ | gth_correct.py > {output[gff3]} 2> {log}"""
         cmd = cmd.format(**locals())
         return cmd
 

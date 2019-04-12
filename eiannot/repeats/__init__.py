@@ -11,7 +11,7 @@ class RetrieveLibraries(AtomicOperation):
 
         super().__init__()
         self.configuration = configuration
-        self.input = {"mock": "."}
+        self.input = {"genome": self.genome}
         self.output = {"libraries": os.path.join(self.outdir, "retrieved.fa")}
         self.log = os.path.join(self.outdir, "logs", "extract_libraries.log")
 

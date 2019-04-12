@@ -23,7 +23,7 @@ class SplitMikadoPrepareFasta(MikadoOp):
 
     @property
     def chunks(self):
-        return self.configuration["mikado_homology"]["chunks"]
+        return self.configuration["mikado"]["homology"]["chunks"]
 
     @property
     def loader(self):
@@ -67,6 +67,12 @@ class SplitMikadoPrepareFasta(MikadoOp):
 
 class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
 
+    def __init_subclass__(cls):
+
+        if not hasattr(cls, "__toolname__"):
+            raise NotImplementedError("Wrapper {} does not have a defined toolname!".format(cls.__name__))
+        super().__init_subclass__()
+
     def __init__(self,
                  chunk_id,
                  split: SplitMikadoPrepareFasta,
@@ -94,11 +100,11 @@ class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
 
     @property
     def max_target_seqs(self):
-        return self.configuration["mikado_homology"]["max_target_seqs"]
+        return self.configuration["mikado"]["homology"]["max_target_seqs"]
 
     @property
     def evalue(self):
-        return self.configuration["mikado_homology"]["evalue"]
+        return self.configuration["mikado"]["homology"]["evalue"]
 
     @property
     def log(self):
@@ -121,8 +127,14 @@ class MikadoHomology(MikadoOp, metaclass=abc.ABCMeta):
     def fasta_dir(self):
         return os.path.join(self.mikado_dir, "mikado_homology", "fastas")
 
+    @property
+    def toolname(self):
+        return self.__toolname__
+
 
 class MikadoDiamond(MikadoHomology):
+
+    __toolname__ = "diamond"
 
     def __init__(self,
                  chunk_id: int,
@@ -134,6 +146,10 @@ class MikadoDiamond(MikadoHomology):
     @property
     def loader(self):
         return ["diamond"]
+
+    @property
+    def toolname(self):
+        return self.__toolname__
 
     @property
     def cmd(self):
@@ -153,6 +169,8 @@ class MikadoDiamond(MikadoHomology):
 
 
 class MikadoBlastx(MikadoHomology):
+
+    __toolname__ = "blast"
 
     def __init__(self,
                  chunk_id: int,
@@ -243,7 +261,7 @@ class MikadoHomologyWrapper(EIWrapper):
 
     @property
     def dbs(self):
-        return self.configuration["mikado_homology"]["prot_dbs"]
+        return self.configuration["mikado"]["homology"]["prot_dbs"]
 
     @property
     def flag_name(self):
@@ -251,15 +269,15 @@ class MikadoHomologyWrapper(EIWrapper):
 
     @property
     def chunks(self):
-        return self.configuration["mikado_homology"]["chunks"]
+        return self.configuration["mikado"]["homology"]["chunks"]
 
     @property
     def program(self):
-        return self.configuration["mikado_homology"]["program"]
+        return self.configuration["mikado"]["homology"]["program"]
 
     @property
     def execute(self):
-        return self.configuration["mikado_homology"]["execute"] and len(self.sanitizer.protein_dbs) > 0
+        return self.configuration["mikado"]["homology"]["execute"] and len(self.sanitizer.protein_dbs) > 0
 
     @property
     def blast_xmls(self):

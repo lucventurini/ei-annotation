@@ -193,9 +193,11 @@ class FilterAlignments(AtomicOperation):
 
     @property
     def source(self):
+        identity = self.identity or 0
+        coverage = self.coverage or 0
         return "{dbname}.{cov}cov{iden}id".format(dbname=self.dbname,
-                                                  cov=int(round(self.coverage)),
-                                                  iden=int(round(self.identity)))
+                                                  cov=int(round(coverage)),
+                                                  iden=int(round(identity)))
 
     @property
     def cmd(self):
