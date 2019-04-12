@@ -40,7 +40,7 @@ def evaluate(transcript: Transcript, args, verified_introns: set):
         transcript.attributes["note"] = transcript.attributes["Note"]
         del transcript.attributes["Note"]
 
-    if "note" in transcript.attributes or "Note" in transcript.attributes:
+    if (args.min_coverage or args.min_identity) and ("note" in transcript.attributes or "Note" in transcript.attributes):
         note = transcript.attributes["note"].split("|")
         transcript.note = dict((re.search("^([^:]*):(.*)", no).groups()) for no in note)
         # try:
@@ -49,14 +49,14 @@ def evaluate(transcript: Transcript, args, verified_introns: set):
         #     raise IndexError(transcript.attributes["note"])
         if not ("cov" in transcript.note and "id" in transcript.note):
             # No coverage and identity!
-            print("No cov/iden for {}".format(transcript.id))
+            # print("No cov/iden for {}".format(transcript.id))
             return None
         transcript.note["cov"] = float(transcript.note["cov"])
         transcript.note["id"] = float(transcript.note["id"])
         if transcript.note["cov"] < args.min_coverage or transcript.note["id"] < args.min_identity:
             return None
     else:
-        print("No note")
+        pass
 
     if transcript.monoexonic is True:
         # No further check is needed

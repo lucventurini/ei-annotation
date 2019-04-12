@@ -50,18 +50,23 @@ def main():
     # Open handles as needed
     args, bed_to_close, out_to_close = get_handles(args)
 
-    names = defaultdict(list)
-    for line in args.bed:
-        record = Mikado.parsers.bed12.BED12(line)
-        if record.header is True or record.invalid is True:
-            continue
-        names[record.id].append(record)
+    names = dict()
 
-    for name in names:
-        records = sorted(names[name], key=lambda bed: (-bed.score, bed.chrom, bed.start, bed.end))
-        for path, record in enumerate(records, 1):
-            record.name = "{record.name}.path{path}".format(**locals())
-            print(record, file=args.out)
+    for line in args.bed:
+        _fields = line.rstrip().split("\t")
+        if ";" in _fields[3]:
+            _splitted = _fields[3].split(";")
+            name, _other = _splitted[0], _splitted[1:]
+
+        else:
+            name, _other = _fields[3], ""
+        names.__setitem__(name, names.get(name, 0) + 1)
+        _fields[3] = "{name}.path{counter}{addi}".format(
+            counter=names.get(name),
+            addi=";" + _other if _other else "",
+            **locals()
+        )
+        print(*_fields, sep="\t", file=args.out)
 
     if bed_to_close:
         args.bed.close()

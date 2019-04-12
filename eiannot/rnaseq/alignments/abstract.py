@@ -302,9 +302,11 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
         self.run = run
         # self.input = {"indexer": indexer.index}
         self.input["read1"] = self.sample.read1
-        self.log = os.path.join(self.outdir, "{toolname}-{sample}-{run}.log".format(
-            toolname=self.toolname, sample=self.sample.label, run=self.run
-        ))
+        self.log = os.path.join(self.outdir, "{toolname}", "{label}-{run}", "{toolname}.log").format(
+            label=self.sample.label,
+            run=self.run,
+            toolname=self.toolname
+        )
 
         self.message = "Aligning input with {toolname} (sample {sample} - run {run})".format(
             toolname=self.toolname,
@@ -343,8 +345,8 @@ class LongAligner(AtomicOperation, metaclass=abc.ABCMeta):
     @property
     def link(self):
         return os.path.join(self.outdir, "output", "{toolname}-{sample}-{run}{suffix}".format(
-            toolname=self.toolname, sample=self.sample.label, run=self.run, suffix=self.suffix)
-                            )
+            toolname=self.toolname, sample=self.sample.label, run=self.run,
+            suffix=self.suffix if self.suffix.startswith(".") else "." + self.suffix))
 
     @property
     def outdir(self):
@@ -475,6 +477,8 @@ class LongWrapper(EIWrapper, metaclass=abc.ABCMeta):
         new_gfs = set()
 
         for gf in self.gfs:
+
+
             stats = LongAlignerStats(gf)
             self.add_edge(gf, stats)
             new_gfs.add(stats)
@@ -545,12 +549,6 @@ class LongAlignerStats(AtomicOperation):
             raise KeyError(type(aligner), aligner.rulename)
         self.message = "Calculating statistics for: {input[link]}".format(input=self.input)
         self.log = self.output["stats"] + ".log"
-        # if aligner.suffix.lower().lstrip(".") not in ("gff", "gff3", "gtf"):
-        #     self.touch = True
-        #     self._null_cmd = True
-        # else:
-        #     self.touch = False
-        #     self._null_cmd = False
 
     @property
     def rulename(self):

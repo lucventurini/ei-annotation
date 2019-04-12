@@ -138,9 +138,9 @@ class MiniMap2(LongAligner):
             else:
                 extra += option
 
-        cmd = "{load} mkdir -p {outdir} && minimap2 -x splice -c --cs=long {extra}"
-        cmd += " -G {max_intron} {strand_option} -t {threads} {kmer}"
-        cmd += " -I $(determine_genome_size.py -G {genome}) -a "
+        cmd = "{load} mkdir -p {outdir} && minimap2 -x splice --cs=long {extra} {kmer}"
+        cmd += " --secondary=no -G {max_intron} {strand_option} -t {threads} "
+        cmd += " -I $(determine_genome_size.py -G {genome}) -a -L --MD -Y --eqx -2 "
         cmd += " {noncanonical_cost} {genome} {input[read1]} 2> {log} | "
         cmd += " samtools view -bS - | "
         cmd += "samtools sort -@ {threads} --reference {genome} -T {output[bam]}.sort -o {output[bam]} -"
@@ -192,6 +192,7 @@ class Minimap2Convert(LongAligner):
                            os.path.dirname(self.bed12),
                            re.sub("\.bed12", "", os.path.basename(self.bed12)) + ".paf.gz")
                        }
+        self.log = os.path.join(os.path.dirname(self.bed12), "convert.log")
 
     @property
     def rulename(self):
@@ -206,10 +207,10 @@ class Minimap2Convert(LongAligner):
 
         load = self.load
         input, output = self.input, self.output
-        cmd = "{load} k8 $(which paftools.js) sam2paf <(samtools view -h {input[bam]}) | gzip -c - > {output[paf]}"
-        cmd += " && k8 $(which paftools.js) splice2bed -m <(samtools view -h {input[bam]}) | "
+        log = self.log
+        cmd = "{load} k8 $(which paftools.js) splice2bed -m <(samtools view -h {input[bam]}) 2> {log} | "
         # Needed to correct for the fact that minimap2 BED12
-        cmd += " correct_bed12_mappings.py > {output[gf]}"
+        cmd += " correct_bed12_mappings.py > {output[gf]} 2> {log}"
         # Now link
         link_dir = os.path.dirname(self.link)
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
@@ -228,9 +229,10 @@ class Minimap2Convert(LongAligner):
 
     @property
     def bed12(self):
-        return os.path.join(self.outdir, "minimap2", "{label}-{run}", "minimap2.bed12").format(
+        return os.path.join(self.outdir, "{toolname}", "{label}-{run}", "{toolname}.bed12").format(
             label=self.sample.label,
-            run=self.run
+            run=self.run,
+            toolname=self.toolname
         )
 
     @property

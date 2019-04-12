@@ -377,7 +377,7 @@ class GmapLongReads(LongAligner):
 
         self.output = {
             "link": self.link,
-            "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "gmap-{sample}-{run}{suffix}").format(
+            "gf": os.path.join(self.outdir,  "gmap", "{sample}-{run}", "gmap-{sample}-{run}.{suffix}").format(
                 sample=self.sample.label, run=self.run, suffix=self.suffix)
         }
 
@@ -389,10 +389,6 @@ class GmapLongReads(LongAligner):
         return ["gmap", "ei-annotation"]
 
     __toolname__ = "gmap"
-
-    @property
-    def suffix(self):
-        return ".gff"
 
     @property
     def rulename(self):
@@ -421,7 +417,8 @@ class GmapLongReads(LongAligner):
         cmd += " {coverage} {identity} {cross} {strand}"
         threads = self.threads
         extra = self.extra
-        cmd += " --format=2 {extra} --nthreads={threads} > {output[gf]} 2> {log} "
+        oformat = self.format
+        cmd += "{oformat} {extra} --nthreads={threads} > {output[gf]} 2> {log} "
         link_src = os.path.relpath(self.output["gf"], start=os.path.dirname(self.output["link"]))
         cmd += " && ln -sf {link_src} {output[link]} && touch -h {output[link]}"
         cmd = cmd.format(**locals())
@@ -438,10 +435,27 @@ class GmapLongReads(LongAligner):
 
     @property
     def cross_species(self):
-        if self.sample.type in ("pacbio", "ont", "ont-direct"):
-            return " --cross-species "
-        else:
-            return ""
+        return ""
+        # if self.sample.type in ("pacbio", "ont", "ont-direct"):
+        #     return " --cross-species "
+        # else:
+        #     return ""
+
+    @property
+    def format(self):
+        return "--format=gff3_match_cdna"
+        # if self.sample.type in ("pacbio", "ont", "ont-direct"):
+        #     return "--format=samse"
+        # else:
+        #     return "--format=gff3_match_cdna"
+
+    @property
+    def suffix(self):
+        return "gff"
+        # if self.sample.type in ("pacbio", "ont", "ont-direct"):
+        #     return "bam"
+        # else:
+        #     return "gff"
 
     @property
     def coverage(self):
@@ -488,7 +502,7 @@ class GmapLongWrapper(LongWrapper):
 
         if len(self.runs) > 0 and len(self.samples) > 0:
             # Start creating the parameters necessary for the run
-            indexer = self.indexer(self.configuration, self.outdir)
+            indexer = self.indexer(self.configuration)  #, self.outdir)
             self.add_edge(prepare_wrapper, indexer)
             if self._use_iit and indexer.transcriptome is not None:
                 iit = GmapExonsIIT(indexer)

@@ -180,12 +180,34 @@ class FilterAlignments(AtomicOperation):
         return _get_value(self.configuration, self.dbname, "max_intron_ends")
 
     @property
-    def identity(self):
-        return _get_value(self.configuration, self.dbname, "identity")
+    def coverage(self):
+        cov = _get_value(self.configuration, self.dbname, "coverage")
+        if cov is not None:
+            return cov
+        else:
+            return 0
 
     @property
-    def coverage(self):
-        return _get_value(self.configuration, self.dbname, "coverage")
+    def identity(self):
+        iden = _get_value(self.configuration, self.dbname, "identity")
+        if iden is not None:
+            return iden
+        else:
+            return 0
+
+    @property
+    def cmd_coverage(self):
+        if self.coverage:
+            return " -mincov {} ".format(self.coverage)
+        else:
+            return ""
+
+    @property
+    def cmd_identity(self):
+        if self.identity:
+            return " -minid {} ".format(self.identity)
+        else:
+            return ""
 
     @property
     def threads(self):
@@ -208,7 +230,7 @@ class FilterAlignments(AtomicOperation):
         genome = self.masked_genome
         outdir = self.outdir
         logdir = os.path.dirname(self.log)
-        min_coverage, min_identity = self.coverage, self.identity
+        min_coverage, min_identity = self.cmd_coverage, self.cmd_identity
         input, output, log = self.input, self.output, self.log
         source = self.source
         if "junctions" in self.input:
@@ -218,7 +240,7 @@ class FilterAlignments(AtomicOperation):
 
         cmd = "{load} mkdir -p {outdir} && mkdir -p {logdir} && "
         cmd += " filter_exonerate.py -s {source} -minI {mini} -maxE {maxe} -maxM {maxm} {junctions} -g {genome} "
-        cmd += " -minid {min_identity} -mincov {min_coverage} {input[gff3]} {output[gff3]} 2> {log} > {log}"
+        cmd += " {min_identity} {min_coverage} {input[gff3]} {output[gff3]} 2> {log} > {log}"
 
         cmd = cmd.format(**locals())
         return cmd

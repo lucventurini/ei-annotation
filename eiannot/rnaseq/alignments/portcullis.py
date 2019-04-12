@@ -8,7 +8,7 @@ import subprocess
 
 @functools.lru_cache(maxsize=8, typed=True)
 def portcullis_help(command, step):
-    cmd = subprocess.Popen("{} portcullis {} --help".format(command, step),
+    cmd = subprocess.Popen("{} portcullis {} --help".format(command, step), executable="/bin/bash",
                            shell=True, stdout=subprocess.PIPE).stdout.read().decode()
     return cmd
 
