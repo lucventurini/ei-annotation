@@ -33,7 +33,7 @@ def main():
     parser.add_argument("-p", "--priorities", nargs=2, type=int, default=[6, 4],
                         help="Priorities for pass/fail. Default: 6, 4")
     parser.add_argument("-mi", "--max-intron-length", default=10000, type=int, dest="mi")
-    parser.add_argument("-t", "--threshold", nargs=1, type=is_threshold, default=1)
+    parser.add_argument("-t", "--threshold", type=is_threshold, default=1)
     parser.add_argument("prefix")
     args = parser.parse_args()
 
@@ -50,8 +50,11 @@ def main():
     with tempfile.NamedTemporaryFile(mode="wt") as temp_pass:
         with tempfile.NamedTemporaryFile(mode="wt") as temp_fail:
             tab = pd.read_csv(args.tab, delimiter="\t")
-            pass_df = tab[(tab.score >= args.threshold) & (tab.size <= args.mi)]
-            fail_df = tab[(tab.score < args.threshold) | (tab.size > args.mi)]
+            try:
+                pass_df = tab[(tab.score >= args.threshold) & (tab["size"] <= args.mi)]
+            except ValueError:
+                raise ValueError((args.threshold, args.mi))
+            fail_df = tab[(tab.score < args.threshold) | (tab["size"] > args.mi)]
             pass_df.to_csv(temp_pass, sep="\t", index=False)
             temp_pass.flush()
             fail_df.to_csv(temp_fail, sep="\t", index=False)

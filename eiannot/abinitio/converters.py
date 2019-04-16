@@ -618,7 +618,7 @@ class ConvertMikado(HintMethod):
         input, output = self.input, self.output
         mikado_loci = self.input["bed12"]
         
-        cmd = "{load} filtered_fln_to_hints.py "
+        cmd = "{load} prepare_mikado_hints.py "
         gold_score, gold_source = self.gold_score, self.gold_source
         cmd += " -gs {gold_score} --gold-source {gold_source} "
         

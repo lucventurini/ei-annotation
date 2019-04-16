@@ -52,6 +52,49 @@ def perc(string):
     return string
 
 
+def load_blast_db(args):
+    blast_db = pd.read_csv(args.blast, delimiter="\t",
+                           names=["qseqid",
+                                  'sseqid',
+                                  'pident',
+                                  'qstart',
+                                  'qend',
+                                  'sstart',
+                                  'send',
+                                  'qlen',
+                                  'slen',
+                                  'length',
+                                  'nident',
+                                  'mismatch',
+                                  'positive',
+                                  'gapopen',
+                                  'gaps',
+                                  'evalue',
+                                  'bitscore'], index_col=["qseqid"], comment="#")
+
+    blast_db = blast_db[blast_db.evalue <= args.evalue]
+    blast_db["subject_coverage"] = 100 * (blast_db.send - blast_db.sstart + 1) / blast_db.slen
+    blast_db["query_coverage"] = 100 * (blast_db.qend - blast_db.qstart + 1) / blast_db.qlen
+    blast_db["coverage"] = blast_db[["subject_coverage", "query_coverage"]].apply(min, axis=1)
+    blast_db["distance"] = pd.DataFrame({"send_dist": blast_db["slen"] - blast_db["send"],
+                                         "qend_dist": blast_db["qlen"] - blast_db["qend"],
+                                         "qstart": blast_db.qstart, "sstart": blast_db.sstart}).apply(max, axis=1)
+    if 0 <= blast_db.pident.min() <= blast_db.pident.max() <= 1:
+        if args.identity > 1:
+            args.identity /= 100
+
+    blast_db["Complete"] = (blast_db.coverage >= args.coverage) & (blast_db.distance <= args.distance) & \
+                           (blast_db.pident >= args.identity)
+
+    # Select ONLY THE BEST VALUE FOR EACH MATCH
+    blast_db = blast_db.sort_values(
+        ["Complete", "evalue", "coverage", "pident", "distance"], ascending=False).groupby(by=blast_db.index).head(1)
+
+    blast_db = blast_db.assign(Status="Fragment")
+    blast_db.loc[blast_db.Complete == True, "Status"] = "Complete"
+    return blast_db
+
+
 def main():
 
     parser = argparse.ArgumentParser(__doc__)
@@ -59,19 +102,28 @@ def main():
     parser.add_argument("--max-intron", dest="max_intron", type=int, default=10000)
     parser.add_argument("-cov", "--coverage", type=perc, default=80)
     parser.add_argument("-id", "--identity", type=perc, default=80)
+    parser.add_argument("-e", "--evalue", type=float, default=10**-6)
+    parser.add_argument("-d", "--distance", type=int, default=20)  # TODO change name
     parser.add_argument("--max-training", dest="max_training", default=2000, type=int)
     parser.add_argument("-cs", "--cross-testing", dest="cross_testing", default=0.2, type=float,
                         help="Fraction of training candidates to be used for cross testing.")
-    parser.add_argument("fln")
+    # parser.add_argument("fln")
     parser.add_argument("mikado")
     parser.add_argument("blast")
     parser.add_argument("out_prefix")
     args = parser.parse_args()
 
     args.flank = abs(args.flank)
+
+    blast_db = load_blast_db(args)
+
+
+
+
+
     bed12 = args.mikado + ".bed12"
     metrics = args.mikado + ".metrics.tsv"
-    midx = args.mikado + ".gff3.midx"
+    midx = args.mikado + ".bed12.midx"
 
     fln = pd.read_csv(args.fln, sep="\t")
     fln.set_index(fln.columns[0], inplace=True)
@@ -121,28 +173,9 @@ def main():
                                                      gene_positions,
                                                      args.flank)
 
-    blast_db = pd.read_csv(args.blast, delimiter="\t",
-                           names=["qseqid",
-                                      'sseqid',
-                                      'pident',
-                                      'qstart',
-                                      'qend',
-                                      'sstart',
-                                      'send',
-                                      'qlen',
-                                      'slen',
-                                      'length',
-                                      'nident',
-                                      'mismatch',
-                                      'positive',
-                                      'gapopen',
-                                      'gaps',
-                                      'evalue',
-                                      'bitscore'])
 
-    blast_db["subject_coverage"] = 100 * (blast_db.send -blast_db.sstart +1) /blast_db.slen
-    blast_db["query_coverage"] = 100 * (blast_db.qend - blast_db.qstart + 1) / blast_db.qlen
-    blast_db["coverage"] = blast_db[["subject_coverage", "query_coverage"]].apply(max, axis=1)
+
+    
 
     nodes = blast_db[(blast_db.qseqid.isin(training_candidates[gold.columns[0]])) &
                          (blast_db.qseqid != blast_db.sseqid) &

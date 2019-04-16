@@ -429,7 +429,7 @@ class FilterFLN(FLNOp):
         # args = parser.parse_args()
 
         cmd = "{load} "
-        cmd += "mkdir -p {outdir} && filter_fln.py "
+        cmd += "mkdir -p {outdir} && filter_mikado.py "
         cmd += " --flank {flank} "
         cmd += " --max-intron {max_intron} -cov {coverage} -id {identity} --max-training {max_training} "
         cmd += " {input[table]} {mikado_loci} {input[blast_txt]} {outprefix} > {log} 2> {log}"
