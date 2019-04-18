@@ -114,31 +114,14 @@ def main():
     args = parser.parse_args()
 
     args.flank = abs(args.flank)
-
     blast_db = load_blast_db(args)
-
-
-
-
-
+    metrics = pd.read_csv(args.mikado + ".metrics.tsv", sep="\t", index_col=0)
     bed12 = args.mikado + ".bed12"
-    metrics = args.mikado + ".metrics.tsv"
     midx = args.mikado + ".bed12.midx"
 
-    fln = pd.read_csv(args.fln, sep="\t")
-    fln.set_index(fln.columns[0], inplace=True)
-    transcripts = [Mikado.transcripts.Transcript(_) for _ in Mikado.parsers.bed12.Bed12Parser(bed12)
-                   if _.header is False]
-    orfs = list(itertools.chain(
-        *[[(t.id, _.thick_start, _.thick_end) for _ in t.get_internal_orf_beds()] for t in transcripts]))
-    orf_df = pd.DataFrame(orfs, columns=[fln.columns[0], "mikado_orf_start", "mikado_orf_end"])
-    orf_df.set_index(fln.columns[0], inplace=True)
-    metrics = pd.read_csv(metrics, sep="\t")
-    metrics.set_index(metrics.column[0], inplace=True)
     metrics["transcripts_per_gene"] = metrics.groupby("parent")["parent"].transform("count")
-    merged = pd.merge(
-        pd.merge(fln, orf_df, left_index=True, right_index=True, validate="one_to_one", how="outer"),
-        metrics, left_index=True, right_index=True, validate="one_to_one", how="outer")
+    merged = pd.merge(metrics, blast_db, left_index=True, right_index=True, validate="one_to_one", how="outer")
+    merged.loc[merged.Status.isnan(), ]
 
     # Purge everything which has a long intron
     merged = merged[merged.max_intron_length <= args.max_intron]
@@ -152,12 +135,8 @@ def main():
     # This instead are the gold/silver/bronze categories for the training
 
     gold = merged[(
-        (merged.index.str.endswith(".1")) &
-
         (merged.Status.str.contains("complete", case=False)) &
-        ((merged["ORF_start"] == merged["mikado_orf_start"]) &
          # Mikado and FLN account for the end of the ORF differently. This ensures that they mean the same codon.
-         (abs(merged["ORF_end"] - merged["mikado_orf_end"])) < 3) &
         ((merged.combined_cds_length == merged.selected_cds_length) &
          (merged.three_utr_num_complete <= 1)) & (merged.five_utr_num_complete <= 2) &
         (merged.three_utr_num <= 2) & (merged.five_utr_num <= 3)
@@ -229,9 +208,6 @@ def main():
 
     # Now write out the CSVs ...
     merged.to_csv(args.out_prefix + ".table.txt", sep="\t", index=False, header=True)
-    # merged[[merged.columns[0], "parent", "Training", "Category"]].to_csv(
-    #     args.out_prefix + ".list.txt", sep="\t", index=False, header=True
-    # )
 
     # Now write out the GFFs
 

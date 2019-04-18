@@ -74,8 +74,9 @@ class TransdecoderLongOrf(OrfCaller):
     def __init__(self, prepare: MikadoPrepare):
         super().__init__(prepare)
         self.output = {"orfs": os.path.join(self.outdir,
-                                            "transcripts.fasta.transdecoder_dir",
-                                            "longest_orfs.gff3")}
+                                            os.path.basename(self.input["fa"]) + ".transdecoder_dir",
+                                            "longest_orfs.gff3"),
+                       "fa_link": os.path.join(self.outdir, os.path.basename(self.input["fa"]))}
         self.log = os.path.join(self.outdir, "transdecoder.longorf.log")
         self.message = "Running transdecoder longorf on Mikado prepared transcripts: {input[fa]}".format(
             input=self.input)
@@ -97,15 +98,16 @@ class TransdecoderLongOrf(OrfCaller):
 
         load = self.load
         outdir = self.outdir
-        cmd = "{load} mkdir -p {outdir} && cd {outdir} &&"
+        cmd = "{load} mkdir -p {outdir} && cd {outdir} && "
         genecode = self.genecode
         link_src = os.path.relpath(self.input["fa"], start=self.outdir)
         fa = os.path.basename(self.input["fa"])
-        cmd += "ln -sf {params.tr_in} {fa} && "
+        input_fa = os.path.relpath(self.input["fa"], outdir)
+        cmd += "ln -sf {input_fa} {fa} && "
         minprot = self.minprot
-        log = self.log
+        log = os.path.relpath(self.log, self.outdir)
         genecode = self.genecode
-        cmd += "TransDecoder.LongOrfs -m {minprot} -t {fa} --genetic_code {genecode} > {log} 2>&1"
+        cmd += "TransDecoder.LongOrfs -m {minprot} -t {fa} -G {genecode} > {log} 2>&1"
         cmd = cmd.format(**locals())
         return cmd
 
@@ -129,7 +131,10 @@ class TransdecoderPred(OrfCaller):
         self.message="Running transdecoder predict on Mikado prepared transcripts: {input[fa]}".format(
             input=self.input
         )
-        self.output = {"orfs": os.path.join(self.outdir, "transcripts.fasta.transdecoder.bed")}
+        self.output = {"orfs": long_orfs.output["fa_link"] + ".transdecoder.bed",
+                       "cds": long_orfs.output["fa_link"] + ".transdecoder.cds",
+                       "gff": long_orfs.output["fa_link"] + ".transdecoder.gff3",
+                       "pep": long_orfs.output["fa_link"] + ".transdecoder.pep"}
 
     @property
     def _rulename(self):
@@ -148,8 +153,9 @@ class TransdecoderPred(OrfCaller):
         load = self.load
         outdir = self.outdir
         cmd = "{load} "
-
-        cmd += "cd {outdir} && TransDecoder.Predict -t {fa} > {log} 2>&1"
+        log = os.path.relpath(self.log, self.outdir)
+        genecode = self.genecode
+        cmd += "cd {outdir} && TransDecoder.Predict -t {fa} -G {genecode} > {log} 2>&1"
 
         cmd = cmd.format(**locals())
         return cmd
