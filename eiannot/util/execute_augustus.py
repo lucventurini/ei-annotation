@@ -34,9 +34,9 @@ def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("genome", type=fasta_index)
     parser.add_argument("db")
-    parser.add_argument("chunk", type=positive)
+    parser.add_argument("chunk", type=positive, help="Number of chunks to divide the genome into.")
     parser.add_argument("out")
-    parser.add_argument("augustus")
+    parser.add_argument("augustus", help="Command line to be used for this parallelisation.")
     args = parser.parse_args()
 
     assert os.path.exists(args.db)

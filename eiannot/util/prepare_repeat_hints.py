@@ -6,11 +6,15 @@ import subprocess as sp
 import sys
 import tempfile
 import os
+import Mikado
+import io
 
 
 def main():
 
     parser = argparse.ArgumentParser(__doc__)
+    parser.add_argument("-p", "--priority", default=1, type=int)
+    parser.add_argument("-s", "--source", default="RM")
     parser.add_argument("rmout")
     parser.add_argument("out", type=argparse.FileType("wt"), default=sys.stdout)
     args = parser.parse_args()
@@ -39,14 +43,28 @@ def main():
                                                                           index=False)
 
     temp.flush()
-    if args.out != sys.stdout:
-        end = " > {args.out.name}".format(**locals())
-    else:
-        end = ""
+    pipe = sp.Popen("rmOutToGff3.pl {temp.name}".format(**locals()), shell=True, stdout=sp.PIPE)
 
-    outcode = sp.call("rmOutToGff3.pl {temp.name} {end}".format(**locals()), shell=True)
+    for line in Mikado.parsers.to_gff(pipe.stdout, input_format="gff3"):
+        if line.header is True:
+            print(line, file=args.out)
+            continue
+        else:
+            assert isinstance(line, Mikado.parsers.GFF.GffLine)
+            line.feature = "nonexonpart"
+            line.add_attribute("source", args.source)
+            line.add_attribute("priority", args.priority)
+            group = line.attributes.get("target", line.attributes.get("Target"))
+            # if group is not None:
+            #     line.add_attribute("group", group.split()[0])
+            line.remove_attribute("target")
+            line.remove_attribute("Target")
+            print(line, file=args.out)
+
+    pipe.wait()
+    outcode = pipe.returncode
     if outcode != 0:
-        raise OSError("rmOutToGff3.pl failed")
+        raise OSError("rmOutToGff3.pl failed. Returncode: {}".format(outcode))
 
     temp.close()
 

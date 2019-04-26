@@ -7,3 +7,6 @@ test/EIannot/
 **/*~
 test/*stats
 test/*ipynb
+*.so
+eiannot.egg-info
+eiannot/util/bam2hints.cpp
