@@ -337,7 +337,7 @@ class PortcullisFilter(AtomicOperation):
                                           start=os.path.dirname(self.output["tab_link"]))
 
         cmd += " && ln -sf {bed_link_src} {output[bed_link]} && ln -sf {tab_link_src} {output[tab_link]} )"
-        cmd += " || ln -sf {bed_link_unfilt} {output[bed_link]} && ln -sf {tab_link_unfilt} {output[tab_link]}"
+        cmd += " || (ln -sf {bed_link_unfilt} {output[bed_link]} && ln -sf {tab_link_unfilt} {output[tab_link]})"
         cmd += " && touch -h {output[tab_link]} && touch -h {output[bed_link]}"
         cmd = cmd.format(**locals())
         return cmd

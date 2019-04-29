@@ -678,6 +678,16 @@ class ConvertRepeats(HintMethod):
         return 1
 
     @property
+    def src(self):
+        # TODO change
+        return "RM"
+
+    @property
+    def priority(self):
+        # TODO change
+        return 1
+
+    @property
     def cmd(self):
         # TODO CHANGE
         load = self.load
