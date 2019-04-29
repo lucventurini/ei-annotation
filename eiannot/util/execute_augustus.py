@@ -22,7 +22,7 @@ __doc__ = """"""
 def positive(string):
 
     string = int(string)
-    if string < 1:
+    if string < 0:
         raise ValueError("Only positive values are acceptable!")
     return string
 
@@ -57,7 +57,7 @@ def main():
             chrom, start, end = chunk.chrom, chunk.start, chunk.end
             # Using SeqIO because it is much faster than PyFaidx for this purpose
             Bio.SeqIO.write(args.genome[chrom], chrom_file, "fasta")
-            chrom_file.flush()
+            chrom_file.close()
             assert os.path.exists(chrom_file._handle.name)
             assert os.stat(chrom_file._handle.name).st_size > 0
             # We will have to use bgzip to decompress on the fly
@@ -68,7 +68,7 @@ def main():
             aug = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, executable="/bin/bash")
             for line in io.TextIOWrapper(aug.stdout):
                 if line[0] == "#":
-                    print(line, file=out)
+                    print(line, file=out, end='')
                 else:
                     # we have to change the line so that the gene/transcript names are correct
                     current_gene = None

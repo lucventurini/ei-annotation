@@ -8,3 +8,5 @@ pandas
 pyfaidx
 sqlalchemy
 numpy>=1.16.0
+pyBigWig>=0.3.14
+deepTools>=3.2.1

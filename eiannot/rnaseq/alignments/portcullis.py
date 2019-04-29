@@ -323,7 +323,7 @@ class PortcullisFilter(AtomicOperation):
         output = self.output
         bed_link_src = os.path.relpath(os.path.join(self.sample_dir, "3-filt", "portcullis.pass.junctions.bed"),
                                        start=os.path.dirname(self.output["bed_link"]))
-        tab_link_src = os.path.relpath(os.path.join(self.sample_dir, "3-filt", "portcullis.pass.junctions.bed"),
+        tab_link_src = os.path.relpath(os.path.join(self.sample_dir, "3-filt", "portcullis.pass.junctions.tab"),
                                        start=os.path.dirname(self.output["tab_link"]))
 
         # We need the unfiltered files because, if there are too few reads, portcullis filter will fail

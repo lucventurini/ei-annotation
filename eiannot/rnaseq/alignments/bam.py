@@ -202,7 +202,7 @@ class Bam2BigWig(AtomicOperation):
         out = self.output["bw"]
         threads = self.threads
         cmd = "{load} "
-        cmd += "bamCoverage -b {bam} --ignoreDuplicates {rna_sense} -o {out} -p {threads} --normalizeUsing BPM"
+        cmd += "bamCoverage -b {bam} --ignoreDuplicates {rna_sense} -o {out} -p {threads} --normalizeUsing CPM"
         cmd = cmd.format(**locals())
         return cmd
 

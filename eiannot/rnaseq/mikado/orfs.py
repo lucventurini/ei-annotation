@@ -104,6 +104,8 @@ class TransdecoderLongOrf(OrfCaller):
         fa = os.path.basename(self.input["fa"])
         input_fa = os.path.relpath(self.input["fa"], outdir)
         cmd += "ln -sf {input_fa} {fa} && "
+        checkpoint_dir = self.input["fa"] + ".transdecoder_dir.__checkpoints"
+        cmd += " if [ -d {checkpoint_dir} ]; then rm -rf {checkpoint_dir}; fi && "
         minprot = self.minprot
         log = os.path.relpath(self.log, self.outdir)
         genecode = self.genecode
@@ -155,7 +157,10 @@ class TransdecoderPred(OrfCaller):
         cmd = "{load} "
         log = os.path.relpath(self.log, self.outdir)
         genecode = self.genecode
-        cmd += "cd {outdir} && TransDecoder.Predict -t {fa} -G {genecode} > {log} 2>&1"
+        checkpoint_dir = self.input["fa"] + ".transdecoder_dir.__checkpoints"
+        checkpoint_file = os.path.join(checkpoint_dir, "make_final_cds*ok")
+        cmd += "cd {outdir} && if [ -e {checkpoint_file} ]; then rm -rf {checkpoint_dir}; fi &&"
+        cmd += " TransDecoder.Predict -t {fa} -G {genecode} > {log} 2>&1"
 
         cmd = cmd.format(**locals())
         return cmd
