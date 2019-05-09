@@ -1,8 +1,7 @@
 from .abstract import MikadoOp
-from ...preparation import FaidxGenome
 from ..alignments.portcullis import PortcullisWrapper
 from .prepare import MikadoPrepare
-from .orfs import OrfCaller
+from .orfs import OrfCaller, GTCDS
 from .homology import MikadoHomologyWrapper
 import os
 
@@ -69,10 +68,10 @@ class MikadoSerialise(MikadoOp):
 
     @property
     def orfs_cli(self):
-        if not self.orfs:
-            return ""
-        else:
+        if "orfs" in self.input:
             return " --orfs={input[orfs]}".format(input=self.input)
+        else:
+            return ""
 
     @property
     def junctions(self):

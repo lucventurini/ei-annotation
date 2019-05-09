@@ -6,7 +6,12 @@ import pandas as pd
 import Mikado
 import Mikado.transcripts
 from Mikado.parsers.GFF import GffLine
-from eiannot.util import build_pos_index
+from Mikado.parsers import to_gff
+from Mikado.scales.gene_dict import GeneDict
+from Mikado.scales.compare import check_index, create_index
+from Mikado.utilities.log_utils import create_null_logger, create_default_logger
+
+# from eiannot.util import build_pos_index
 import os
 import re
 
@@ -74,13 +79,17 @@ def main():
         midx = os.path.join(os.path.dirname(args.loci),
                             re.sub("\.(gff3*|bed12)", ".gff3.midx", os.path.basename(args.loci)))
         if not os.path.exists(midx):
-            raise OSError("I cannot find the MIDX index file {midx}".format(**locals()))
+            create_index(to_gff(args.loci), create_null_logger(), midx, ref_gff=True,
+                         exclude_utr=False, protein_coding=False)
 
     try:
-        indexer, positions, gene_positions, genes = build_pos_index(midx)
+        check_index(args.loci, create_null_logger())
     except Mikado.exceptions.CorruptIndex:
-        raise Mikado.exceptions.CorruptIndex("Invalid MIDX file: {midx}".format(**locals()))
+        os.remove(midx)
+        create_index(to_gff(args.loci), create_null_logger(), midx, ref_gff=True,
+                     exclude_utr=False, protein_coding=False)
 
+    genes = GeneDict(midx)
     table = pd.read_csv(args.table, delimiter="\t", index_col=[0])
 
     grouped = table.groupby("parent")
@@ -89,7 +98,10 @@ def main():
         group = grouped.get_group(parent)
         for tidx in group.index:
             row = group.loc[tidx]
-            tid = row.tid
+            try:
+                tid = row.tid
+            except AttributeError:
+                raise AttributeError(row)
             try:
                 transcript = gene[tid]
             except KeyError:

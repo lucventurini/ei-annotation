@@ -1,0 +1,13 @@
+name: eiannot
+channels:
+  - defaults
+  - bioconda
+  - conda-forge
+dependencies:
+  - defaults::python>=3.6
+  - mikado>=1.5
+  - portcullis>=1.1.2
+  - bedtools>=2.28.0
+  - samtools>=1.9
+  - augustus>=3.2
+  

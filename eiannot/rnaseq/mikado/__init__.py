@@ -6,7 +6,7 @@ from .prepare import MikadoConfig, MikadoPrepare
 from .serialise import MikadoSerialise
 from .homology import MikadoHomologyWrapper
 from .pick import MikadoPick, IndexMikado, MikadoStats
-from .orfs import Prodigal, TransdecoderLongOrf, TransdecoderPred
+from .orfs import Prodigal, TransDecoderWrapper, GTCDS  # TransdecoderLongOrf, TransdecoderPred, TransdecoderOrfBlast
 import os
 import networkx as nx
 
@@ -52,11 +52,13 @@ class Mikado(EIWrapper):
             if self.orf_caller == "Prodigal":
                 self.orfs = Prodigal(self.preparer)
                 self.add_edge(self.preparer, self.orfs)
+            elif self.orf_caller == "GTCDS":
+                self.orfs = GTCDS(self.preparer)
+                self.add_edge(self.preparer, self.orfs)
             elif self.orf_caller == "Transdecoder":
-                longorf = TransdecoderLongOrf(self.preparer)
-                self.add_edge(self.preparer, longorf)
-                self.orfs = TransdecoderPred(self.preparer, longorf)
-                self.add_edge(longorf, self.orfs)
+                self.trans_wrapper = TransDecoderWrapper(self.preparer)
+                self.add_edge(self.preparer, self.trans_wrapper)
+                self.orfs = self.trans_wrapper.orfs
             else:
                 self.orfs = None
             self.homologies = MikadoHomologyWrapper(self.preparer)
@@ -64,14 +66,12 @@ class Mikado(EIWrapper):
                 self.homologies = None
             else:
                 self.add_edge(self.preparer, self.homologies)
-
             self.serialiser = MikadoSerialise(prepare=self.preparer,
                                               homology=self.homologies,
                                               orfs=self.orfs,
                                               portcullis=self.portcullis)
             self.add_edges_from([_, self.serialiser] for _ in [self.preparer,
                                                                self.homologies, self.orfs] if _ is not None)
-
             self.picker = MikadoPick(self.serialiser)
             self.add_edge(self.serialiser, self.picker)
             self.indexer = IndexMikado(self.picker)
@@ -111,6 +111,8 @@ class Mikado(EIWrapper):
         if self.configuration.get("orfs", dict()).get("execute", True):
             if self.configuration.get("mikado", dict()).get("use_prodigal", True):
                 return "Prodigal"
+            elif self.configuration.get("mikado", dict()).get("use_gt", False):
+                return "GTCDS"
             else:
                 return "Transdecoder"
         else:

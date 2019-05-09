@@ -455,11 +455,9 @@ class AtomicOperation(metaclass=abc.ABCMeta):
             string[-1] = string[-1].rstrip(",")
 
         if self.cmd:
-            cmd = re.sub('"', '\\"',
-                         re.sub("{", "{{",
-                                re.sub("}", "}}", self.cmd)))
-
-            string.append("  shell: \"{}\"".format(cmd))
+            cmd = re.sub("{", "{{",
+                                re.sub("}", "}}", self.cmd)) # re.sub( # '"', '\\"',)
+            string.append("  shell: \"\"\"{}\"\"\"".format(cmd))
 
         string.append("")
         return "\n".join(string) + "\n"
